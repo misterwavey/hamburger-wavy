@@ -431,6 +431,9 @@ void app_tick(void) {
 }
 void standalone_main(void) {
   board_init();
+#ifdef ONE_EXTENDED_APP
+  extension_startup();
+#endif
 #ifdef ONE_FLASH_PROBE
   flash_probe_startup();
 #endif

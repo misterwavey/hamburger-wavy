@@ -109,3 +109,22 @@ If rollback succeeds, the next implementation step can place real application fu
 ### Build 23 rollback result
 
 After the requested rollback procedure, the mounted card's image matched the archived normal build-21 image and ONEBUILD.TXT identified build 21. Continued SD update access and return to normal application startup are therefore confirmed following the full 48 KiB extension-bank trial. The user reported completion of the requested procedure; detailed listening observations were not separately supplied. Whether the bank was erased on rollback remains unknown. Both extension trials and their rollbacks have now reached the expected build records. Real application placement in the verified bank is the next implementation step; the current standard build still uses only the legacy layout.
+
+## Build 24: real application in the verified bank
+
+`make extended` builds a separate normal candidate under `build/extended`, and `make extended-profile` builds its profiling counterpart under `build/extended/profile`. Both identify as build 24. Default normal/profiling builds remain build 21, while the earlier build-22/23 probe targets remain available.
+
+A generated linker script places the complete FAT, WAV, pitch/envelope policy, config/playlist, recall and profiler objects (code and constants) in `.app_extension` starting at CPU `0x9D014000`. Startup, exception/reset entries, application control, low-level SD/SPI/audio drivers and memory helpers stay in the legacy region. The fixed entries and 48 KiB address coverage match the established trials. Unoccupied bank bytes are explicitly `0xFF`, replacing the build-23 test pattern.
+
+A low-flash checker validates CRC32 for each of the 48 bank pages through its uncached alias before calling the relocated application. The expected page CRCs are generated from a first link; a second link inserts them and must leave bank contents unchanged. The comparison uses volatile reads so the compiler cannot replace it with a constant result. A mismatch retains the alternating red/blue failure signal and prevents normal startup/build-record writing. CRC32 provides corruption detection, not cryptographic authenticity; this is distinct from the prior exact-pattern experiment. The image still contains only source-built code/data and the existing configuration words.
+
+| Code/constants resource | Normal build 24 | Profiling build 24 |
+| --- | ---: | ---: |
+| Legacy bank used / free | 13200 / 18612 bytes | 13728 / 18084 bytes |
+| Extension bank used / free | 14576 / 34576 bytes | 18312 / 30840 bytes |
+| Combined used / free | 27776 / 53188 bytes | 32040 / 48924 bytes |
+| Static RAM | 55712 bytes | 57040 bytes |
+
+The combined limit is 80964 bytes. Code-space gains do not change RAM or sample-stream throughput. Placement can affect instruction timing, so build 24 needs playback and profiling regression on hardware despite unchanged sample logic, buffer sizes, SD clock and deadline guard.
+
+First install the extended profiling image with the AGNT2-only Loop/Quantize configuration under `build/extended/bench-loop`, run at fixed maximum pitch for at least one minute, stop with FILE, wait five seconds, power down and mount. A fresh build-24 ONEPROF.TXT is needed; ONEBUILD.TXT alone cannot distinguish the normal and profiling variants. Analyse with `build/extended/profile/manifest.json` and baseline `build/extended/manifest.json`. Keep the archived build-21 image available for rollback. After streaming/envelope checks, test the extended normal image's file changes and retriggers before adopting this layout as the default.

@@ -10,11 +10,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from build import extract, template
-from analyze_profile import parse_report
+from analyze_profile import parse_report, attach_build_info
 from mips32 import CPU
 
 
@@ -48,6 +49,12 @@ def read_hex(path):
 
 
 class ReleaseTests(unittest.TestCase):
+    def _compiled_artifact(self):
+        directory=getattr(self,'compiled_dir',ROOT/'build')
+        manifest=json.loads((directory/'manifest.json').read_text())
+        _,symbols,_,_=extract(directory/'hamburger-wavy.elf',extended='extended_application' in manifest)
+        return read_hex(directory/'image.hex'),symbols
+
     def test_image_contains_source_and_fill_only(self):
         payload, _, layout, _ = extract(ROOT / 'build/hamburger-wavy.elf')
         image = read_hex(ROOT / 'build/image.hex')
@@ -235,8 +242,7 @@ class ReleaseTests(unittest.TestCase):
                 with path.open('rb') as f:f.seek((data+spc)*512);self.assertEqual(f.read(512),sample)
 
     def test_compiled_bulk_spi_and_audio_copy(self):
-        image = read_hex(ROOT/'build/image.hex')
-        _, symbols, _, _ = extract(ROOT/'build/hamburger-wavy.elf')
+        image,symbols=self._compiled_artifact()
         class SpiCPU(CPU):
             def __init__(self, stuck_after=None, delay=0):
                 super().__init__(image)
@@ -310,8 +316,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(m.read(destination+words*4,1),0x5a)
 
     def test_compiled_memcpy_alignment_and_bounds(self):
-        image=read_hex(ROOT/'build/image.hex')
-        _,symbols,_,_=extract(ROOT/'build/hamburger-wavy.elf')
+        image,symbols=self._compiled_artifact()
         for a in range(4):
             for b in range(4):
                 for length in (0,1,3,4,5,31,32,33,511,512,513,1536):
@@ -325,8 +330,7 @@ class ReleaseTests(unittest.TestCase):
                     self.assertEqual(m.read(dst+length,1),0x5a)
 
     def test_compiled_pcm_decode_formats_and_bounds(self):
-        image=read_hex(ROOT/'build/image.hex')
-        _,symbols,_,_=extract(ROOT/'build/hamburger-wavy.elf')
+        image,symbols=self._compiled_artifact()
         for bits in (16,24):
             for frames in (0,1,37,1024,2048):
                 m=CPU(image);src=0xa0001001;dst=0xa0006004
@@ -345,9 +349,8 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(m.run(symbols['pcm_decode'],0xa0001000,8,0xa0006000,1),0xffffffff)
 
     def test_compiled_audio_deadline_guard(self):
-        image=read_hex(ROOT/'build/image.hex')
-        _,symbols,_,_=extract(ROOT/'build/hamburger-wavy.elf')
-        buffers=json.loads((ROOT/'build/manifest.json').read_text())['audio_buffers']
+        image,symbols=self._compiled_artifact()
+        buffers=json.loads((getattr(self,'compiled_dir',ROOT/'build')/'manifest.json').read_text())['audio_buffers']
         half_bytes=buffers['half_frames']*8
         self.assertEqual(buffers['dma_bytes'],half_bytes*2)
         self.assertLessEqual(buffers['dma_bytes'],65535)
@@ -472,6 +475,70 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual((root/'build/flash-bank/image.hex').read_bytes(),(out/'image.hex').read_bytes())
         invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--flash-bank','--profile'],
                                capture_output=True,text=True)
+        self.assertNotEqual(invalid.returncode,0)
+
+    def test_extended_application_layout_and_execution(self):
+        for profiling in (False,True):
+            flags=['--extended']+(['--profile'] if profiling else [])
+            result=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),*flags],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            out=ROOT/('build/extended/profile' if profiling else 'build/extended')
+            image=read_hex(out/'image.hex');_,contract=template(ROOT/'board/update-layout.json')
+            extra=set(range(0x1d014000,0x1d020000))
+            self.assertEqual(set(image),set(contract)|extra)
+            payload,symbols,layout,calls=extract(out/'hamburger-wavy.elf',extended=True)
+            with self.assertRaises(ValueError):extract(out/'hamburger-wavy.elf')
+            for address,byte in image.items():self.assertEqual(byte,payload.get(address,255))
+            for name in ('fat_mount','file_read','wave_open','pcm_decode','pitch_divider','recall_save'):
+                self.assertTrue(0x9d014000<=symbols[name]<0x9d020000,name)
+            if profiling:self.assertTrue(0x9d014000<=symbols['profile_idle']<0x9d020000)
+            for name in ('standalone_main','extension_check','extension_page_crc','board_init','board_watchdog','sd_read'):
+                self.assertLess(symbols[name],0x9d013a44,name)
+            for name,address in [('standalone_start',0x9d00b970),('standalone_reset',0x9d013a44)]:
+                self.assertEqual(symbols[name],address)
+            normal=read_hex(ROOT/'build/image.hex')
+            self.assertEqual({a for a in image if a>=0x1fc00000},{a for a in normal if a>=0x1fc00000})
+            for address in normal:
+                if address>=0x1fc00000:self.assertEqual(image[address],normal[address])
+            manifest=json.loads((out/'manifest.json').read_text())
+            self.assertEqual(manifest['resources']['combined_text_bytes'],layout['.text']['bytes']+layout['.app_extension']['bytes'])
+            self.assertEqual(manifest['resources']['combined_text_free'],80964-manifest['resources']['combined_text_bytes'])
+            if profiling:
+                report={'build':24}
+                attach_build_info(report,out/'manifest.json',ROOT/'build/extended/manifest.json')
+                self.assertEqual(report['profiling_overhead_bytes']['combined_text'],
+                                 report['profiling_overhead_bytes']['main_text']+report['profiling_overhead_bytes']['extension_text'])
+            # Run the actual compiled CRC body against an independent implementation.
+            for data in (bytes(1024),bytes([255])*1024,bytes((i*173+91)&255 for i in range(1024))):
+                m=CPU(image)
+                for i,b in enumerate(data):m.poke(0xa0001000+i,b,1)
+                self.assertEqual(m.run(symbols['extension_page_crc'],0xa0001000,budget=200000),zlib.crc32(data))
+            # Check the actual bank-validation control flow using independently computed page CRCs.
+            for corrupt in (None,0,24576,49151):
+                m=CPU(image)
+                for address in extra:m.poke(address|0xa0000000,image[address],1)
+                if corrupt is not None:
+                    address=0xbd014000+corrupt;m.poke(address,m.read(address,1)^1,1)
+                m.hooks[symbols['board_watchdog']]=lambda cpu,*args:0
+                m.hooks[symbols['extension_page_crc']]=lambda cpu,address,*args:zlib.crc32(bytes(cpu.read(address+i,1) for i in range(1024)))
+                self.assertEqual(m.run(symbols['extension_check']),int(corrupt is None))
+                if corrupt is None:self.assertEqual(len(m.calls),96)
+            # Both layouts execute actual relocated decoding/copies/deadline and SD paths.
+            self.compiled_dir=out
+            try:
+                self.test_compiled_bulk_spi_and_audio_copy()
+                self.test_compiled_memcpy_alignment_and_bounds()
+                self.test_compiled_pcm_decode_formats_and_bounds()
+                self.test_compiled_audio_deadline_guard()
+            finally:del self.compiled_dir
+            with tempfile.TemporaryDirectory() as temp:
+                root=Path(temp)
+                for name in ('firmware','tools','board'):
+                    shutil.copytree(ROOT/name,root/name,ignore=shutil.ignore_patterns('__pycache__'))
+                result=subprocess.run([sys.executable,str(root/'tools/build.py'),*flags],capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual((root/('build/extended/profile' if profiling else 'build/extended')/'image.hex').read_bytes(),(out/'image.hex').read_bytes())
+        invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--extended','--flash-bank'],capture_output=True,text=True)
         self.assertNotEqual(invalid.returncode,0)
 
     def test_crc_update_exhaustively(self):

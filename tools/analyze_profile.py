@@ -103,10 +103,17 @@ def attach_build_info(report, manifest_path, baseline_path=None):
         baseline = json.loads(baseline_path.read_text())
         if baseline.get('profiling') or baseline.get('build_number') != report['build']:
             raise ValueError('baseline must be the same build number without profiling')
+        if bool(manifest.get('extended_application')) != bool(baseline.get('extended_application')):
+            raise ValueError('baseline must use the same application layout')
         report['profiling_overhead_bytes'] = dict(
             source_payload=manifest['source_payload_bytes']-baseline['source_payload_bytes'],
             main_text=manifest['sections']['.text']['bytes']-baseline['sections']['.text']['bytes'],
             static_ram=manifest['sections']['.bss']['bytes']-baseline['sections']['.bss']['bytes'])
+        if manifest.get('extended_application'):
+            report['profiling_overhead_bytes']['extension_text'] = (
+                manifest['sections']['.app_extension']['bytes']-baseline['sections']['.app_extension']['bytes'])
+            report['profiling_overhead_bytes']['combined_text'] = (
+                manifest['resources']['combined_text_bytes']-baseline['resources']['combined_text_bytes'])
     frames = []
     for path in manifest_path.parent.glob('*.su'):
         for line in path.read_text().splitlines():
@@ -148,8 +155,14 @@ def summary(report):
                  'instrumentation overhead is not subtracted.')
     if 'local_build_resources' in report:
         mem = report['local_build_resources']
-        lines.append(f"Local build: {mem['text_bytes']} code/constant bytes; "
-                     f"{mem['text_free']} bytes left in the current application layout")
+        if 'combined_text_bytes' in mem:
+            lines.append(f"Local build: {mem['combined_text_bytes']} combined code/constant bytes; "
+                         f"{mem['combined_text_free']} bytes free across both banks")
+            lines.append(f"Bank use/free: legacy {mem['text_bytes']}/{mem['text_free']}; "
+                         f"extension {mem['extension_text_bytes']}/{mem['extension_free']}")
+        else:
+            lines.append(f"Local build: {mem['text_bytes']} code/constant bytes; "
+                         f"{mem['text_free']} bytes left in the current application layout")
         lines.append('Profiling overhead versus normal build: '+
                      json.dumps(report.get('profiling_overhead_bytes', {})))
         lines.append('Largest compiler stack frames (not a call-chain bound): '+

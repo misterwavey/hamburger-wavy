@@ -69,3 +69,6 @@ The separate build-22 flash-extension probe adds a project-written routine and m
 
 
 The build-23 bank probe fills 48 KiB with a project-generated index-dependent word pattern, overridden only by the project's compiled endpoint routines and final marker. Low-flash code compares every word against the generated expectations before making checked calls near both ends. No vendor code/data are imported. The standard build-21 images remain unchanged; the expanded address contract is explicit and experimental. See flash-layout.md for coverage and pending hardware validation.
+
+
+Build 24 relocates existing project application objects and constants into the hardware-tested extension bank. Its new low-flash per-page CRC32 checker and generated expected values are project-written and derived from the linked application, with no imported vendor implementation. Standard build-21 outputs remain unchanged. The generated linker/header and source hashes are archived with each candidate. Hardware playback/timing regression for the new placement is pending.

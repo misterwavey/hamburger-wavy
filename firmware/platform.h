@@ -4,6 +4,9 @@
 #include "core.h"
 #define REG(a) (*(volatile uint32_t *)(uintptr_t)(a))
 void board_init(void);
+#ifdef ONE_EXTENDED_APP
+void extension_startup(void);
+#endif
 #ifdef ONE_FLASH_PROBE
 void flash_probe_startup(void);
 #endif
