@@ -1,6 +1,6 @@
 # Profiling build 16
 
-This optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark. No hardware measurements have been collected yet; the included test report is synthetic regression data.
+This optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark. A first short hardware run is recorded below; the included `build/test-profile.txt` fixture remains synthetic regression data.
 
 ## Build and install
 
@@ -101,3 +101,19 @@ diskutil eject "/Volumes/TTA ONE"
 ```
 
 Install normally. Normal firmware leaves an existing profile report untouched; it may be stale. Delete it on the computer when no longer needed.
+
+## First hardware observation — 2026-11-16
+
+A CRC-valid build-16 report from five playback starts over 11.91 seconds recorded no streaming errors or report-write failures. The card's image matched the profiling artifact; `ONEBUILD.TXT` identified build 16. The last and worst observed contexts were 96 kHz/24-bit Trigger/Quantize, slowed to approximately 57–64 kHz output. No envelope samples were recorded.
+
+| Operation | Mean | Worst |
+| --- | --- | --- |
+| Streaming sector read attempt | 1.528 ms | 4.533 ms |
+| Prefetch/read and decode | 4.976 ms | 9.191 ms |
+| Complete refill work | 5.496 ms | 9.713 ms |
+| PCM decoding | 0.181 ms | 0.182 ms |
+| Half-buffer copying/publication | 0.513 ms | 0.513 ms |
+
+The minimum observed publication margin was 401 frames, about 6.257 ms at its recorded rate. The maximum background-service gap was 0.534 ms. The stack watermark indicated 1696 bytes used and 30344 bytes untouched in the instrumented build. Refill work occupied about 54.2% of observed playback time; this is not CPU utilisation. SD read attempts dominated that work; the report does not separate card wait from driver/CRC/polling overhead.
+
+This short run supports comfortable observed RAM margin and successful read-ahead, not a guarantee at native/highest output rates. At 96 kHz, a 512-frame half lasts 5.333 ms; at highest quantized pitch it lasts about 3.56 ms. The current 5.496 ms mean suggests those conditions need explicit sustained tests and possibly read/copy optimisation before adding substantial audio processing. Run them as separate cases, followed by Fade/Gate to measure the currently unsampled envelope path.
