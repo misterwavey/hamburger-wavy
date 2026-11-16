@@ -1,6 +1,6 @@
 # Updater image layout and the first extension trial
 
-The standard build remains build 21. `make flash-probe` creates a separate experimental build 22 under `build/flash-probe`; it does not replace the standard image. Hardware acceptance is pending.
+The standard build remains build 21. `make flash-probe` creates a separate experimental build 22 under `build/flash-probe`; it does not replace the standard image. The first hardware trial reached build 22; rollback is pending.
 
 ## Hardware capacity versus our current limit
 
@@ -63,3 +63,8 @@ Install with the usual updater procedure. A successful probe has the usual one-s
 If low-flash build 22 runs but the new page fails validation, it alternates red/blue at quarter-second intervals and does not enter the application or write build 22. If the updater rejects the whole candidate and old build 21 still runs, the normal build record remains/returns to 21. Other failure appearances are not uniquely diagnosed by the LEDs.
 
 After success, test rollback through the same updater using `build/image.hex` (the unchanged normal build 21), verify ONEBUILD.TXT returns to 21, and check playback. This tests continued update access. The normal image does not explicitly erase the experimental page; successful rollback does not prove that those bytes were erased.
+
+
+## First hardware result
+
+On the first build-22 trial, the mounted card's image matched the candidate hash and ONEBUILD.TXT identified build 22. Because the build-record writer is reached only after the full-page comparison and two checked extension calls, this supports successful programming/readback and execution of the added page at physical 0x1D014000 on the tested module. The user reported completion of the requested install/playback procedure; detailed playback observations were not separately supplied. It does not establish the updater's erase extent, availability of other upper pages, or continued update access. The next check is rollback to the unchanged build-21 normal image, then confirmation that ONEBUILD.TXT returns to 21 and playback works.
