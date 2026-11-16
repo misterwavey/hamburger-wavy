@@ -28,7 +28,7 @@ The exported build-15 image matches its development counterpart byte-for-byte wi
 
 ## Export verification — 2026-11-16
 
-The source-only package passes five release tests, including an isolated rebuild and the C suite under AddressSanitizer/UndefinedBehaviorSanitizer (659375 checks with the local host compiler). The exported firmware's SHA-256 is `2019b6f340b8b49f9f75e6e3a4769d1b91d9b90e02b2a2f8d0bec4f9ad42b2ae`, identical to the private development build 15. This hash is a software-build observation, not a manufacturer checksum or hardware certification.
+At the initial build-15 export, the source-only package passed five release tests, including an isolated rebuild and the C suite under AddressSanitizer/UndefinedBehaviorSanitizer (659375 checks with the local host compiler). The exported firmware's SHA-256 is `2019b6f340b8b49f9f75e6e3a4769d1b91d9b90e02b2a2f8d0bec4f9ad42b2ae`, identical to the private development build 15. This hash is a software-build observation, not a manufacturer checksum or hardware certification.
 
 ## References
 
@@ -41,3 +41,9 @@ The source-only package passes five release tests, including an isolated rebuild
 - [Microsoft FAT specification](https://www.microsoft.com/en-us/download/details.aspx?id=53426) and [RIFF description](https://learn.microsoft.com/en-us/windows/win32/xaudio2/resource-interchange-file-format--riff-): filesystem/container formats.
 
 References are links, not bundled vendor documents or a grant of rights over those documents. Hardware/product names identify compatibility; the project is unofficial.
+
+## Optional profiler — build 16
+
+Normal build 16 is byte-for-byte identical to build 15 apart from its two embedded build-number constants (15 to 16). Its main text/constants remain 26996 bytes and static RAM 32160 bytes. The optional diagnostic uses 31500 main-text bytes and 33488 static-RAM bytes; main-text headroom is 312 bytes in the existing 31812-byte region. Its total additional source payload is 4544 bytes, including a 40-byte startup watermark initializer; static-RAM overhead is 1328 bytes. No update addresses/configuration words are added or changed.
+
+Eight release tests pass, covering normal and instrumented host C under sanitizers, source-only rebuilds of both images, timer wrap/64-bit carry, CRC/partial-report rejection and independent FAT16/FAT32 filesystem checks with recall/build/profile files. A further targeted check covers divider-weighted margin selection. The startup watermark loop was inspected in the linked MIPS disassembly: it fills only the aligned region from `__bss_end` to the initial stack pointer, before calling C. Hardware profiling results have not yet been collected. See `profiling.md` for measurement scope, instrumentation effects and the idle-only reserved-file write path.

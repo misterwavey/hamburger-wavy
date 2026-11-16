@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "../firmware/platform.h"
+#include "../firmware/profile.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -561,6 +562,13 @@ static CvMode host_mode;
 static const uint32_t *host_audio;
 const SdIo board_sd_io = {&app_card, xfer, select_mock, speed_mock, time_mock};
 static int audio_is_active(void) { return host_active != 0; }
+#ifdef ONE_PROFILE
+static uint32_t profile_mock_ticks;
+uint32_t board_ticks(void) { return app_card.time * 24000u + ++profile_mock_ticks; }
+void board_stack_info(uint32_t out[3]) {
+  out[0] = 33488; out[1] = 2048; out[2] = 29992;
+}
+#endif
 void board_init(void) {}
 static uint32_t boot_clock, boot_watchdogs, boot_events;
 static uint32_t boot_times[16], boot_colours[16];
@@ -580,6 +588,7 @@ void board_pitch(uint32_t value, uint32_t rate) {
 }
 void board_pitch_mode(uint32_t value, uint32_t rate, CvMode mode) {
   host_mode = mode;
+  PROFILE(profile_pitch(pitch_divider(value, rate, mode)));
   board_pitch(value, rate);
 }
 void board_led(uint32_t value) {
@@ -1352,6 +1361,28 @@ static void test_build_info(void) {
   CHECK(!fat_mount(&f, disk, 0));
   CHECK(fat_build_info(&f, 15) < 0 && !writes); /* No writer. */
 }
+#ifdef ONE_PROFILE
+static void test_profile_file(void) {
+  Fat f;
+  Entry e;
+  uint8_t report[1024];
+  memset(report, ' ', sizeof(report));
+  memcpy(report, "Hamburger Wavy profile 1\n", sizeof("Hamburger Wavy profile 1\n")-1);
+  disk16();
+  memset(block(24), 0x73, 512);
+  CHECK(!fat_mount(&f, disk, 0)); f.write = disk_write;
+  CHECK(!fat_profile_write(&f, report));
+  CHECK(fat_find(&f, "ONEPROF.TXT", &e) == 1 && e.size == 1024);
+  CHECK(!fat_profile_write(&f, report));
+  for (uint32_t i=0; i<512; ++i) CHECK(block(24)[i]==0x73);
+  uint32_t lba = f.data + (e.cluster-2)*f.spc;
+  memset(block(lba), 'X', 512);
+  uint32_t before=writes;
+  CHECK(fat_profile_write(&f,report)<0 && writes==before);
+  /* A refused foreign report must leave the shared directory cache invalid. */
+  CHECK(fat_find(&f,"SAMPLE.WAV",&e)==1 && e.cluster==3);
+}
+#endif
 static void test_state_allocation(void) {
   Fat f;
   uint32_t area[2];
@@ -1638,6 +1669,9 @@ int main(void) {
   test_recall();
   test_state_allocation();
   test_build_info();
+#ifdef ONE_PROFILE
+  test_profile_file();
+#endif
   test_front_panel_and_remember();
   test_playback_error_recovery_and_read_ahead();
   test_fade_gate_read_ahead();

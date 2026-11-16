@@ -318,7 +318,7 @@ int fat_find(Fat *f, const char *name, Entry *out) {
   return scan(f, out, 1, name);
 }
 
-/* Two reserved root files only: recall state and running-build text.
+/* Reserved files only: recall, running-build text, optional profiling report.
  * No general file writing API. */
 static void put16(uint8_t *p, uint32_t v) {
   p[0] = (uint8_t)v;
@@ -557,3 +557,29 @@ int fat_build_info(Fat *f, uint32_t number) {
       return -1;
   return 1;
 }
+
+#ifdef ONE_PROFILE
+int fat_profile_write(Fat *f, const uint8_t data[1024]) {
+  uint32_t lbas[2], zero = 1, own = 1;
+  if (reserved_area(f, "ONEPROF.TXT", "ONEPROF TXT", 2, lbas)) return -1;
+  f->cache_lba = f->fat_lba = 0xffffffffu;
+  const char *magic = "Hamburger Wavy profile 1\n";
+  for (uint32_t sector_index = 0; sector_index < 2; ++sector_index) {
+    if (f->read(f->ctx, lbas[sector_index], f->cache)) return -1;
+    if (!sector_index)
+      for (uint32_t i = 0; magic[i]; ++i)
+        if (f->cache[i] != (uint8_t)magic[i]) own = 0;
+    for (uint32_t i = 0; i < 512; ++i) if (f->cache[i]) zero = 0;
+  }
+  if (!zero && !own) return -1;
+  for (uint32_t sector_index = 0; sector_index < 2; ++sector_index) {
+    const uint8_t *expected = data + sector_index * 512u;
+    if (write_sector(f, lbas[sector_index], expected) ||
+        f->read(f->ctx, lbas[sector_index], f->cache)) return -1;
+    for (uint32_t i = 0; i < 512; ++i)
+      if (f->cache[i] != expected[i]) return -1;
+  }
+  f->cache_lba = f->fat_lba = 0xffffffffu;
+  return 0;
+}
+#endif

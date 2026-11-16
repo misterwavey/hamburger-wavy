@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "platform.h"
+#include "profile.h"
 static uint32_t clock_last, clock_ms, spi_poll;
 static uint32_t count(void) {
   uint32_t value;
@@ -21,6 +22,7 @@ void board_led(uint32_t channels) {
 uint32_t board_adc(void) { return REG(0xbf809070) & 1023u; }
 void board_pitch_mode(uint32_t value, uint32_t rate, CvMode mode) {
   uint32_t fixed = pitch_divider(value, rate, mode);
+  PROFILE(profile_pitch(fixed));
   uint32_t div = fixed >> 9, trim = fixed & 511u;
   REG(0xbf80f020) &= ~0x100u;
   REG(0xbf80f020) &= ~0x8000u;
@@ -175,3 +177,16 @@ void standalone_fault(void) {
     board_led((count() >> 22) & 1u);
   }
 }
+
+#ifdef ONE_PROFILE
+uint32_t board_ticks(void) { return count(); }
+void board_stack_info(uint32_t out[3]) {
+  extern uint32_t __bss_end;
+  uintptr_t scan = (uintptr_t)&__bss_end;
+  const uintptr_t top = 0xa000fff8u;
+  while (scan < top && *(volatile uint32_t *)scan == 0xa55a5aa5u) scan += 4;
+  out[0] = (uint32_t)((uintptr_t)&__bss_end - 0xa0000000u);
+  out[1] = (uint32_t)(top - (uintptr_t)scan);
+  out[2] = (uint32_t)((uintptr_t)scan - (uintptr_t)&__bss_end);
+}
+#endif

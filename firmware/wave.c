@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "core.h"
+#include "profile.h"
 static uint32_t u16(const uint8_t *p) {
   return (uint32_t)p[0] | ((uint32_t)p[1] << 8);
 }
@@ -71,6 +72,7 @@ int pcm_decode(const uint8_t *src, uint32_t bits, uint32_t *dst,
                uint32_t frames) {
   if (bits != 16 && bits != 24)
     return -1;
+  PROFILE_BEGIN(decode);
   for (uint32_t i = 0; i < frames; i++) {
     uint32_t word = bits == 16
                         ? ((uint32_t)src[0] << 16) | ((uint32_t)src[1] << 24)
@@ -79,6 +81,7 @@ int pcm_decode(const uint8_t *src, uint32_t bits, uint32_t *dst,
     dst[i * 2] = dst[i * 2 + 1] = word;
     src += bits / 8;
   }
+  PROFILE_END(PROF_DECODE, decode);
   return 0;
 }
 int wave_read(File *f, Wave *w, uint32_t *dst, uint32_t frames, uint32_t *got,

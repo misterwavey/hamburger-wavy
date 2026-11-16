@@ -27,7 +27,21 @@ standalone_start:
     sw $zero,0($t0)
     b 1b
     addiu $t0,$t0,4
-2:  jal standalone_main
+2:
+#ifdef ONE_PROFILE
+    lui $t2,0xa55a
+    ori $t2,$t2,0x5aa5
+    lui $t0,%hi(__bss_end)
+    addiu $t0,$t0,%lo(__bss_end)
+    move $t1,$sp
+3:  beq $t0,$t1,4f
+    nop
+    sw $t2,0($t0)
+    b 3b
+    addiu $t0,$t0,4
+4:
+#endif
+    jal standalone_main
     nop
     j standalone_fault
     nop

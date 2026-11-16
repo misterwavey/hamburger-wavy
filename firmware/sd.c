@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "core.h"
+#include "profile.h"
 static int tx(Sd *s, uint8_t v) { return s->io->xfer(s->io->ctx, v); }
 static void release(Sd *s) {
   s->io->select(s->io->ctx, 0);
@@ -120,6 +121,7 @@ int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
     return -1;
   if (!s->high_capacity && lba > 0x7fffffu)
     return -1;
+  PROFILE_BEGIN(read_sector);
   if (command(s, 17, s->high_capacity ? lba : lba << 9))
     goto fail;
   uint32_t begin = s->io->millis(s->io->ctx);
@@ -145,10 +147,12 @@ int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
   if (high < 0 || low < 0 || crc != ((uint16_t)high << 8 | (uint16_t)low))
     goto fail;
   release(s);
+  PROFILE_END(PROF_SD, read_sector);
   return 0;
 fail:
   release(s);
   s->ready = 0;
+  PROFILE_END(PROF_SD, read_sector);
   return -1;
 }
 

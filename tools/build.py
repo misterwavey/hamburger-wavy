@@ -89,12 +89,13 @@ def write_image(spec,memory,path):
  path.write_bytes((spec['line_ending'].join(output)+spec['line_ending']).encode('ascii'))
 
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--cc');ap.add_argument('--ld');ap.add_argument('--out',type=Path,default=ROOT/'build');args=ap.parse_args()
- out=args.out;out.mkdir(parents=True,exist_ok=True)
+ ap=argparse.ArgumentParser();ap.add_argument('--cc');ap.add_argument('--ld');ap.add_argument('--out',type=Path);ap.add_argument('--profile',action='store_true');args=ap.parse_args()
+ out=args.out or (ROOT/'build/profile' if args.profile else ROOT/'build');out.mkdir(parents=True,exist_ok=True)
  pitch_report=generate_pitch(out)
  cc=tool(args.cc,['/usr/local/opt/llvm/bin/clang','/opt/homebrew/opt/llvm/bin/clang','clang'])
  ld=tool(args.ld,['ld.lld',*Path.home().glob('.rustup/toolchains/*/lib/rustlib/*/bin/rust-lld')])
- flags=['-I'+str(out),'--target=mipsel-none-elf','-march=mips32r2','-mabi=32','-mno-abicalls','-fno-pic','-G0','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-jump-tables','-Os','-Wall','-Wextra','-Werror']
+ flags=['-I'+str(out),'--target=mipsel-none-elf','-march=mips32r2','-mabi=32','-mno-abicalls','-fno-pic','-G0','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-jump-tables','-Os','-fstack-usage','-Wall','-Wextra','-Werror']
+ if args.profile:flags+=['-DONE_PROFILE=1']
  sources=sorted(p for p in (ROOT/'firmware').iterdir() if p.suffix in ('.c','.S'));objects=[]
  for src in sources:
   obj=out/(src.stem+'.o');subprocess.run([cc,*flags,'-c',str(src),'-o',str(obj)],check=True);objects.append(str(obj))
@@ -108,7 +109,7 @@ def main():
   if bytes(payload.get(a+i,0) for i in range(4))!=w.to_bytes(4,'little'):raise ValueError('hardware configuration changed')
  memory.update(payload);image=out/'image.hex';write_image(spec,memory,image)
  build_number=int(re.search(r'^#define ONE_BUILD_NUMBER (\d+)$',(ROOT/'firmware/build.h').read_text(),re.M)[1])
- report=dict(project='Hamburger Wavy',licence='GPL-3.0-only',build_number=build_number,status='EXPERIMENTAL — COMPLETE APPLICATION, NOT HARDWARE VALIDATED',source_built=True,
+ report=dict(profiling=args.profile,project='Hamburger Wavy',licence='GPL-3.0-only',build_number=build_number,status='EXPERIMENTAL — COMPLETE APPLICATION, NOT HARDWARE VALIDATED',source_built=True,
              features=dict(config_txt=True,playlist_txt=True,playback_modes=['Trigger','Gate','Fade','Loop','Sequence','Combo','Random Sequence','Random Loop'],cv_modes=['Free','Quantize','Select File'],cv_select_delays_ms=dict(Short=0,Medium=2,Long=10),front_panel_modes=True,last_manual_file_recall='ONESTATE.BIN: two alternating CRC32 sectors; stock status.bin read-only import',build_identification='ONEBUILD.TXT: best-effort on mount, written only if content changes',generated_chromatic_tables=True,fade_ramp_samples=256),
              pitch_quantization=pitch_report,
              boot_debug_handler='omitted: no debug-vector bytes distributed; resident flash preservation unverified',
@@ -118,6 +119,13 @@ def main():
              unused_application_bytes='0xff',
              record_layout='address/record headers in board/update-layout.json; debug-vector bytes absent',
              source_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted([*(ROOT/'firmware').iterdir(),ROOT/'tools/generate_pitch.py',ROOT/'board/update-layout.json',Path(__file__).resolve()]) if p.is_file()})
+ report['resources']=dict(text_bytes=layout['.text']['bytes'],text_limit=0x7c44,
+                          text_free=0x7c44-layout['.text']['bytes'],
+                          static_ram_bytes=layout['.bss']['bytes'],ram_total=65536,
+                          minimum_stack_reserve=8192,
+                          static_ram_growth_budget=0xe000-layout['.bss']['bytes'])
+ if args.profile:
+  report['sd_write_scope']+='; ONEPROF.TXT (two sectors) and its allocation, only when playback is stopped'
  (out/'manifest.json').write_text(json.dumps(report,indent=2)+'\n')
  print(json.dumps({k:report[k] for k in ('project','build_number','status','image_sha256','source_payload_bytes','sections')},indent=2))
 

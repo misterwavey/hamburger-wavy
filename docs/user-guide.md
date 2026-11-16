@@ -78,3 +78,5 @@ WAV, config and playlist files remain read-only. Two reserved root files can be 
 First creation also updates allocated FAT entries, a root directory entry and applicable FAT32 FSInfo hints. Existing unrelated/read-only same-name files are refused. Build logging is best effort; a failed write does not deliberately block playback. Interrupted metadata creation can leak a cluster; this is not transactional FAT storage.
 
 Startup: one second blue, then no build count. Red indicates playback. Solid blue indicates a playback error, including a missed refill deadline; flashing blue can indicate card recovery or stationary DMA. These signals do not uniquely diagnose the underlying fault. PLAY retries after a playback error reopen/re-prime the selected file.
+
+The optional diagnostic build adds `ONEPROF.TXT` reporting after playback stops. Normal builds do not create or update it. See [profiling](profiling.md) for collection instructions and the additional reserved write scope.

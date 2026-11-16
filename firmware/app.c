@@ -9,6 +9,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "build.h"
 #include "platform.h"
+#include "profile.h"
 static Sd card;
 static Fat fs;
 static Entry entries[ONE_MAX_FILES];
@@ -46,6 +47,7 @@ static void queue_trigger(uint32_t manual) {
   trigger_manual |= manual;
 }
 static void stop(void) {
+  PROFILE(profile_stop(board_millis()));
   ring.running = 0;
   staging_ready = 0;
   board_audio_stop();
@@ -58,17 +60,21 @@ static void playback_error(void) {
 }
 void app_background(void) {
   board_watchdog();
+  PROFILE(profile_poll());
   if (ring.running) {
     uint32_t offset = board_audio_offset(), now = board_millis();
     if (offset != dma_last_offset) {
       dma_last_offset = offset;
       dma_last_time = now;
     } else if ((uint32_t)(now - dma_last_time) >= 1000u) {
+      PROFILE(profile_error(PROF_DMA_ERROR));
       playback_error();
       error_state = 2;
     }
-    if (ring_boundary(&ring, offset / (ONE_HALF_FRAMES * 8u)) < 0)
+    if (ring_boundary(&ring, offset / (ONE_HALF_FRAMES * 8u)) < 0) {
+      PROFILE(profile_error(PROF_RING_ERROR));
       playback_error();
+    }
   }
   uint32_t pins = board_pins(), gate = (pins & 0x800u) == 0;
   if (gate && !last_gate && (pins & 0x200u) && !ui.button && !ui.menu &&
@@ -196,6 +202,8 @@ static void trigger(void) {
     return;
   ring_start(&ring);
   board_audio_start(audio);
+  PROFILE(profile_start(wave.rate, wave.bits, settings.play, settings.cv,
+                        pitch_divider(last_pitch, wave.rate, settings.cv)));
   dma_last_offset = board_audio_offset();
   dma_last_time = board_millis();
   board_led(2);
@@ -251,6 +259,7 @@ static void mount_card(void) {
   error_state = 1;
 }
 void app_init(void) {
+  PROFILE(profile_init());
   memset(&ring, 0, sizeof(ring));
   settings_default(&settings);
   ready = mounted = trigger_pending = 0;
@@ -357,11 +366,14 @@ void app_tick(void) {
   if (ring.running) {
     uint32_t half = (ring.pending & 1u) ? 0 : 1, got = ONE_HALF_FRAMES;
     if (!staging_ready) {
+      PROFILE_BEGIN(read_ahead);
       int failed = looping() ? wave_read_loop(&file, &wave, staging,
                                               ONE_HALF_FRAMES, raw, sizeof(raw))
                              : wave_read(&file, &wave, staging, ONE_HALF_FRAMES,
                                          &got, raw, sizeof(raw));
+      PROFILE_END(PROF_PREFETCH, read_ahead);
       if (failed) {
+        PROFILE(profile_error(PROF_READ_ERROR));
         stop();
         mounted = 0;
         error_state = 1;
@@ -375,24 +387,35 @@ void app_tick(void) {
     if (selection_delta || !ring.running || !ring.pending)
       return;
     half = (ring.pending & 1u) ? 0 : 1;
+    PROFILE_BEGIN(publish);
+    PROFILE(profile_margin(half));
     if (!board_audio_commit_safe(half)) {
+      PROFILE(profile_error(PROF_LATE_ERROR));
       playback_error();
       return;
     }
     if (fading()) {
+      PROFILE_BEGIN(render);
       envelope_apply(&envelope, staging, ONE_HALF_FRAMES);
       envelope_tail(staging, ONE_HALF_FRAMES, stream_frame,
                     wave.bytes / (wave.bits / 8));
+      PROFILE_END(PROF_ENVELOPE, render);
       /* Recheck after envelope work before touching the inactive DMA half. */
       if (!board_audio_commit_safe(half)) {
+        PROFILE(profile_error(PROF_LATE_ERROR));
         playback_error();
         return;
       }
     }
     stream_frame += ONE_HALF_FRAMES;
+    PROFILE_BEGIN(copy);
     memcpy(audio + half * ONE_HALF_FRAMES * 2, staging, sizeof(staging));
     board_audio_publish();
+    PROFILE_END(PROF_COPY, copy);
+    PROFILE(profile_margin(half));
+    PROFILE_PUBLISH(publish);
     if (ring_commit(&ring, half)) {
+      PROFILE(profile_error(PROF_RING_ERROR));
       playback_error();
       return;
     }
@@ -402,6 +425,9 @@ void app_tick(void) {
   }
   if (error_state)
     board_led(error_state == 2 ? ((board_millis() / 250u) & 1u) : 1u);
+  PROFILE(profile_idle(&fs, board_millis(),
+      !ring.running && !trigger_pending && !ui.menu && !ui.button &&
+      !ui_events && !selection_delta && (board_pins() & 0x200u)));
 }
 void standalone_main(void) {
   board_init();

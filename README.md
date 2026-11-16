@@ -38,6 +38,10 @@ Tests validate the HEX/ELF address contract, generated pitch mathematics, a rebu
 
 Optional original 440 Hz test WAVs can be generated with `python3 tools/generate_test_tones.py`. No audio files are included in the repository.
 
+## Measure hardware headroom
+
+`make profile` builds an optional diagnostic at `build/profile/image.hex`, leaving the normal image separate. It measures streaming/refill timing, observed buffer margin and stack watermark, then writes `ONEPROF.TXT` only after playback stops. See [profiling instructions and limitations](docs/profiling.md), and analyse a collected report with `python3 tools/analyze_profile.py ONEPROF.TXT`.
+
 ## Install
 
 This is experimental replacement firmware. Preserve your existing firmware and card files separately. The application does not include the resident updater or a full recovery image. See [hardware and update limits](docs/provenance.md#hardware-and-update-limits).
@@ -63,6 +67,6 @@ See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD
 
 ## Validation status
 
-The source snapshot is build 15. Its firmware output matches the private development build 15 byte-for-byte with the tested toolchain. Earlier hardware trials confirmed basic playback, quantization, random sequencing, mode feedback and the Fade read-ahead improvement. Build 14's click protection and build 15's build-record writing have software regression coverage but await hardware confirmation. This is not a claim of testing every combination of file, mode, card and sample rate.
+Current build 16 offers normal and optional profiling images. The normal application's code/data matches build 15 except for the build identifier; profiling is a separate diagnostic configuration and still requires hardware testing. Earlier user trials cover playback, quantization, random sequencing, mode feedback and Fade read-ahead. Click-overlap protection, build-record writing and the profiler have software tests; a complete hardware mode/card/rate matrix has not been reported. See [provenance](docs/provenance.md) for the initial source-export verification.
 
 Hamburger Wavy is independent of Tiptop Audio and is not endorsed by the manufacturer. Hardware/product names identify compatibility.

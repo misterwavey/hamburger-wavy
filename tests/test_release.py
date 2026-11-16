@@ -13,6 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from build import extract, template
+from analyze_profile import parse_report
 
 
 def read_hex(path):
@@ -107,6 +108,129 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
         self.assertIn('checks passed', result.stdout)
         (ROOT/'build/host-test-log.txt').write_text(result.stdout)
+
+    def test_profile_report_and_instrumented_core(self):
+        cc = os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
+        if not cc:
+            self.skipTest('no host C compiler')
+        flags = [cc, '-std=c11', '-g', '-O1', '-Wall', '-Wextra', '-Werror',
+                 '-fno-builtin', '-fsanitize=address,undefined', '-DONE_PROFILE=1',
+                 '-I'+str(ROOT/'build')]
+        binary = ROOT/'build/profile-unit-test'
+        result = subprocess.run([*flags, str(ROOT/'tests/profile.c'),
+                                 str(ROOT/'firmware/profile.c'),
+                                 str(ROOT/'firmware/memory.c'), '-o', str(binary)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        report_path = ROOT/'build/test-profile.txt'
+        result = subprocess.run([str(binary), str(report_path)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        raw = report_path.read_bytes()
+        report = parse_report(raw)
+        self.assertEqual(report['plays'], 3)
+        self.assertEqual(report['metrics']['sd']['samples'], 2)
+        self.assertEqual(report['metrics']['sd']['mean_us'], 1200)
+        self.assertEqual(report['metrics']['refill_work']['maximum_us'], 2560)
+        self.assertEqual(report['errors']['late_commit'], 1)
+        self.assertEqual(report['errors']['copy_overlap'], 1)
+        self.assertEqual(report['previous_report_failures'], 1)
+        self.assertEqual(report['minimum_slack_frames'], 0)
+        self.assertGreater(report['playback_seconds'], 0)
+        self.assertLess(report['playback_seconds'], 1)  # Count wrap is not 2^32 ticks.
+        corrupt = bytearray(raw); corrupt[200] ^= 1
+        with self.assertRaises(ValueError): parse_report(corrupt)
+        with self.assertRaises(ValueError): parse_report(raw[:512])
+        sources = [ROOT/'tests/core.c', *[ROOT/'firmware'/f'{name}.c' for name in
+                   ('fat','wave','sd','ring','memory','app','advertise','settings',
+                    'policy','ui','recall','profile')]]
+        binary = ROOT/'build/profile-core-test'
+        result = subprocess.run([*flags, *map(str,sources), '-o', str(binary)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        result = subprocess.run([str(binary)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        (ROOT/'build/profile-host-test-log.txt').write_text(result.stdout)
+
+    def test_profile_image_contract_and_rebuild(self):
+        result = subprocess.run([sys.executable, str(ROOT/'tools/build.py'), '--profile'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        out = ROOT/'build/profile'
+        payload, _, layout, _ = extract(out/'hamburger-wavy.elf')
+        image = read_hex(out/'image.hex')
+        self.assertEqual(set(image), set(read_hex(ROOT/'build/image.hex')))
+        self.assertNotIn('.boot_debug', layout)
+        for address, byte in image.items():
+            self.assertEqual(byte, payload.get(address,255))
+        self.assertLessEqual(layout['.text']['bytes'], 0x7c44)
+        self.assertLessEqual(layout['.bss']['bytes'], 0xe000)
+        self.assertTrue(json.loads((out/'manifest.json').read_text())['profiling'])
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ('firmware','tools','board'):
+                shutil.copytree(ROOT/name,root/name,ignore=shutil.ignore_patterns('__pycache__'))
+            result = subprocess.run([sys.executable,str(root/'tools/build.py'),'--profile'],
+                                    capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual((root/'build/profile/image.hex').read_bytes(),
+                             (out/'image.hex').read_bytes())
+
+    @unittest.skipUnless(Path('/sbin/fsck_msdos').exists(),'optional macOS filesystem checker')
+    def test_profile_allocation_passes_independent_filesystem_checker(self):
+        import struct
+        cc='/usr/local/opt/llvm/bin/clang'
+        if not Path(cc).exists():cc=shutil.which('clang')
+        binary=ROOT/'build/fs-image-test'
+        sources=[ROOT/'tests/fs_image.c',*[ROOT/'firmware'/f'{n}.c' for n in ('fat','recall','memory')]]
+        subprocess.run([cc,'-DONE_PROFILE=1','-std=c11','-O1','-Wall','-Wextra','-Werror','-fno-builtin',*[str(p) for p in sources],'-o',str(binary)],check=True,capture_output=True,text=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            for kind in (16,32):
+                total=131072;spc=4 if kind==16 else 1
+                reserved=1 if kind==16 else 32;fatsz=128 if kind==16 else 1024
+                root_entries=512 if kind==16 else 0
+                data=reserved+2*fatsz+root_entries//16
+                p=bytearray(512);p[:3]=b'\xeb\x3c\x90';p[3:11]=b'ONETEST '
+                def put16(off,v):struct.pack_into('<H',p,off,v)
+                def put32(off,v):struct.pack_into('<I',p,off,v)
+                put16(11,512);p[13]=spc;put16(14,reserved);p[16]=2
+                put16(17,root_entries);p[21]=248;put16(24,63);put16(26,255);put32(32,total)
+                if kind==16:
+                    put16(22,fatsz);p[36]=128;p[38]=41;put32(39,123456)
+                    p[43:54]=b'ONE TEST   ';p[54:62]=b'FAT16   '
+                else:
+                    put32(36,fatsz);put32(44,2);put16(48,1);put16(50,6)
+                    p[64]=128;p[66]=41;put32(67,123456)
+                    p[71:82]=b'ONE TEST   ';p[82:90]=b'FAT32   '
+                p[510:512]=b'\x55\xaa'
+                path=Path(tmp)/f'fat{kind}.img'
+                with path.open('w+b') as f:
+                    f.truncate(total*512)
+                    def sector(lba,buf):f.seek(lba*512);f.write(buf)
+                    sector(0,p)
+                    fat=bytearray(512)
+                    if kind==16:struct.pack_into('<4H',fat,0,0xfff8,0xffff,0,0xffff)
+                    else:
+                        struct.pack_into('<4I',fat,0,0x0ffffff8,0xffffffff,0x0fffffff,0x0fffffff)
+                        sector(6,p)
+                        info=bytearray(512)
+                        struct.pack_into('<I',info,0,0x41615252)
+                        struct.pack_into('<I',info,484,0x61417272)
+                        struct.pack_into('<I',info,488,(total-data)//spc-2)
+                        struct.pack_into('<I',info,492,4)
+                        struct.pack_into('<I',info,508,0xaa550000)
+                        sector(1,info);sector(7,info)
+                    sector(reserved,fat);sector(reserved+fatsz,fat)
+                    directory=bytearray(512);directory[:11]=b'A       WAV';directory[11]=32
+                    struct.pack_into('<H',directory,26,3);struct.pack_into('<I',directory,28,512)
+                    sector(reserved+2*fatsz if kind==16 else data,directory)
+                    sample=bytes((i*13)&255 for i in range(512))
+                    sector(data+spc,sample)
+                before=subprocess.run(['/sbin/fsck_msdos','-n',str(path)],capture_output=True,text=True)
+                self.assertEqual(before.returncode,0,before.stdout+before.stderr)
+                subprocess.run([str(binary),str(path)],check=True,capture_output=True,text=True)
+                after=subprocess.run(['/sbin/fsck_msdos','-n',str(path)],capture_output=True,text=True)
+                self.assertEqual(after.returncode,0,after.stdout+after.stderr)
+                with path.open('rb') as f:f.seek((data+spc)*512);self.assertEqual(f.read(512),sample)
 
     def test_distribution_has_notices_and_no_private_inputs(self):
         self.assertIn('Version 3, 29 June 2007', (ROOT/'LICENSE').read_text())
