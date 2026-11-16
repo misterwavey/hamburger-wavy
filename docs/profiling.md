@@ -185,3 +185,8 @@ The compiled MIPS SPI model checks both immediately ready and delayed receive fl
 Mount parsing, reserved-file allocation and stopped-audio profile writes use compiler size optimisation to keep the diagnostic within the existing layout. Streaming file reads retain their existing optimisation settings. Normal main code/constants use 27248 bytes (4564 free), profiling 31508 (304 free). RAM, buffer sizes, 12 MHz SD clock, update coverage and the 128-frame copy guard are unchanged from build 20. Hardware speedup is not yet measured.
 
 Install the build-21 profiling image, retain the AGNT2-only playlist and Loop/Quantize config, and repeat maximum-pitch playback without moving the pitch control during the run. Aim for one minute. Turn FILE to stop if necessary, wait one second, then power down and mount. The fresh report must identify build 21.
+
+
+### First build-21 playback observation
+
+The user reports sustained looping at maximum pitch. On the next card mount, image.hex matched the build-21 profiling artifact and ONEBUILD.TXT identified build 21, but ONEPROF.TXT remained byte-identical to the previous build-20 report. This is qualitative playback evidence only; there is no fresh timing/error measurement from that run. The cause of the missing report is not established. Repeat playback followed by a FILE turn with PLAY released, leave the module powered and idle for several seconds, then collect the report before drawing timing conclusions or changing firmware.
