@@ -1,6 +1,8 @@
 # Hamburger Wavy
 
-An unofficial sampler firmware for the Tiptop Audio ONE module, built from source for its PIC32MX170F256B. Eight playback modes, chromatic pitch quantization, random file selection and random loop seeking. Licensed under GPLv3; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+THIS CUSTOM FIRMWARE FOR THE DISCONTINUED TIPTOP AUDIO ONE EURORACK MODULE IS NOT AFFILIATED WITH TIPTOP AUDIO IN ANY WAY. IF YOU USE THIS FIRMWARE, DO NOT APPROACH TIPTOP AUDIO FOR SUPPORT. THEY ARE AN AWESOME COMPANY AND DON'T NEED ANY HEADACHES CAUSED BY THIS PROJECT.
+
+This is an unofficial sampler firmware for the Tiptop Audio ONE module, built from source for its PIC32MX170F256B. Eight playback modes, chromatic pitch quantization, random file selection and random loop seeking. Licensed under GPLv3; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 This repository contains the application, build tools, tests and documentation. No vendor firmware, boot/debug stub, extracted pitch tables or sample library is supplied. The module's existing updater is required. See [provenance](docs/provenance.md) for what was learned through reverse engineering and what is included.
 
