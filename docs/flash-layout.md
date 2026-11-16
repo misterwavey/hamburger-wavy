@@ -97,3 +97,10 @@ Keep the current config/playlist. Successful ordinary startup and a fresh ONEBUI
 
 
 Build-23 software validation: all 16 release tests pass, including full-bank logical execution, first/middle/last-word corruption, a missing final page, exact patterned HEX coverage, legacy record-header preservation, boot/configuration invariants and isolated reconstruction. Testing exposed and corrected the interpreter's prior handling of ROTR as a logical shift; independent immediate/variable rotate and shift encodings now have regression checks. Normal/profile build 21 and the one-page build 22 remain byte-identical to archived artifacts. Hardware acceptance of the bank remains pending.
+
+
+### Build 23 hardware result
+
+The first bank trial returned a mounted card whose image hash matched the build-23 candidate and whose ONEBUILD.TXT identified build 23. This record is reached only after exact uncached comparison of all 12288 words across physical 0x1D014000..0x1D01FFFF and two checked calls to each endpoint routine. The result supports successful programming/readback of the full 48 KiB bank and execution near both ends on the tested module. The user reported completing the requested installation/playback procedure; detailed listening observations were not separately supplied. Addresses at or above 0x1D020000 remain untested, and no full-size real application has been exercised. Rollback following this larger bank trial remains pending.
+
+If rollback succeeds, the next implementation step can place real application functions/constants in this verified bank, retaining the fixed entry/reset addresses. The combined legacy main-text allowance (31812 bytes) plus this extension bank (49152 bytes) is 80964 bytes, approximately 79.1 KiB. This is a layout capacity supported by the bank experiment, not current occupied code size or a guarantee of all updater behaviours. RAM and processing throughput are unchanged by gaining flash addresses.
