@@ -1,8 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "core.h"
+/* may_alias permits word access to arbitrary byte/structure representations. */
+typedef uint32_t __attribute__((may_alias)) CopyWord;
 void *memcpy(void *d, const void *s, size_t n) {
   uint8_t *a = d;
   const uint8_t *b = s;
+  if ((((uintptr_t)a | (uintptr_t)b) & 3u) == 0) {
+    CopyWord *words = (CopyWord *)a;
+    const CopyWord *source = (const CopyWord *)b;
+    while (n >= 4u) { *words++ = *source++; n -= 4u; }
+    a = (uint8_t *)words; b = (const uint8_t *)source;
+  }
   while (n--)
     *a++ = *b++;
   return d;

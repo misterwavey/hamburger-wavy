@@ -293,6 +293,21 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(m.read(destination-1,1),0xa5)
             self.assertEqual(m.read(destination+words*4,1),0x5a)
 
+    def test_compiled_memcpy_alignment_and_bounds(self):
+        image=read_hex(ROOT/'build/image.hex')
+        _,symbols,_,_=extract(ROOT/'build/hamburger-wavy.elf')
+        for a in range(4):
+            for b in range(4):
+                for length in (0,1,3,4,5,31,32,33,511,512,513,1536):
+                    m=CPU(image);src=0xa0001004+b;dst=0xa0006004+a
+                    for i in range(length):m.poke(src+i,(i*7+3)&255,1)
+                    m.poke(dst-1,0xa5,1);m.poke(dst+length,0x5a,1)
+                    self.assertEqual(m.run(symbols['memcpy'],dst,src,length),dst)
+                    self.assertEqual([m.read(dst+i,1) for i in range(length)],
+                                     [(i*7+3)&255 for i in range(length)])
+                    self.assertEqual(m.read(dst-1,1),0xa5)
+                    self.assertEqual(m.read(dst+length,1),0x5a)
+
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
         if not cc: self.skipTest('no host C compiler')

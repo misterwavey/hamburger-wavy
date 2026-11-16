@@ -570,6 +570,20 @@ static void test_bulk_sd_and_audio_copy(void) {
     CHECK(destination[0]==0xdeadbeefu && destination[n+1]==0xdeadbeefu);
   }
 }
+static void test_aligned_and_unaligned_memcpy(void) {
+  static uint8_t source[4104] __attribute__((aligned(16)));
+  static uint8_t destination[4104] __attribute__((aligned(16)));
+  static const uint32_t sizes[]={0,1,2,3,4,5,7,8,9,31,32,33,511,512,513,1536,4096};
+  for (uint32_t i=0; i<sizeof(source); ++i) source[i]=(uint8_t)(i*7+3);
+  for (uint32_t a=0; a<4; ++a) for (uint32_t b=0; b<4; ++b)
+    for (uint32_t k=0; k<sizeof(sizes)/sizeof(*sizes); ++k) {
+      uint32_t n=sizes[k];
+      for (uint32_t i=0; i<sizeof(destination); ++i) destination[i]=0xa5;
+      CHECK(memcpy(destination+4+a,source+4+b,n)==destination+4+a);
+      for (uint32_t i=0; i<n; ++i) CHECK(destination[4+a+i]==source[4+b+i]);
+      CHECK(destination[3+a]==0xa5 && destination[4+a+n]==0xa5);
+    }
+}
 static void test_ring(void) {
   Ring r = {0};
   ring_start(&r);
@@ -1705,6 +1719,7 @@ int main(void) {
   test_wave();
   test_sd();
   test_bulk_sd_and_audio_copy();
+  test_aligned_and_unaligned_memcpy();
   test_ring();
   test_advertisement();
   test_application();

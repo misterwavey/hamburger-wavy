@@ -10,7 +10,7 @@ From the repository:
 make profile
 ```
 
-The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 18; the diagnostic manifest has `profiling: true`.
+The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 19; the diagnostic manifest has `profiling: true`.
 
 Install the diagnostic using the usual SD update procedure:
 
@@ -21,7 +21,7 @@ cmp build/profile/image.hex "/Volumes/TTA ONE/image.hex"
 diskutil eject "/Volumes/TTA ONE"
 ```
 
-Startup remains one second blue. `ONEBUILD.TXT` should show build 18. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
+Startup remains one second blue. `ONEBUILD.TXT` should show build 19. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
 
 ## Collect a report
 
@@ -143,3 +143,12 @@ A CRC-valid build-17 report recorded one Loop/Quantize start with a 96 kHz/24-bi
 Build 18 replaces the CRC16 nibble-table update with a folded polynomial calculation, eliminating both per-byte flash-table reads. The polynomial, initial state, received CRC bytes, CRC comparisons and write CRCs are unchanged. All 65536 CRC states times 256 input bytes were checked against an independent bitwise recurrence (16777216 combinations), alongside the existing normal/instrumented protocol, corruption, transport-failure and filesystem tests. The measured 544 us maximum service gap in the previous run is consistent with a costly software section, but does not by itself isolate that section's duration; hardware measurement is required to quantify the CRC change.
 
 For the next trial install the build-18 profiling image and keep the existing AGNT2-only playlist and Loop/Quantize config. Repeat the same full-pitch run, stop by browsing if it remains playing, wait one second, and collect the report. Normal main code/constants now use 27368 bytes (4444 free); profiling uses 31684 (128 free). RAM is unchanged. No clock, buffer, deadline guard or update-layout change was made.
+
+
+## Build 18 hardware result and build 19 cache-copy trial
+
+The CRC-valid build-18 report recorded 0.487 seconds of playback with one late-commit rejection and no read, ring, stationary-DMA or copy-overlap errors. Mean SD read time fell to 1.026 ms, prefetch to 3.486 ms and completed refill work to 3.565 ms. The tightest half-buffer period remained 3.557 ms at divider 667 (approximately 143928 output frames/s). The worst completed refill was 4.686 ms; pitch varied during this run. These measurements show improvement, but insufficient sustained margin. Stack watermark remained 1680 bytes.
+
+Build 19 adds an alignment-checked word path to the project-written general-purpose memcpy, speeding aligned copies such as the FAT sector cache into the decoder input buffer. Both addresses must be word aligned; unaligned copies and trailing bytes retain byte accesses. A compiler-supported may_alias word type permits access to arbitrary object representations. Host sanitizer and compiled-MIPS tests cover every source/destination alignment combination, tails and boundary guards. This does not change the SD clock, CRC checks, buffer sizes or copy deadline guard.
+
+Normal code/constants use 27464 bytes (4348 free); profiling uses 31780 bytes (32 free). Static RAM is unchanged. All 11 release tests pass. Hardware performance remains unmeasured. Install the build-19 profiling image, retain the AGNT2-only playlist and Loop/Quantize config, and repeat the maximum-pitch run. If playback continues, turn FILE to stop, then wait one second before powering down. A fresh report must identify build 19.
