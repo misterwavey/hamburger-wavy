@@ -63,7 +63,7 @@ At startup, the PLAY button lights blue for one second. The firmware writes its 
 
 PLAY taps trigger; FILE browses. Hold PLAY for at least 400 ms before turning FILE to edit the playback mode, or moving pitch to edit the CV mode. Stop turning and keep PLAY held to read complete red/blue pulse groups; release to apply. A card's `config.txt` is reloaded at each mount.
 
-See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD writes and quantization. Examples are in `examples/config/`.
+See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD writes and quantization. Examples are in `examples/config/`. The [bench guide](docs/bench.md) prepares Fade/Gate profiling and normal-build playback/retrigger checks.
 
 ## Validation status
 

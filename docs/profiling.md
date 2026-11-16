@@ -44,6 +44,8 @@ The firmware accumulates statistics over the current boot, across triggers, file
 
 ## Suggested test order
 
+For staged Fade/Gate and normal-firmware checks, use the [bench pack instructions](bench.md). They generate original long PCM24 audio, prepare separate configs/playlists and preserve the pre-test card setup locally.
+
 Start with a quick smoke test: one Q480 playback, let it finish, wait, and check the report. Then run:
 
 | Case | Material and activity |
