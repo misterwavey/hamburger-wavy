@@ -1,0 +1,4 @@
+# Hamburger Wavy configuration
+Trigger
+Quantize
+Short

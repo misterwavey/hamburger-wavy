@@ -1,0 +1,4 @@
+# Hamburger Wavy configuration
+Fade
+Free
+Short

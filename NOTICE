@@ -1,0 +1,25 @@
+Hamburger Wavy
+
+This source distribution is licensed under the GNU General Public License,
+version 3 only (SPDX: GPL-3.0-only). The complete terms are in LICENSE.
+The software is provided without warranty, as described there.
+
+Third-party component: rotary encoder state machine
+Copyright 2011 Ben Buxton. Licenced under the GNU GPL Version 3.
+Original: Rotary encoder handler for Arduino, v1.1, full-step table and
+masked-state traversal, Rotary.cpp / Rotary::process.
+https://github.com/buxtronix/arduino/blob/master/libraries/Rotary/Rotary.cpp
+
+The table and traversal in firmware/app.c are adapted for PIC32 GPIO polling
+and integrated event handling. Adaptation and project integration date:
+2026-11-16. The rest of the original Arduino library is not included.
+
+The remaining project implementation, build scripts, tests and documentation
+are provided by the Hamburger Wavy contributors under GPL-3.0-only.
+
+Product names identify compatible hardware. Hamburger Wavy is an independent,
+unofficial project and is not affiliated with or endorsed by Tiptop Audio.
+No vendor firmware, sound library, or vendor bootloader is included.
+Hardware compatibility information and development provenance are documented
+in docs/provenance.md. This notice is not a claim of historical clean-room
+reverse engineering or a comprehensive third-party rights clearance.

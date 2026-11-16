@@ -1,0 +1,4 @@
+# Hamburger Wavy configuration
+Trigger
+Select File
+Medium
