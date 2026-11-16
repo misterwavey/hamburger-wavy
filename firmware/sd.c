@@ -135,14 +135,18 @@ int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
   } while (s->io->millis(s->io->ctx) - begin < 250);
   if (token != 0xfe)
     goto fail;
-  uint16_t crc = 0;
-  for (unsigned i = 0; i < 512; i++) {
-    int b = tx(s, 255);
-    if (b < 0)
-      goto fail;
-    out[i] = (uint8_t)b;
-    crc = crc16_byte(crc, (uint8_t)b);
+  if (s->io->read_bytes) {
+    if (s->io->read_bytes(s->io->ctx, out, 512)) goto fail;
+  } else {
+    for (unsigned i = 0; i < 512; ++i) {
+      int b = tx(s, 255);
+      if (b < 0) goto fail;
+      out[i] = (uint8_t)b;
+    }
   }
+  uint16_t crc = 0;
+  for (unsigned i = 0; i < 512; ++i)
+    crc = crc16_byte(crc, out[i]);
   int high = tx(s, 255), low = tx(s, 255);
   if (high < 0 || low < 0 || crc != ((uint16_t)high << 8 | (uint16_t)low))
     goto fail;

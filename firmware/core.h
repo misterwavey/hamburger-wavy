@@ -14,6 +14,7 @@ typedef struct {
   void (*select)(void *, int);
   void (*speed)(void *, int);
   uint32_t (*millis)(void *);
+  int (*read_bytes)(void *, uint8_t *, uint32_t); /* Optional bulk receive. */
 } SdIo;
 typedef struct {
   const SdIo *io;
@@ -115,5 +116,6 @@ void ring_start(Ring *);
 int ring_boundary(Ring *, uint32_t);
 int ring_commit(Ring *, uint32_t);
 void *memcpy(void *, const void *, size_t);
+void audio_copy(uint32_t *, const uint32_t *, uint32_t);
 void *memset(void *, int, size_t);
 #endif

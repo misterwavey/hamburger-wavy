@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from build import extract, template
 from analyze_profile import parse_report
+from mips32 import CPU
 
 
 def read_hex(path):
@@ -231,6 +232,66 @@ class ReleaseTests(unittest.TestCase):
                 after=subprocess.run(['/sbin/fsck_msdos','-n',str(path)],capture_output=True,text=True)
                 self.assertEqual(after.returncode,0,after.stdout+after.stderr)
                 with path.open('rb') as f:f.seek((data+spc)*512);self.assertEqual(f.read(512),sample)
+
+    def test_compiled_bulk_spi_and_audio_copy(self):
+        image = read_hex(ROOT/'build/image.hex')
+        _, symbols, _, _ = extract(ROOT/'build/hamburger-wavy.elf')
+        class SpiCPU(CPU):
+            def __init__(self, stuck_after=None):
+                super().__init__(image)
+                self.pending=False; self.clocks=0; self.received=0
+                self.polls=[]; self.stuck_after=stuck_after
+                self.hooks[symbols['app_background']]=self.background
+            def background(self, cpu, *args):
+                self.polls.append((self.received,self.pending))
+            def write(self,address,value,n=4):
+                if address==0xbf805a20:
+                    self.assert_clock(value)
+                super().write(address,value,n)
+            def assert_clock(self,value):
+                if self.pending or value!=255:
+                    raise AssertionError('extra outstanding byte or non-dummy transmit')
+                self.pending=True; self.clocks+=1
+            def read(self,address,n=4):
+                if address==0xbf805a10:
+                    return int(self.pending and (self.stuck_after is None or
+                                                self.received<self.stuck_after))
+                if address==0xbf805a20:
+                    if not self.pending: raise AssertionError('receive without clock')
+                    self.pending=False
+                    result=(self.received*7+3)&255
+                    self.received+=1
+                    return result
+                return super().read(address,n)
+        for length in (0,1,63,64,65,512):
+            for seed in (0,7):
+                m=SpiCPU(); destination=0xa0001000
+                m.poke(symbols['spi_poll'],seed)
+                m.poke(destination-1,0xa5,1);m.poke(destination+length,0x5a,1)
+                self.assertEqual(m.run(symbols['spi_read_bytes'],0,destination,length),0)
+                self.assertEqual((m.clocks,m.received,m.pending),(length,length,False))
+                self.assertEqual([m.read(destination+i,1) for i in range(length)],
+                                 [(i*7+3)&255 for i in range(length)])
+                self.assertEqual(m.read(destination-1,1),0xa5)
+                self.assertEqual(m.read(destination+length,1),0x5a)
+                expected=[i for i in range(1,length+1) if (seed+i)%64==0]
+                self.assertEqual([n for n,_ in m.polls],expected)
+                self.assertEqual([pending for n,pending in m.polls],
+                                 [n<length for n in expected])
+                self.assertEqual(m.read(symbols['spi_poll']),seed+length)
+        m=SpiCPU(stuck_after=17);m.steps=0xfffffff0
+        self.assertEqual(m.run(symbols['spi_read_bytes'],0,0xa0001000,512,
+                               budget=200000),0xffffffff)
+        self.assertEqual((m.clocks,m.received),(18,17))
+        for words in (0,1,3,4,5,1024,2048):
+            m=CPU(image);source=0xa0001004;destination=0xa0006004
+            for i in range(words):m.poke(source+i*4,(i*0x1020305)&0xffffffff)
+            m.poke(destination-1,0xa5,1);m.poke(destination+words*4,0x5a,1)
+            m.run(symbols['audio_copy'],destination,source,words)
+            self.assertEqual([m.read(destination+i*4) for i in range(words)],
+                             [m.read(source+i*4) for i in range(words)])
+            self.assertEqual(m.read(destination-1,1),0xa5)
+            self.assertEqual(m.read(destination+words*4,1),0x5a)
 
     def test_distribution_has_notices_and_no_private_inputs(self):
         self.assertIn('Version 3, 29 June 2007', (ROOT/'LICENSE').read_text())

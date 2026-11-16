@@ -85,6 +85,29 @@ static int spi_xfer(void *ctx, uint8_t byte) {
   }
   return (int)(REG(0xbf805a20) & 255u);
 }
+/* One byte outstanding at a time. Start the next transfer before doing the
+ * store/poll work, avoiding a function-pointer call for every payload byte.
+ * Each <=64-byte span has a bounded timeout; no card/bus clock change. */
+static int spi_read_bytes(void *ctx, uint8_t *out, uint32_t length) {
+  (void)ctx;
+  if (!length) return 0;
+  uint32_t start=count(), poll=spi_poll;
+  REG(0xbf805a20)=255;
+  for (uint32_t i=0; i<length; ++i) {
+    while (!(REG(0xbf805a10)&1u)) {
+      if (count()-start>120000u) { spi_poll=poll; return -1; }
+    }
+    uint8_t value=(uint8_t)REG(0xbf805a20);
+    if (i+1u<length) REG(0xbf805a20)=255;
+    out[i]=value;
+    if ((++poll&63u)==0) {
+      app_background();
+      start=count();
+    }
+  }
+  spi_poll=poll;
+  return 0;
+}
 static void spi_select(void *ctx, int selected) {
   (void)ctx;
   REG(selected ? 0xbf886134 : 0xbf886138) = 0x400;
@@ -101,7 +124,7 @@ static uint32_t spi_millis(void *ctx) {
   (void)ctx;
   return board_millis();
 }
-const SdIo board_sd_io = {0, spi_xfer, spi_select, spi_speed, spi_millis};
+const SdIo board_sd_io = {0, spi_xfer, spi_select, spi_speed, spi_millis, spi_read_bytes};
 void board_watchdog(void) { REG(0xbf800008) = 1; }
 void board_audio_publish(void) { __asm__ volatile("sync" ::: "memory"); }
 void board_init(void) {

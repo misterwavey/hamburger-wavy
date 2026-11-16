@@ -3,6 +3,11 @@
 #include "profile.h"
 #include "build.h"
 #ifdef ONE_PROFILE
+#if defined(__clang__)
+#define REPORT_SIZE __attribute__((minsize))
+#else
+#define REPORT_SIZE
+#endif
 /* All report storage is fixed; no allocation or disk access while playing. */
 typedef struct { uint32_t count, low, high, minimum, maximum; } Metric;
 static struct {
@@ -94,25 +99,25 @@ void profile_margin(uint32_t half) {
   }
 }
 void profile_error(uint32_t reason) { increment(p.errors + reason); }
-static void append(const char *s, uint32_t *at) {
+static REPORT_SIZE void append(const char *s, uint32_t *at) {
   while (*s && *at < 1009u) p.text[(*at)++] = *s++;
 }
-static void number(uint32_t n, uint32_t *at) {
+static REPORT_SIZE void number(uint32_t n, uint32_t *at) {
   char digits[10]; uint32_t used = 0;
   do { digits[used++] = (char)('0' + n % 10u); n /= 10u; } while (n);
   while (used && *at < 1009u) p.text[(*at)++] = digits[--used];
 }
-static void field(const char *name, uint32_t n, uint32_t *at) {
+static REPORT_SIZE void field(const char *name, uint32_t n, uint32_t *at) {
   append(name, at); number(n, at); append("\n", at);
 }
-static void row(const char *name, const uint32_t *values, uint32_t n, uint32_t *at) {
+static REPORT_SIZE void row(const char *name, const uint32_t *values, uint32_t n, uint32_t *at) {
   append(name, at);
   for (uint32_t i = 0; i < n; ++i) {
     append(",", at); number(values[i], at);
   }
   append("\n", at);
 }
-void profile_idle(Fat *fs, uint32_t now, uint32_t allowed) {
+REPORT_SIZE void profile_idle(Fat *fs, uint32_t now, uint32_t allowed) {
   if (!allowed || p.playing || !p.dirty || now - p.stopped < 250u) return;
   p.dirty = 0; /* One attempt per stop; no repeated idle write failures. */
   board_stack_info(p.stack);

@@ -338,6 +338,7 @@ typedef struct {
       write_timeout;
   uint8_t write_data[514];
   uint8_t packet[6], queue[520];
+  uint32_t bulk_calls, bulk_bytes, bulk_fail_at;
   uint32_t time, commands[512], arguments[512], n, attempts, transfers;
 } Mock;
 static void enqueue(Mock *m, int b) {
@@ -476,6 +477,18 @@ static int xfer(void *ctx, uint8_t b) {
   }
   return 255;
 }
+static int bulk_mock(void *ctx, uint8_t *out, uint32_t length) {
+  Mock *m=ctx;
+  ++m->bulk_calls;
+  for (uint32_t i=0; i<length; ++i) {
+    if (m->bulk_fail_at && i==m->bulk_fail_at) return -1;
+    int value=xfer(ctx,255);
+    if (value<0) return -1;
+    out[i]=(uint8_t)value;
+    ++m->bulk_bytes;
+  }
+  return 0;
+}
 static void select_mock(void *ctx, int yes) {
   Mock *m = ctx;
   m->selected = yes;
@@ -493,7 +506,7 @@ static void test_sd(void) {
     Mock m = {0};
     m.modern = kind != 0;
     m.hc = kind == 2;
-    SdIo io = {&m, xfer, select_mock, speed_mock, time_mock};
+    SdIo io = {&m, xfer, select_mock, speed_mock, time_mock, 0};
     Sd s;
     CHECK(!sd_init(&s, &io));
     CHECK(s.ready && s.high_capacity == (uint32_t)m.hc);
@@ -516,12 +529,46 @@ static void test_sd(void) {
   Mock m = {0};
   m.modern = 1;
   m.echo_bad = 1;
-  SdIo io = {&m, xfer, select_mock, speed_mock, time_mock};
+  SdIo io = {&m, xfer, select_mock, speed_mock, time_mock, 0};
   Sd s;
   CHECK(sd_init(&s, &io) < 0 && !s.ready);
   memset(&m, 0, sizeof(m));
   m.fail = 1;
   CHECK(sd_init(&s, &io) < 0);
+}
+static void test_bulk_sd_and_audio_copy(void) {
+  for (uint32_t hc=0; hc<2; ++hc) {
+    Mock m={0}; m.modern=1; m.hc=hc;
+    SdIo io={&m,xfer,select_mock,speed_mock,time_mock,bulk_mock};
+    Sd card;
+    uint8_t bytes[514]; memset(bytes,0x7b,sizeof(bytes));
+    CHECK(!sd_init(&card,&io));
+    CHECK(!sd_read(&card,123,bytes+1));
+    CHECK(m.bulk_calls==1 && m.bulk_bytes==512);
+    CHECK(bytes[0]==0x7b && bytes[513]==0x7b);
+    for (uint32_t i=0; i<512; ++i) CHECK(bytes[i+1]==(uint8_t)i);
+    CHECK(m.arguments[m.n-1]==(hc?123u:123u*512u));
+    m.crc_bad=1;
+    CHECK(sd_read(&card,124,bytes+1)<0 && !card.ready);
+    m.crc_bad=0;
+    CHECK(!sd_init(&card,&io)); m.bulk_fail_at=101;
+    CHECK(sd_read(&card,124,bytes+1)<0 && !card.ready);
+    CHECK(bytes[0]==0x7b && bytes[513]==0x7b);
+    m.bulk_fail_at=0;
+    CHECK(!sd_init(&card,&io)); m.token_bad=1;
+    uint32_t calls=m.bulk_calls;
+    CHECK(sd_read(&card,124,bytes+1)<0 && !card.ready && m.bulk_calls==calls);
+  }
+  static uint32_t source[2050],destination[2050];
+  static const uint32_t sizes[]={0,1,2,3,4,5,7,8,9,511,512,1023,1024,2048};
+  for (uint32_t i=0; i<2050; ++i) source[i]=i*0x1020305u;
+  for (uint32_t k=0; k<sizeof(sizes)/sizeof(*sizes); ++k) {
+    uint32_t n=sizes[k];
+    for (uint32_t i=0; i<2050; ++i) destination[i]=0xdeadbeefu;
+    audio_copy(destination+1,source+1,n);
+    for (uint32_t i=0; i<n; ++i) CHECK(destination[i+1]==source[i+1]);
+    CHECK(destination[0]==0xdeadbeefu && destination[n+1]==0xdeadbeefu);
+  }
 }
 static void test_ring(void) {
   Ring r = {0};
@@ -560,7 +607,7 @@ static void audio_progress_on_transfer(void) {
 }
 static CvMode host_mode;
 static const uint32_t *host_audio;
-const SdIo board_sd_io = {&app_card, xfer, select_mock, speed_mock, time_mock};
+const SdIo board_sd_io = {&app_card, xfer, select_mock, speed_mock, time_mock, bulk_mock};
 static int audio_is_active(void) { return host_active != 0; }
 #ifdef ONE_PROFILE
 static uint32_t profile_mock_ticks;
@@ -1123,7 +1170,7 @@ static void test_sd_write(void) {
     Mock m = {0};
     m.modern = 1;
     m.hc = hc;
-    SdIo io = {&m, xfer, select_mock, speed_mock, time_mock};
+    SdIo io = {&m, xfer, select_mock, speed_mock, time_mock, 0};
     Sd s;
     uint8_t data[512];
     for (uint32_t i = 0; i < 512; i++)
@@ -1657,6 +1704,7 @@ int main(void) {
   test_fat();
   test_wave();
   test_sd();
+  test_bulk_sd_and_audio_copy();
   test_ring();
   test_advertisement();
   test_application();

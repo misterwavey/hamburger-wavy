@@ -67,6 +67,6 @@ See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD
 
 ## Validation status
 
-Current build 16 offers normal and optional profiling images. The normal application's code/data matches build 15 except for the build identifier; profiling is a separate diagnostic configuration with an initial short hardware run recorded in the [profiling guide](docs/profiling.md). Earlier user trials cover playback, quantization, random sequencing, mode feedback and Fade read-ahead. The first profiling run successfully wrote both build identification and a CRC-valid report, with no streaming errors. A complete hardware mode/card/rate matrix has not been reported. See [provenance](docs/provenance.md) for the initial source-export verification.
+Current build 17 offers normal and optional profiling images. It adds bulk SD reception and word-wise audio-buffer copies; profiling is a separate diagnostic configuration with an initial short hardware run recorded in the [profiling guide](docs/profiling.md). Earlier user trials cover playback, quantization, random sequencing, mode feedback and Fade read-ahead. The first profiling run successfully wrote both build identification and a CRC-valid report, with no streaming errors. Build 17's speedup still needs hardware measurement; a complete mode/card/rate matrix has not been reported. See [provenance](docs/provenance.md) for the initial source-export verification.
 
 Hamburger Wavy is independent of Tiptop Audio and is not endorsed by the manufacturer. Hardware/product names identify compatibility.

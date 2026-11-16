@@ -1,0 +1,4 @@
+# Hamburger Wavy sustained quantized-pitch test
+Loop
+Quantize
+Short

@@ -187,7 +187,7 @@ static void trigger(void) {
       return;
     }
     wave.remaining = wave.bytes - cached_bytes;
-    memcpy(audio, cache, sizeof(audio));
+    audio_copy(audio, cache, ONE_CACHE_FRAMES * 2u);
   }
   envelope.gain = fading() ? 0 : 32768;
   envelope.target = 32768;
@@ -409,7 +409,7 @@ void app_tick(void) {
     }
     stream_frame += ONE_HALF_FRAMES;
     PROFILE_BEGIN(copy);
-    memcpy(audio + half * ONE_HALF_FRAMES * 2, staging, sizeof(staging));
+    audio_copy(audio + half * ONE_HALF_FRAMES * 2, staging, ONE_HALF_FRAMES * 2u);
     board_audio_publish();
     PROFILE_END(PROF_COPY, copy);
     PROFILE(profile_margin(half));

@@ -1,4 +1,4 @@
-# Profiling build 16
+# Profiling diagnostics
 
 This optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark. A first short hardware run is recorded below; the included `build/test-profile.txt` fixture remains synthetic regression data.
 
@@ -10,7 +10,7 @@ From the repository:
 make profile
 ```
 
-The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both identify as build 16; the diagnostic manifest has `profiling: true`.
+The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 17; the diagnostic manifest has `profiling: true`.
 
 Install the diagnostic using the usual SD update procedure:
 
@@ -21,7 +21,7 @@ cmp build/profile/image.hex "/Volumes/TTA ONE/image.hex"
 diskutil eject "/Volumes/TTA ONE"
 ```
 
-Startup remains one second blue. `ONEBUILD.TXT` should show build 16. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
+Startup remains one second blue. `ONEBUILD.TXT` should show build 17. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
 
 ## Collect a report
 
@@ -80,7 +80,7 @@ Before the first C function runs, the diagnostic fills unused RAM between the li
 
 The untouched gap is not a guaranteed safe allocation budget. Longer or different workloads may use more stack, and the diagnostic has extra frames. This build keeps the same 8 KiB minimum linker stack reservation and the same application-address limit. Compare normal/profiling manifests for code and static-RAM overhead; do not mistake the diagnostic's small code-space remainder for the normal firmware's headroom.
 
-For this build, normal main text/constants use 26996 bytes and static RAM 32160 bytes. The diagnostic uses 31500 main-text bytes and 33488 static-RAM bytes, leaving 312 bytes before the fixed reset handler. Total extra source payload is 4544 bytes (including startup instrumentation); extra static RAM is 1328 bytes. These are measured build sizes, not measured hardware timings.
+For build 16, normal main text/constants use 26996 bytes and static RAM 32160 bytes. The diagnostic uses 31500 main-text bytes and 33488 static-RAM bytes, leaving 312 bytes before the fixed reset handler. Total extra source payload is 4544 bytes (including startup instrumentation); extra static RAM is 1328 bytes. These are measured build sizes, not measured hardware timings.
 
 These measurements do not establish whether the resident updater accepts a larger flash layout. That remains a separate investigation.
 
@@ -125,3 +125,13 @@ A second CRC-valid report recorded eight starts over 1.751 seconds, with five ri
 At the tightest observation, a 96 kHz/24-bit sample ran at approximately 135785 output frames/s (divider 707). A 512-frame half therefore lasted 3.771 ms. Completed refill work averaged 5.157 ms (minimum 5.006 ms, maximum 6.594 ms). Failed/unused prefetch attempts are excluded from that completed-work metric; prefetch alone reached 7.579 ms. The smallest observed margin was 21 frames, about 155 us. Stack watermark was 1736 bytes, leaving 30304 bytes untouched.
 
 This confirms a streaming/refill scheduling-capacity failure in the diagnostic build at that setting, rather than evidence of corrupt reads or a stalled DMA engine. Mean sector-read attempt time was 1.415 ms and buffer copying remained 0.513 ms per half. The SD/SPI read path and bytewise audio copies are the next optimisation targets. This does not isolate card wait from driver CPU cost, and profiling itself adds overhead. Normal-firmware high-rate limits still need testing; sustained maximum-pitch 96 kHz/24-bit operation is not established as supported.
+
+## Build 17 throughput trial
+
+Build 17 adds an optional bulk-receive transport to the SD driver. The board implementation pipelines one SPI2 byte at a time at the same 12 MHz clock, starts the next byte before storing/polling, and avoids the per-payload-byte function-pointer call. Controls/watchdog continue to be polled every 64 transferred bytes. Each receive span has a bounded timeout; received sector data still undergo CRC16 checking. The ordinary byte transport remains the fallback and is still used for commands, responses and writes.
+
+Audio cache and staging copies now use a typed, four-word-unrolled copy for non-overlapping uint32_t arrays. General-purpose `memcpy` remains byte-safe. Buffer sizes, copy deadline guards, pitch mapping and SD write scope are unchanged. The profiling report formatter uses size optimisation only while stopped, keeping the diagnostic within the existing application layout. Normal code/constants use 27480 bytes (4332 free); the diagnostic uses 31796 bytes (16 free). Static RAM is unchanged at 32160 / 33488 bytes respectively. Hardware speedup remains unmeasured until a new run is collected.
+
+For the next comparison, keep the AGNT2-only playlist and install the build-17 profiling image. Copy `examples/config/loop-quantized.txt` to the card as `config.txt` so the run reliably starts in Loop/Quantize rather than Trigger. Preserve your previous config if needed. Use the same highest-pitch setting that failed in build 16, run for a minute if it remains playing, then turn FILE to stop and wait one second. If it turns blue earlier, stop triggering and let the diagnostic save its failure report. The new report must say build 17; old build-16 data can remain on the card until a new report is successfully written.
+
+Regression coverage includes bulk and fallback card protocols, CRC rejection, partial transfer failure, control polling cadence and timeout wraparound. A narrow MIPS32 instruction model executes the actual linked receive/copy functions to check clock/receive counts, one outstanding byte, guard bytes and poll placement. This is a logical register model, not a cycle-accurate SPI/card simulation. Independent measurements on the module are still required.
