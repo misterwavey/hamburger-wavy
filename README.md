@@ -51,7 +51,7 @@ diskutil eject "/Volumes/TTA ONE"
 
 Use the [manufacturer's update procedure](https://www.tiptopaudio.com/manuals/Tiptop_Audio_one.pdf): power down, insert the card, hold PLAY while powering up, and allow the updater's rapid flashing to complete. The application then starts. Do not interrupt updating.
 
-Normal application startup shows blue for one second, without a build-count flash sequence. After running with a writable card, `ONEBUILD.TXT` records the running build. Read its first line after returning the card to your computer. A same-name conflicting file or unavailable write does not deliberately prevent playback.
+At startup, the PLAY button lights blue for one second. The firmware writes its build number to `ONEBUILD.TXT` on the SD card, which you can read on your computer to check which version is installed. If the file cannot be written, playback can still start.
 
 ## Use
 
