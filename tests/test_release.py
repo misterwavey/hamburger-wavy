@@ -404,6 +404,76 @@ class ReleaseTests(unittest.TestCase):
                                capture_output=True,text=True)
         self.assertNotEqual(invalid.returncode,0)
 
+    def test_mips_rotate_and_shift_encodings(self):
+        def run(word,value,amount=0):
+            code=word.to_bytes(4,'little')+bytes.fromhex('0800e00300000000')
+            m=CPU({0x1d000000+i:b for i,b in enumerate(code)})
+            return m.run(0x9d000000,value,amount)
+        for value in (0,1,0x80000000,0x12345678,0xffffffff):
+            for amount in range(32):
+                rotate=((value>>amount)|(value<<(32-amount)))&0xffffffff
+                self.assertEqual(run((1<<21)|(4<<16)|(2<<11)|(amount<<6)|2,value),rotate)
+                self.assertEqual(run((5<<21)|(4<<16)|(2<<11)|(1<<6)|6,value,amount),rotate)
+                self.assertEqual(run((4<<16)|(2<<11)|(amount<<6)|2,value),value>>amount)
+                self.assertEqual(run((5<<21)|(4<<16)|(2<<11)|6,value,amount),value>>amount)
+        with self.assertRaises(AssertionError):run((2<<21)|(4<<16)|(2<<11)|2,1)
+        with self.assertRaises(AssertionError):run((5<<21)|(4<<16)|(2<<11)|(2<<6)|6,1,1)
+
+    def test_flash_bank_image_and_execution(self):
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--flash-bank'],
+                              capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        out=ROOT/'build/flash-bank';image=read_hex(out/'image.hex')
+        spec,contract=template(ROOT/'board/update-layout.json')
+        extra=set(range(0x1d014000,0x1d020000))
+        self.assertEqual(set(image)-set(contract),extra)
+        self.assertFalse(set(contract)-set(image))
+        normal=read_hex(ROOT/'build/image.hex')
+        self.assertEqual({a for a in image if a>=0x1fc00000},
+                         {a for a in normal if a>=0x1fc00000})
+        for a in image:
+            if a>=0x1fc00000:self.assertEqual(image[a],normal[a])
+        lines=(out/'image.hex').read_text().splitlines()
+        for expected,actual in zip(spec['records'][:-1],lines):
+            self.assertEqual(expected.lower(),actual[:9].lower() if expected[7:9]=='00' else actual.lower())
+        with self.assertRaises(ValueError):extract(out/'hamburger-wavy.elf')
+        with self.assertRaises(ValueError):extract(out/'hamburger-wavy.elf',True)
+        payload,symbols,layout,calls=extract(out/'hamburger-wavy.elf',True,True)
+        self.assertEqual(symbols['standalone_start'],0x9d00b970)
+        self.assertEqual(symbols['standalone_reset'],0x9d013a44)
+        self.assertEqual(symbols['flash_extension_mix'],0x9d014000)
+        self.assertEqual(symbols['flash_extension_high'],0x9d01ff00)
+        self.assertEqual(symbols['flash_extension_tail'],0x9d01fff0)
+        for address,byte in image.items():
+            expected=255
+            if address in extra:
+                word=(((address-0x1d014000)//4)*0x9e3779b9)^0x48570017
+                expected=(word>>((address&3)*8))&255
+            self.assertEqual(byte,payload.get(address,expected))
+        for target in (0x9d014000,0x9d01ff00):
+            self.assertTrue(any(int(dst,16)==target for _,dst in calls))
+        for corrupt in (None,0,255,256,6144,12224,12287,'last_page_missing'):
+            m=CPU(image)
+            m.hooks[symbols['board_watchdog']]=lambda cpu,*args:0
+            for address in extra:m.poke(address|0xa0000000,image[address],1)
+            if corrupt=='last_page_missing':
+                for address in range(0xbd01fc00,0xbd020000):m.poke(address,255,1)
+            elif corrupt is not None:
+                address=0xbd014000+corrupt*4;m.poke(address,m.read(address)^1)
+            self.assertEqual(m.run(symbols['flash_probe_check'],budget=2000000),int(corrupt is None))
+            if corrupt is None:self.assertEqual(len(m.calls),48)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            for name in ('firmware','tools','board'):
+                shutil.copytree(ROOT/name,root/name,ignore=shutil.ignore_patterns('__pycache__'))
+            result=subprocess.run([sys.executable,str(root/'tools/build.py'),'--flash-bank'],
+                                  capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual((root/'build/flash-bank/image.hex').read_bytes(),(out/'image.hex').read_bytes())
+        invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--flash-bank','--profile'],
+                               capture_output=True,text=True)
+        self.assertNotEqual(invalid.returncode,0)
+
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
         if not cc: self.skipTest('no host C compiler')

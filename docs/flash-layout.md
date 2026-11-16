@@ -73,3 +73,27 @@ On the first build-22 trial, the mounted card's image matched the candidate hash
 ### Rollback result
 
 After the requested rollback procedure, the mounted card's image matched the archived normal build-21 image and ONEBUILD.TXT identified build 21. This confirms continued SD update access and return to normal application startup after the first extension trial. The user reported completing the requested procedure; detailed listening observations were not separately supplied. It does not establish whether the extension page was erased or provide a general recovery guarantee. Only the extra page at physical 0x1D014000 has been verified; the remaining upper-flash range is still untested. A further investigation should check a bounded larger extension bank with executable code and data near its upper end before treating that bank as available application capacity.
+
+## Build 23: bounded 48 KiB bank trial
+
+After build 22 and its rollback succeeded, `make flash-bank` prepares a separate build 23 at `build/flash-bank/image.hex`. Standard builds remain build 21. This extends addressed coverage to the whole bank `0x1D014000..0x1D01FFFF`: 49152 bytes, or 48 hardware erase pages. The legacy gap before that bank stays unaddressed. Code near both ends of the bank is called after verification: the lower routine starts at CPU `0x9D014000`, the upper routine at `0x9D01FF00`, and a marker occupies `0x9D01FFF0..0x9D01FFFF`.
+
+The bank is deliberately filled with varied non-erased words. For each word index from zero, the expected fill is `((index * 0x9E3779B9) ^ 0x48570017) modulo 2^32`, except where the linked code and final marker override it. Low flash stores only the small compiled code/marker expectations and computes the rest of the pattern. It compares all 12288 words through the uncached alias, servicing the watchdog every 256 words, before making two checked calls to each end's routine. This tests missing middle pages as well as the endpoints without duplicating a 48 KiB bank in low flash. It is an exact word comparison, not merely a checksum. The code and marker differ from build 22, so its stale one-page contents cannot pass this trial.
+
+The builder retains the one-page mode's address limits. A separate explicit bank mode permits the larger section placements and HEX span, with two-pass generation and exact coverage tests. Main text/constants use 27908 bytes (3904 free in the legacy main region), the linked bank code/marker occupy 116 bytes, and static RAM remains 55712 bytes. The rest of the addressed bank contains generated test data. This demonstrates available locations if accepted, not that a 48 KiB real-world application has been exercised. It also does not investigate addresses at or above `0x1D020000`.
+
+The bank is not yet hardware validated. It addresses substantially more previously undumped flash than build 22, so that trial's success and rollback do not guarantee this one. Boot/configuration addresses and entry/reset locations are retained. The candidate must not be treated as the new ordinary firmware until acceptance, startup, playback and rollback are checked.
+
+Copy the candidate, compare, eject and install using the usual updater procedure:
+
+```sh
+cp build/flash-bank/image.hex "/Volumes/TTA ONE/image.hex"
+sync
+cmp build/flash-bank/image.hex "/Volumes/TTA ONE/image.hex"
+diskutil eject "/Volumes/TTA ONE"
+```
+
+Keep the current config/playlist. Successful ordinary startup and a fresh ONEBUILD.TXT identifying **23** establish that the full bank compared correctly and code at both ends executed. As with build 22, a validation failure alternates red/blue without entering the application or writing the new build record. Let it boot, check playback, stop and wait five seconds idle, then power down and mount. After success, separately test rollback with the unchanged normal build-21 image. No profiler report is expected from the bank probe.
+
+
+Build-23 software validation: all 16 release tests pass, including full-bank logical execution, first/middle/last-word corruption, a missing final page, exact patterned HEX coverage, legacy record-header preservation, boot/configuration invariants and isolated reconstruction. Testing exposed and corrected the interpreter's prior handling of ROTR as a logical shift; independent immediate/variable rotate and shift encodings now have regression checks. Normal/profile build 21 and the one-page build 22 remain byte-identical to archived artifacts. Hardware acceptance of the bank remains pending.

@@ -2,7 +2,7 @@
 PYTHON ?= python3
 BUILD_FLAGS ?=
 
-.PHONY: all profile flash-probe test clean
+.PHONY: all profile flash-probe flash-bank test clean
 all:
 	$(PYTHON) tools/build.py $(BUILD_FLAGS)
 
@@ -11,6 +11,9 @@ profile:
 
 flash-probe:
 	$(PYTHON) tools/build.py --flash-probe $(BUILD_FLAGS)
+
+flash-bank:
+	$(PYTHON) tools/build.py --flash-bank $(BUILD_FLAGS)
 
 test: all
 	$(PYTHON) -m unittest discover -s tests -v

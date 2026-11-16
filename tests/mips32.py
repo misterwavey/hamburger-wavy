@@ -72,10 +72,15 @@ class CPU:
             if op==0:
                 a,b=self.r[rs],self.r[rt]
                 if fn==0: self.r[rd]=b<<sa
-                elif fn==2: self.r[rd]=b>>sa
+                elif fn==2:
+                    if rs not in (0,1):raise AssertionError('reserved SRL/ROTR encoding')
+                    self.r[rd]=(b>>sa)|(b<<(32-sa)) if rs else b>>sa
                 elif fn==3: self.r[rd]=signed(b)>>sa
                 elif fn==4: self.r[rd]=b<<(a&31)
-                elif fn==6: self.r[rd]=b>>(a&31)
+                elif fn==6:
+                    if sa not in (0,1):raise AssertionError('reserved SRLV/ROTRV encoding')
+                    shift=a&31
+                    self.r[rd]=(b>>shift)|(b<<(32-shift)) if sa else b>>shift
                 elif fn==7: self.r[rd]=signed(b)>>(a&31)
                 elif fn==8: branch=a
                 elif fn==9: self.r[rd]=pc+8;branch=a

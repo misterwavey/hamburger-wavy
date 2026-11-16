@@ -72,3 +72,5 @@ Current build 21 offers normal and optional profiling images. It retains build 2
 Hamburger Wavy is independent of Tiptop Audio and is not endorsed by the manufacturer. Hardware/product names identify compatibility.
 
 An optional [flash-layout experiment](docs/flash-layout.md) builds a separate build-22 image to test one extra application page. Its first hardware trial verified and executed that page, and rollback to build 21 also succeeded. Standard builds remain build 21.
+
+`make flash-bank` prepares the next separate experiment, build 23, to verify a 48 KiB extension bank and execute code near both ends. Hardware acceptance is pending; see the flash-layout guide.

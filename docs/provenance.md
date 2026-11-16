@@ -66,3 +66,6 @@ Build 21 subsequently completed a CRC-valid 152.681-second maximum-quantized-pit
 
 
 The separate build-22 flash-extension probe adds a project-written routine and marker in one new program-flash page and a low-flash verifier generated from the compiled page. It imports no vendor implementation or data. The normal image still uses the previous address contract. See flash-layout.md for address coverage, generated expected-data provenance, execution checks and the distinction between hardware capacity and unverified updater acceptance.
+
+
+The build-23 bank probe fills 48 KiB with a project-generated index-dependent word pattern, overridden only by the project's compiled endpoint routines and final marker. Low-flash code compares every word against the generated expectations before making checked calls near both ends. No vendor code/data are imported. The standard build-21 images remain unchanged; the expanded address contract is explicit and experimental. See flash-layout.md for coverage and pending hardware validation.
