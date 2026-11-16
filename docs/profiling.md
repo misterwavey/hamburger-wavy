@@ -10,7 +10,7 @@ From the repository:
 make profile
 ```
 
-The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 17; the diagnostic manifest has `profiling: true`.
+The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 18; the diagnostic manifest has `profiling: true`.
 
 Install the diagnostic using the usual SD update procedure:
 
@@ -21,7 +21,7 @@ cmp build/profile/image.hex "/Volumes/TTA ONE/image.hex"
 diskutil eject "/Volumes/TTA ONE"
 ```
 
-Startup remains one second blue. `ONEBUILD.TXT` should show build 17. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
+Startup remains one second blue. `ONEBUILD.TXT` should show build 18. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
 
 ## Collect a report
 
@@ -135,3 +135,11 @@ Audio cache and staging copies now use a typed, four-word-unrolled copy for non-
 For the next comparison, keep the AGNT2-only playlist and install the build-17 profiling image. Copy `examples/config/loop-quantized.txt` to the card as `config.txt` so the run reliably starts in Loop/Quantize rather than Trigger. Preserve your previous config if needed. Use the same highest-pitch setting that failed in build 16, run for a minute if it remains playing, then turn FILE to stop and wait one second. If it turns blue earlier, stop triggering and let the diagnostic save its failure report. The new report must say build 17; old build-16 data can remain on the card until a new report is successfully written.
 
 Regression coverage includes bulk and fallback card protocols, CRC rejection, partial transfer failure, control polling cadence and timeout wraparound. A narrow MIPS32 instruction model executes the actual linked receive/copy functions to check clock/receive counts, one outstanding byte, guard bytes and poll placement. This is a logical register model, not a cycle-accurate SPI/card simulation. Independent measurements on the module are still required.
+
+## Build 17 hardware result and build 18 CRC trial
+
+A CRC-valid build-17 report recorded one Loop/Quantize start with a 96 kHz/24-bit file at approximately 143928 output frames/s. It stopped after 31.24 ms with one late-commit rejection and no read, stationary-DMA, ring-underrun or copy-overlap errors. Copy time fell to 75.333 us from build 16's roughly 512.6 us. Mean SD read attempt time was 1.137 ms, prefetch 3.812 ms and completed refill work 3.903 ms. The half-buffer period was 3.557 ms; the improvement was insufficient for sustained operation. Minimum observed margin was 112 frames (778 us), below the unchanged 128-frame copy guard. Reducing that guard alone would not correct an average refill slower than the playback period.
+
+Build 18 replaces the CRC16 nibble-table update with a folded polynomial calculation, eliminating both per-byte flash-table reads. The polynomial, initial state, received CRC bytes, CRC comparisons and write CRCs are unchanged. All 65536 CRC states times 256 input bytes were checked against an independent bitwise recurrence (16777216 combinations), alongside the existing normal/instrumented protocol, corruption, transport-failure and filesystem tests. The measured 544 us maximum service gap in the previous run is consistent with a costly software section, but does not by itself isolate that section's duration; hardware measurement is required to quantify the CRC change.
+
+For the next trial install the build-18 profiling image and keep the existing AGNT2-only playlist and Loop/Quantize config. Repeat the same full-pitch run, stop by browsing if it remains playing, wait one second, and collect the report. Normal main code/constants now use 27368 bytes (4444 free); profiling uses 31684 (128 free). RAM is unchanged. No clock, buffer, deadline guard or update-layout change was made.

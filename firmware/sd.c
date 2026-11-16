@@ -108,13 +108,14 @@ fail:
   release(s);
   return -1;
 }
-static uint16_t crc16_byte(uint16_t crc, uint8_t byte) {
-  static const uint16_t table[16] = {
-      0,      0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
-      0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef};
-  crc = (uint16_t)((crc << 4) ^ table[(crc >> 12) ^ (byte >> 4)]);
-  return (uint16_t)((crc << 4) ^ table[(crc >> 12) ^ (byte & 15u)]);
+/* Expand the x^16+x^12+x^5+1 recurrence one byte at a time. The folded
+ * high byte removes both flash-table lookups; CRC checking stays enabled. */
+static inline __attribute__((always_inline)) uint16_t crc16_byte(uint16_t crc, uint8_t byte) {
+  uint32_t x = (crc >> 8) ^ byte;
+  x ^= x >> 4;
+  return (uint16_t)((crc << 8) ^ (x << 12) ^ (x << 5) ^ x);
 }
+
 int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
   Sd *s = ctx;
   if (!s->ready)

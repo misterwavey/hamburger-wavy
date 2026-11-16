@@ -143,7 +143,7 @@ def summary(report):
     if wall_us:
         share = 100*report['metrics']['refill_work']['total_us']/wall_us
         lines.append(f"Measured refill work / observed playback time: {share:.2f}% "
-                     '(includes SD waits; excludes other work; not CPU utilisation)')
+                     '(completed refills only; includes SD waits; excludes discarded prefills/other work; not CPU utilisation)')
     lines.append(f"Back-to-back timer-read minimum: {report['timer_read_pair_min_us']:.3f} us; "
                  'instrumentation overhead is not subtracted.')
     if 'local_build_resources' in report:

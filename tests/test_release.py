@@ -293,6 +293,18 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(m.read(destination-1,1),0xa5)
             self.assertEqual(m.read(destination+words*4,1),0x5a)
 
+    def test_crc_update_exhaustively(self):
+        cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
+        if not cc: self.skipTest('no host C compiler')
+        binary=ROOT/'build/crc-test'
+        result=subprocess.run([cc,'-std=c11','-O2','-Wall','-Wextra','-Werror',
+                               str(ROOT/'tests/crc.c'),'-o',str(binary)],
+                              capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        result=subprocess.run([str(binary)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('16777216',result.stdout)
+
     def test_distribution_has_notices_and_no_private_inputs(self):
         self.assertIn('Version 3, 29 June 2007', (ROOT/'LICENSE').read_text())
         self.assertIn('Copyright 2011 Ben Buxton', (ROOT/'NOTICE').read_text())
