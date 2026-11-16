@@ -1,6 +1,6 @@
 # Updater image layout and the first extension trial
 
-The standard build remains build 21. `make flash-probe` creates a separate experimental build 22 under `build/flash-probe`; it does not replace the standard image. The first hardware trial reached build 22; rollback is pending.
+The standard build remains build 21. `make flash-probe` creates a separate experimental build 22 under `build/flash-probe`; it does not replace the standard image. The first hardware trial reached build 22, then rollback reached build 21.
 
 ## Hardware capacity versus our current limit
 
@@ -68,3 +68,8 @@ After success, test rollback through the same updater using `build/image.hex` (t
 ## First hardware result
 
 On the first build-22 trial, the mounted card's image matched the candidate hash and ONEBUILD.TXT identified build 22. Because the build-record writer is reached only after the full-page comparison and two checked extension calls, this supports successful programming/readback and execution of the added page at physical 0x1D014000 on the tested module. The user reported completion of the requested install/playback procedure; detailed playback observations were not separately supplied. It does not establish the updater's erase extent, availability of other upper pages, or continued update access. The next check is rollback to the unchanged build-21 normal image, then confirmation that ONEBUILD.TXT returns to 21 and playback works.
+
+
+### Rollback result
+
+After the requested rollback procedure, the mounted card's image matched the archived normal build-21 image and ONEBUILD.TXT identified build 21. This confirms continued SD update access and return to normal application startup after the first extension trial. The user reported completing the requested procedure; detailed listening observations were not separately supplied. It does not establish whether the extension page was erased or provide a general recovery guarantee. Only the extra page at physical 0x1D014000 has been verified; the remaining upper-flash range is still untested. A further investigation should check a bounded larger extension bank with executable code and data near its upper end before treating that bank as available application capacity.
