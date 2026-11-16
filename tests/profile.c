@@ -35,11 +35,11 @@ int main(int argc, char **argv) {
   profile_sample(PROF_ENVELOPE,1200);
   profile_sample(PROF_COPY,240);
   profile_pitch(2000);
-  offset=4096+512;
+  offset=ONE_HALF_FRAMES * 8u + (ONE_HALF_FRAMES - 448u) * 8u;
   profile_margin(0); /* 448 frames remain in the active half. */
   profile_publish(1440);
   /* More remaining frames can still mean less time at a faster pitch. */
-  profile_pitch(1000); offset=4096+256; profile_margin(0);
+  profile_pitch(1000); offset=ONE_HALF_FRAMES * 8u + (ONE_HALF_FRAMES - 480u) * 8u; profile_margin(0);
   profile_error(PROF_LATE_ERROR);
   ticks+=100000;
   profile_stop(1000);

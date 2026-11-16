@@ -9,6 +9,10 @@ static int exact(File *f, void *p, uint32_t n) {
   uint32_t got;
   return file_read(f, p, n, &got) || got != n ? -1 : 0;
 }
+/* Header parsing runs only during file selection. */
+#if defined(__clang__)
+__attribute__((minsize))
+#endif
 int wave_open(File *f, Wave *w) {
   uint8_t h[40];
   memset(w, 0, sizeof(*w));
@@ -73,13 +77,20 @@ int pcm_decode(const uint8_t *src, uint32_t bits, uint32_t *dst,
   if (bits != 16 && bits != 24)
     return -1;
   PROFILE_BEGIN(decode);
-  for (uint32_t i = 0; i < frames; i++) {
-    uint32_t word = bits == 16
-                        ? ((uint32_t)src[0] << 16) | ((uint32_t)src[1] << 24)
-                        : ((uint32_t)src[0] << 8) | ((uint32_t)src[1] << 16) |
-                              ((uint32_t)src[2] << 24);
-    dst[i * 2] = dst[i * 2 + 1] = word;
-    src += bits / 8;
+  /* Select the PCM width once per buffer, not once per sample. */
+  if (bits == 16) {
+    for (uint32_t i = 0; i < frames; i++) {
+      uint32_t word = ((uint32_t)src[0] << 16) | ((uint32_t)src[1] << 24);
+      dst[0] = dst[1] = word;
+      dst += 2; src += 2;
+    }
+  } else {
+    for (uint32_t i = 0; i < frames; i++) {
+      uint32_t word = ((uint32_t)src[0] << 8) | ((uint32_t)src[1] << 16) |
+                      ((uint32_t)src[2] << 24);
+      dst[0] = dst[1] = word;
+      dst += 2; src += 3;
+    }
   }
   PROFILE_END(PROF_DECODE, decode);
   return 0;

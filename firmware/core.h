@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #define ONE_MAX_FILES 256u
-#define ONE_HALF_FRAMES 512u
+#define ONE_HALF_FRAMES 1024u
 #define ONE_CACHE_FRAMES (ONE_HALF_FRAMES * 2u)
 typedef int (*BlockRead)(void *, uint32_t, uint8_t *);
 typedef int (*BlockWrite)(void *, uint32_t, const uint8_t *);

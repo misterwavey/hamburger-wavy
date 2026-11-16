@@ -28,7 +28,7 @@ static void add(uint32_t *low, uint32_t *high, uint32_t ticks) {
   *low += ticks;
   *high += *low < old;
 }
-void profile_init(void) {
+REPORT_SIZE void profile_init(void) {
   memset(&p, 0, sizeof(p));
   p.slack = p.slack_weight = 0xffffffffu; p.timer_min = 0xffffffffu;
   for (uint32_t i = 0; i < 16; ++i) {
@@ -44,14 +44,14 @@ void profile_poll(void) {
   if (elapsed > p.gap_max) p.gap_max = elapsed;
   p.last_tick = now;
 }
-void profile_start(uint32_t rate, uint32_t bits, uint32_t mode, uint32_t cv,
+REPORT_SIZE void profile_start(uint32_t rate, uint32_t bits, uint32_t mode, uint32_t cv,
                    uint32_t divider) {
   p.context[0] = rate; p.context[1] = bits; p.context[2] = mode;
   p.context[3] = cv; p.context[4] = divider;
   p.playing = 1; p.prefetch = 0; p.last_tick = board_ticks();
   increment(&p.plays);
 }
-void profile_stop(uint32_t now) {
+REPORT_SIZE void profile_stop(uint32_t now) {
   if (p.playing) {
     profile_poll();
     p.playing = 0; p.dirty = 1; p.stopped = now;
@@ -88,8 +88,8 @@ void profile_publish(uint32_t ticks) {
 }
 void profile_margin(uint32_t half) {
   uint32_t pos = board_audio_offset();
-  uint32_t frames = pos < 8192 && pos / 4096u != half ?
-                    (4096u - pos % 4096u) / 8u : 0;
+  uint32_t frames = pos < ONE_CACHE_FRAMES * 8u && pos / (ONE_HALF_FRAMES * 8u) != half ?
+                    (ONE_HALF_FRAMES * 8u - pos % (ONE_HALF_FRAMES * 8u)) / 8u : 0;
   p.latest_margin = frames;
   /* Current divider fits 16 bits: this weighted product cannot overflow. */
   uint32_t weight = frames * p.context[4];

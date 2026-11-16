@@ -611,7 +611,7 @@ static void audio_progress_on_transfer(void) {
     uint32_t advance = host_transfer_advance;
     if (host_transfer_budget && advance > host_transfer_budget)
       advance = host_transfer_budget;
-    host_offset = (host_offset + advance) % 8192u;
+    host_offset = (host_offset + advance) % (ONE_CACHE_FRAMES * 8u);
     if (host_transfer_budget) {
       host_transfer_budget -= advance;
       if (!host_transfer_budget)
@@ -690,14 +690,14 @@ void board_audio_start(const uint32_t *data) {
 }
 uint32_t board_audio_offset(void) { return host_offset; }
 int board_audio_commit_safe(uint32_t half) {
-  return !host_unsafe && host_offset / 4096u != half &&
-         4096u - host_offset % 4096u >= 1024u;
+  return !host_unsafe && host_offset / (ONE_HALF_FRAMES * 8u) != half &&
+         ONE_HALF_FRAMES * 8u - host_offset % (ONE_HALF_FRAMES * 8u) >= 1024u;
 }
 static void test_application(void) {
   static uint8_t data[9000];
   clear_disk();
   boot(block(0), 5000, 20, 1, 32, 1);
-  uint32_t size = wav(data, 16, 2000);
+  uint32_t size = wav(data, 16, ONE_HALF_FRAMES * 4u - 48u);
   entry(block(21), "PLAYER  WAV", 3, size);
   for (uint32_t off = 0, cluster = 3; off < size; cluster++, off += 512) {
     uint32_t n = size - off;
@@ -719,21 +719,21 @@ static void test_application(void) {
   CHECK(host_starts == 1);
   host_pins |= 0x800;
   app_tick();
-  host_offset = 4096;
+  host_offset = ONE_HALF_FRAMES * 8u;
   app_tick();
-  uint32_t offset = 44 + 1024 * 2u,
+  uint32_t offset = 44 + ONE_CACHE_FRAMES * 2u,
            expected = ((uint32_t)data[offset] << 16) |
                       ((uint32_t)data[offset + 1] << 24);
   CHECK(host_active && host_audio[0] == expected && host_audio[1] == expected);
   host_offset = 0;
   app_tick();
   CHECK(host_active);
-  offset = 44 + 1999 * 2u;
+  offset = 44 + (ONE_HALF_FRAMES * 4u - 49u) * 2u;
   expected =
       ((uint32_t)data[offset] << 16) | ((uint32_t)data[offset + 1] << 24);
-  CHECK(host_audio[1024 + 463 * 2] == expected &&
-        host_audio[1024 + 464 * 2] == 0);
-  host_offset = 4096;
+  CHECK(host_audio[ONE_HALF_FRAMES * 2u + (ONE_HALF_FRAMES - 49u) * 2u] == expected &&
+        host_audio[ONE_HALF_FRAMES * 2u + (ONE_HALF_FRAMES - 48u) * 2u] == 0);
+  host_offset = ONE_HALF_FRAMES * 8u;
   app_tick();
   CHECK(host_audio[0] == 0 && host_active);
   host_pins &= ~0x200u;
@@ -758,7 +758,7 @@ static void test_application(void) {
   CHECK(host_pitch == 128);
   /* Refuse a late unsafe buffer copy rather than overwriting active DMA data.
    */
-  host_offset = 4096;
+  host_offset = ONE_HALF_FRAMES * 8u;
   host_unsafe = 1;
   app_tick();
   CHECK(!host_active && host_led == 1);
@@ -772,7 +772,7 @@ static void test_application(void) {
   app_tick();
   CHECK(host_active && host_starts == 3);
   app_card.token_bad = 1;
-  host_offset = 4096;
+  host_offset = ONE_HALF_FRAMES * 8u;
   app_tick(); /* The already-prefetched half may publish without card access. */
   app_tick(); /* The following prefetch encounters the injected read error. */
   CHECK(!host_active);
@@ -877,7 +877,7 @@ static void pulse(void) {
   app_tick();
 }
 static void advance_half(void) {
-  host_offset ^= 4096;
+  host_offset ^= ONE_HALF_FRAMES * 8u;
   app_card.time++;
   app_tick();
 }
@@ -1054,15 +1054,15 @@ static void test_modes(void) {
     feature_mount();
     pulse();
     CHECK(host_active && host_starts == 1);
-    for (uint32_t i = 0; i < 1024; i++)
+    for (uint32_t i = 0; i < ONE_CACHE_FRAMES; i++)
       CHECK(host_audio[2 * i] == sample_word(1, i % 37));
     for (uint32_t half = 0; half < 8; half++) {
       advance_half();
       CHECK(host_active);
-      uint32_t offset = (half & 1u) * 1024u;
-      for (uint32_t i = 0; i < 512; i++)
+      uint32_t offset = (half & 1u) * ONE_HALF_FRAMES * 2u;
+      for (uint32_t i = 0; i < ONE_HALF_FRAMES; i++)
         CHECK(host_audio[offset + 2 * i] ==
-              sample_word(1, (1024 + half * 512 + i) % 37));
+              sample_word(1, (ONE_CACHE_FRAMES + half * ONE_HALF_FRAMES + i) % 37));
     }
     pulse();
     CHECK(host_active && host_audio[0] == sample_word(1, 0));
@@ -1117,12 +1117,12 @@ static void test_modes(void) {
     CHECK(frame < feature_frames);
     if (frame)
       different++;
-    for (uint32_t k = 0; k < 1024; k++)
+    for (uint32_t k = 0; k < ONE_CACHE_FRAMES; k++)
       CHECK(host_audio[2 * k] == sample_word(1, (frame + k) % feature_frames));
     advance_half();
-    for (uint32_t k = 0; k < 512; k++)
+    for (uint32_t k = 0; k < ONE_HALF_FRAMES; k++)
       CHECK(host_audio[2 * k] ==
-            sample_word(1, (frame + 1024 + k) % feature_frames));
+            sample_word(1, (frame + ONE_CACHE_FRAMES + k) % feature_frames));
   }
   CHECK(different > 0);
   feature_disk("# card\nTrigger\nSelect File\nMedium", 0, 37, 16);
@@ -1541,7 +1541,7 @@ static void test_playback_error_recovery_and_read_ahead(void) {
   click_play();
   CHECK(host_active && host_led == 2);
   /* Forced deadline failure must recover on another quick button click. */
-  host_offset = 4096;
+  host_offset = ONE_HALF_FRAMES * 8u;
   host_unsafe = 1;
   app_tick();
   CHECK(!host_active && host_led == 1);
@@ -1555,10 +1555,10 @@ static void test_playback_error_recovery_and_read_ahead(void) {
   host_transfer_advance = 160;
   click_play();
   CHECK(host_active && host_led == 2);
-  if (host_offset < 4096)
-    host_offset = 4096;
+  if (host_offset < ONE_HALF_FRAMES * 8u)
+    host_offset = ONE_HALF_FRAMES * 8u;
   app_tick();
-  CHECK(host_active && host_audio[0] == sample_word(1, 1024));
+  CHECK(host_active && host_audio[0] == sample_word(1, ONE_CACHE_FRAMES));
   host_transfer_advance = 0;
 }
 static void test_fade_gate_read_ahead(void) {
@@ -1571,10 +1571,10 @@ static void test_fade_gate_read_ahead(void) {
     host_transfer_advance = 128;
     click_play();
     CHECK(host_active && host_led == 2 && host_audio[0] == 0);
-    if (host_offset < 4096)
-      host_offset = 4096;
+    if (host_offset < ONE_HALF_FRAMES * 8u)
+      host_offset = ONE_HALF_FRAMES * 8u;
     app_tick();
-    CHECK(host_active && host_audio[0] == sample_word(1, 1024));
+    CHECK(host_active && host_audio[0] == sample_word(1, ONE_CACHE_FRAMES));
     host_transfer_advance = 0;
     /* Prefetch the next raw half, then request release/retrigger. The first
      * published release half must fade this data, rather than skipping it or
@@ -1584,8 +1584,8 @@ static void test_fade_gate_read_ahead(void) {
     CHECK(host_active && host_starts == 1);
     host_offset = 0;
     app_tick();
-    CHECK(host_audio[1024] < sample_word(1, 1536));
-    CHECK(host_audio[1024 + 2 * 255] == 0);
+    CHECK(host_audio[ONE_HALF_FRAMES * 2u] < sample_word(1, ONE_CACHE_FRAMES + ONE_HALF_FRAMES));
+    CHECK(host_audio[ONE_HALF_FRAMES * 2u + 2 * 255] == 0);
     for (uint32_t i = 0; i < 3; i++)
       advance_half();
     if (mode == 0)

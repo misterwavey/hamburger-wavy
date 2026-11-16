@@ -119,6 +119,9 @@ def main():
              unused_application_bytes='0xff',
              record_layout='address/record headers in board/update-layout.json; debug-vector bytes absent',
              source_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted([*(ROOT/'firmware').iterdir(),ROOT/'tools/generate_pitch.py',ROOT/'board/update-layout.json',Path(__file__).resolve()]) if p.is_file()})
+ half_frames=int(re.search(r'^#define ONE_HALF_FRAMES (\d+)u$',(ROOT/'firmware/core.h').read_text(),re.M)[1])
+ report['audio_buffers']=dict(half_frames=half_frames,dma_frames=half_frames*2,
+                              dma_bytes=half_frames*16,commit_guard_frames=128)
  report['resources']=dict(text_bytes=layout['.text']['bytes'],text_limit=0x7c44,
                           text_free=0x7c44-layout['.text']['bytes'],
                           static_ram_bytes=layout['.bss']['bytes'],ram_total=65536,

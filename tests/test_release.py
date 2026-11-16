@@ -283,7 +283,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(m.run(symbols['spi_read_bytes'],0,0xa0001000,512,
                                budget=200000),0xffffffff)
         self.assertEqual((m.clocks,m.received),(18,17))
-        for words in (0,1,3,4,5,1024,2048):
+        for words in (0,1,3,4,5,1024,2048,4096):
             m=CPU(image);source=0xa0001004;destination=0xa0006004
             for i in range(words):m.poke(source+i*4,(i*0x1020305)&0xffffffff)
             m.poke(destination-1,0xa5,1);m.poke(destination+words*4,0x5a,1)
@@ -307,6 +307,41 @@ class ReleaseTests(unittest.TestCase):
                                      [(i*7+3)&255 for i in range(length)])
                     self.assertEqual(m.read(dst-1,1),0xa5)
                     self.assertEqual(m.read(dst+length,1),0x5a)
+
+    def test_compiled_pcm_decode_formats_and_bounds(self):
+        image=read_hex(ROOT/'build/image.hex')
+        _,symbols,_,_=extract(ROOT/'build/hamburger-wavy.elf')
+        for bits in (16,24):
+            for frames in (0,1,37,1024,2048):
+                m=CPU(image);src=0xa0001001;dst=0xa0006004
+                width=bits//8
+                data=bytes((i*173+91)&255 for i in range(frames*width))
+                for i,b in enumerate(data):m.poke(src+i,b,1)
+                m.poke(dst-1,0xa5,1);m.poke(dst+frames*8,0x5a,1)
+                self.assertEqual(m.run(symbols['pcm_decode'],src,bits,dst,frames),0)
+                for i in range(frames):
+                    expected=int.from_bytes(data[i*width:(i+1)*width],'little')<<(32-bits)
+                    self.assertEqual(m.read(dst+i*8),expected)
+                    self.assertEqual(m.read(dst+i*8+4),expected)
+                self.assertEqual(m.read(dst-1,1),0xa5)
+                self.assertEqual(m.read(dst+frames*8,1),0x5a)
+        m=CPU(image)
+        self.assertEqual(m.run(symbols['pcm_decode'],0xa0001000,8,0xa0006000,1),0xffffffff)
+
+    def test_compiled_audio_deadline_guard(self):
+        image=read_hex(ROOT/'build/image.hex')
+        _,symbols,_,_=extract(ROOT/'build/hamburger-wavy.elf')
+        buffers=json.loads((ROOT/'build/manifest.json').read_text())['audio_buffers']
+        half_bytes=buffers['half_frames']*8
+        self.assertEqual(buffers['dma_bytes'],half_bytes*2)
+        self.assertLessEqual(buffers['dma_bytes'],65535)
+        for half in (0,1):
+            for active in (0,1):
+                for left in (8,1016,1024,1032,half_bytes):
+                    m=CPU(image)
+                    m.poke(0xbf883190,active*half_bytes+half_bytes-left)
+                    expected=int(active!=half and left>=1024)
+                    self.assertEqual(m.run(symbols['board_audio_commit_safe'],half),expected)
 
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')

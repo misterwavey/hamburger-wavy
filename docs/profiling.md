@@ -10,7 +10,7 @@ From the repository:
 make profile
 ```
 
-The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 19; the diagnostic manifest has `profiling: true`.
+The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 20; the diagnostic manifest has `profiling: true`.
 
 Install the diagnostic using the usual SD update procedure:
 
@@ -21,7 +21,7 @@ cmp build/profile/image.hex "/Volumes/TTA ONE/image.hex"
 diskutil eject "/Volumes/TTA ONE"
 ```
 
-Startup remains one second blue. `ONEBUILD.TXT` should show build 19. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
+Startup remains one second blue. `ONEBUILD.TXT` should show build 20. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
 
 ## Collect a report
 
@@ -159,3 +159,16 @@ Normal code/constants use 27464 bytes (4348 free); profiling uses 31780 bytes (3
 The CRC-valid report recorded one start and 2.980 seconds of playback, ending with one late-commit rejection. Read, stationary-DMA, ring and copy-overlap counters were zero. Mean completed refill time was 3.535 ms, worst 4.675 ms; mean prefetch was 3.456 ms and worst 4.593 ms. SD reads averaged 1.045 ms (worst 1.120 ms), with all attempts below 2 ms. Minimum slack was 122 frames, approximately 848 us at divider 667, below the unchanged 128-frame guard. Stack watermark remained 1680 bytes.
 
 The mean is now slightly below the tightest 3.557 ms half-buffer period, but leaves only about 22 us before other work and timing variation. Pitch varied: the worst completed refill context used divider 707, while the tightest slack used 667. The report does not record failure position or attribute individual stalls to a loop boundary. AGNT2 contains 261862 frames, lasting about 1.819 seconds at maximum pitch; the observed duration is consistent with crossing a loop boundary and stopping later, rather than proving failure exactly on wrap. More buffering can absorb occasional slow refills, but average throughput margin still needs improvement.
+
+
+## Build 20 buffer and decoder trial
+
+Build 20 doubles each DMA half from 512 to 1024 frames, the whole DMA ring from 1024 to 2048 frames, and the associated initial cache, staging and raw-input buffers. At divider 667 a half lasts approximately 7.115 ms. Each refill now processes twice as much audio: a larger half provides more tolerance of individual delays, not twice the sustainable throughput. The SD clock remains 12 MHz, received sectors retain CRC checks, and the commit guard remains 128 frames (1024 bytes). Profiler margin calculations and the host DMA model now use the actual buffer constants. Build manifests record the buffer sizes.
+
+PCM16 and PCM24 decoding use separate loops selected once per buffer. For 512 frames, the compiled normal-image logical MIPS model executes 5137 steps for PCM16 and 6672 for PCM24, compared with 7182 and 8206 in build 19. This is an instruction-path comparison, not a cycle-accurate speed measurement. Both formats, zero-length input, unaligned input and output boundary guards are checked through the compiled MIPS code. Loop continuity, PCM tails, prefetch, envelope/retrigger behaviour and deadline-error recovery are also exercised under host sanitizers with the larger buffers.
+
+Normal main code/constants use 27472 bytes (4340 free); profiling uses 31812 (zero free in the existing main-text region). Size optimisation of file-header parsing and profiler setup/stop code keeps the diagnostic within the fixed layout. No linker boundary, update coverage or boot configuration is expanded. Static RAM rises to 55712 bytes normally and 57040 with profiling, leaving 9824 and 8496 bytes respectively for the stack, including the existing 8192-byte minimum reserve. This deliberately spends most of the previous RAM headroom on streaming. Future feature work must revisit the buffer/cache allocation rather than assuming the earlier spare RAM remains available.
+
+Larger buffers can increase loop-trigger preparation latency because twice as much initial audio is read before playback starts. Buffered envelope/retrigger scheduling and the block-rounded end-of-playback interval can also lengthen. Trigger-mode starts still use the preloaded cache. Existing mode/light choices are retained; the effects on feel need a hardware check after the throughput trial.
+
+Install the build-20 profiling image and retain the AGNT2-only playlist and Loop/Quantize config. Set maximum pitch before starting and leave it there, so the report is a clean comparison. Aim for one minute of looping; if it stays playing, turn FILE to stop. Whether it stops itself or you stop it, wait one second before powering down and mounting. Check that the fresh report identifies build 20. Hardware performance remains unmeasured.

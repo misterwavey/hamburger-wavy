@@ -54,3 +54,6 @@ Build 18 uses a folded algebraic CRC16 polynomial update rather than table reads
 
 
 Build 19 extends the project-written memcpy with alignment-checked word accesses and a byte fallback, using a may_alias type for arbitrary object representations. No vendor code or library implementation was imported. All 11 release tests pass, including compiled-MIPS copy bounds/alignment tests; hardware performance awaits measurement. The build-18 hardware report confirmed improved transfer/refill timing but still recorded a late-commit stop at maximum pitch.
+
+
+Build 20 doubles the project's audio buffer sizes and uses project-written separate PCM16/PCM24 decode loops. Profiler margin calculations use the same constants as DMA playback. No vendor implementation is imported. File-header parsing and profiler setup/stop code use compiler size optimisation to retain the existing image layout. The normal/profiling static allocations are 55712/57040 bytes; both preserve the 8192-byte minimum stack reserve. Hardware performance and larger-buffer latency effects await measurement.
