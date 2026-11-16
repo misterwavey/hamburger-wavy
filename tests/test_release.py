@@ -359,6 +359,51 @@ class ReleaseTests(unittest.TestCase):
                     expected=int(active!=half and left>=1024)
                     self.assertEqual(m.run(symbols['board_audio_commit_safe'],half),expected)
 
+    def test_flash_extension_image_and_execution(self):
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--flash-probe'],
+                              capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        out=ROOT/'build/flash-probe'
+        image=read_hex(out/'image.hex')
+        _,contract=template(ROOT/'board/update-layout.json')
+        extra=set(range(0x1d014000,0x1d014400))
+        self.assertEqual(set(image)-set(contract),extra)
+        self.assertFalse(set(contract)-set(image))
+        self.assertEqual({a for a in image if a>=0x1fc00000},
+                         set(range(0x1fc00bf4,0x1fc00bfc)))
+        normal=read_hex(ROOT/'build/image.hex')
+        for a in image:
+            if a>=0x1fc00000:self.assertEqual(image[a],normal[a])
+        with self.assertRaises(ValueError):extract(out/'hamburger-wavy.elf')
+        payload,symbols,layout,calls=extract(out/'hamburger-wavy.elf',True)
+        self.assertEqual(symbols['standalone_start'],0x9d00b970)
+        self.assertEqual(symbols['standalone_reset'],0x9d013a44)
+        self.assertEqual(symbols['flash_extension_mix'],0x9d014000)
+        self.assertEqual(symbols['flash_extension_tail'],0x9d0143f0)
+        self.assertTrue(any(0x9d014000<=int(target,16)<0x9d014400 for _,target in calls))
+        for address,byte in image.items():self.assertEqual(byte,payload.get(address,255))
+        for corrupt in (None,0,31,127,255,'missing'):
+            m=CPU(image)
+            for address in extra:m.poke(address|0xa0000000,image[address],1)
+            if corrupt=='missing':
+                for address in extra:m.poke(address|0xa0000000,255,1)
+            elif corrupt is not None:
+                address=0xbd014000+corrupt*4
+                m.poke(address,m.read(address)^1)
+            self.assertEqual(m.run(symbols['flash_probe_check']),int(corrupt is None))
+        # A distribution built without private inputs produces the same probe.
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            for name in ('firmware','tools','board'):
+                shutil.copytree(ROOT/name,root/name,ignore=shutil.ignore_patterns('__pycache__'))
+            result=subprocess.run([sys.executable,str(root/'tools/build.py'),'--flash-probe'],
+                                  capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual((root/'build/flash-probe/image.hex').read_bytes(),(out/'image.hex').read_bytes())
+        invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--flash-probe','--profile'],
+                               capture_output=True,text=True)
+        self.assertNotEqual(invalid.returncode,0)
+
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
         if not cc: self.skipTest('no host C compiler')

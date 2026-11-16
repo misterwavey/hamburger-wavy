@@ -63,3 +63,6 @@ Build 21 shares the existing project-written folded CRC16 helper between the SD 
 
 
 Build 21 subsequently completed a CRC-valid 152.681-second maximum-quantized-pitch Loop/PCM24/96 kHz hardware run with zero recorded streaming errors. Mean completed refill work was 5.998 ms; the profiling guide records the measured margins and limits. This is validation of the tested file/card/settings combination, not a complete mode/rate/card matrix or formal timing proof.
+
+
+The separate build-22 flash-extension probe adds a project-written routine and marker in one new program-flash page and a low-flash verifier generated from the compiled page. It imports no vendor implementation or data. The normal image still uses the previous address contract. See flash-layout.md for address coverage, generated expected-data provenance, execution checks and the distinction between hardware capacity and unverified updater acceptance.
