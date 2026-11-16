@@ -56,8 +56,8 @@ uint32_t ui_poll(Ui *u, uint32_t down, int32_t step, uint32_t adc, uint32_t now,
       u->cv = s->cv;
     int32_t next = (int32_t)u->play + step;
     while (next < 0)
-      next += 8;
-    u->play = (PlayMode)(next % 8);
+      next += PLAY_COUNT;
+    u->play = (PlayMode)(next % PLAY_COUNT);
     u->kind = 0;
     u->file_edit = 1;
     u->led_time = now;

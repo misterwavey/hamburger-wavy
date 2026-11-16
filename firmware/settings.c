@@ -89,6 +89,10 @@ int settings_load(Fat *fs, Settings *out) {
     s.play = PLAY_RANDOM_SEQUENCE;
   else if (equal(text, "TG LOOP") || equal(text, "RANDOM LOOP"))
     s.play = PLAY_RANDOM_LOOP;
+#ifdef ONE_FLIP
+  else if (equal(text, "FLIP"))
+    s.play = PLAY_FLIP;
+#endif
   else
     return -2;
   n = line(&f, text, sizeof(text));

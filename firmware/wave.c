@@ -141,3 +141,65 @@ int wave_read_loop(File *f, Wave *w, uint32_t *dst, uint32_t frames,
   }
   return 0;
 }
+
+#ifdef ONE_FLIP
+/* Decode whole PCM frames backwards; byte order within each sample is kept. */
+int pcm_decode_reverse(const uint8_t *src, uint32_t bits, uint32_t *dst,
+                       uint32_t frames) {
+  if (bits != 16 && bits != 24) return -1;
+  PROFILE_BEGIN(decode);
+  if (bits == 16) {
+    for (uint32_t i = frames; i; --i) {
+      const uint8_t *p = src + (i - 1u) * 2u;
+      uint32_t word = (uint32_t)p[0] << 16 | (uint32_t)p[1] << 24;
+      dst[0] = dst[1] = word; dst += 2;
+    }
+  } else {
+    for (uint32_t i = frames; i; --i) {
+      const uint8_t *p = src + (i - 1u) * 3u;
+      uint32_t word = (uint32_t)p[0] << 8 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 24;
+      dst[0] = dst[1] = word; dst += 2;
+    }
+  }
+  PROFILE_END(PROF_DECODE, decode);
+  return 0;
+}
+uint32_t wave_frame_offset(uint32_t frame, uint32_t delta, uint32_t total,
+                           uint32_t reverse) {
+  if (!total) return 0;
+  delta %= total;
+  if (reverse) return frame >= delta ? frame - delta : total - (delta - frame);
+  uint32_t next = frame + delta;
+  return next >= total ? next - total : next;
+}
+int wave_read_direction(File *f, Wave *w, FileIndex *index,
+                        uint32_t *frame, uint32_t reverse, uint32_t *dst,
+                        uint32_t frames, uint8_t *scratch, uint32_t capacity) {
+  if ((w->bits != 16 && w->bits != 24) || !w->bytes) return -1;
+  uint32_t width = w->bits / 8u, total = w->bytes / width;
+  if (*frame >= total || frames > capacity / width) return -1;
+  uint8_t *boundary = 0;
+  if (reverse && capacity >= 1024u && frames * width <= capacity - 1024u)
+    boundary = scratch + capacity - 1024u;
+  else {
+    index->boundary_lba[0] = index->boundary_lba[1] = 0xffffffffu;
+    index->boundary_owner = 0;
+  }
+  while (frames) {
+    uint32_t available = reverse ? *frame + 1u : total - *frame;
+    uint32_t count = frames < available ? frames : available;
+    uint32_t first = reverse ? *frame + 1u - count : *frame, got;
+    if (file_seek_indexed(f, index, w->offset + first * width)) return -1;
+    if (boundary) {
+      if (file_read_window(f,index,scratch,count*width,boundary)) return -1;
+    } else if (file_read(f,scratch,count*width,&got) || got != count*width) return -1;
+    int error = reverse ? pcm_decode_reverse(scratch, w->bits, dst, count) :
+                          pcm_decode(scratch, w->bits, dst, count);
+    if (error) return -1;
+    *frame = wave_frame_offset(*frame, count, total, reverse);
+    dst += count * 2u; frames -= count;
+  }
+  return 0;
+}
+
+#endif

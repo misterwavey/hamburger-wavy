@@ -33,12 +33,64 @@ static uint32_t releasing, release_stop_block, restart_after_release,
     stream_frame, staging_ready;
 static int32_t selection_delta;
 
+#ifdef ONE_FLIP
+static FileIndex flip_index;
+static uint32_t flip_playing, flip_restarting, flip_fading, flip_pending, flip_reverse,
+    flip_requested, flip_cursor, flip_frame, flip_half[2], flip_staging_frame;
+static void flip_cancel(void) {
+  flip_playing = flip_restarting = flip_fading = flip_pending = 0;
+}
+static void flip_edge(void) {
+  if (ring.running) {
+    uint32_t frame = board_audio_offset() / 8u;
+    flip_frame = wave_frame_offset(flip_half[frame / ONE_HALF_FRAMES],
+        frame % ONE_HALF_FRAMES, wave.bytes / (wave.bits / 8u), flip_reverse);
+  }
+  if (ring.running || flip_restarting || flip_fading) {
+    flip_requested ^= 1u;
+    flip_pending = 1;
+  }
+}
+/* Snapshot a short continuation before stopping DMA. Play just this fade
+ * and silence while the main loop waits, instead of waiting whole halves. */
+static void flip_fade_out(void) {
+  uint32_t first = (board_audio_offset() / 8u) * 2u;
+  for (uint32_t i = 0; i < 512u; ++i)
+    staging[i] = audio[(first + i) % (ONE_CACHE_FRAMES * 2u)];
+  board_audio_stop(); ring.running = 0; staging_ready = 0;
+  envelope.gain = 32768; envelope.target = 0;
+  PROFILE_BEGIN(flip_fade);
+  envelope_apply(&envelope, staging, 256);
+  PROFILE_END(PROF_ENVELOPE, flip_fade);
+  audio_copy(audio, staging, 512);
+  for (uint32_t i = 512; i < ONE_CACHE_FRAMES * 2u; ++i) audio[i] = 0;
+  flip_fading = 1; dma_last_time = board_millis();
+  board_audio_start(audio);
+}
+static int flip_fill(uint32_t frame, uint32_t reverse) {
+  flip_reverse = reverse; flip_cursor = frame;
+  flip_half[0] = frame;
+  flip_half[1] = wave_frame_offset(frame, ONE_HALF_FRAMES,
+                                  wave.bytes / (wave.bits / 8u), reverse);
+  return wave_read_direction(&file, &wave, &flip_index, &flip_cursor, reverse,
+                             audio, ONE_CACHE_FRAMES, raw, sizeof(raw));
+}
+#endif
+
 static int looping(void) {
   return settings.play == PLAY_LOOP || settings.play == PLAY_COMBO ||
-         settings.play == PLAY_RANDOM_LOOP;
+         settings.play == PLAY_RANDOM_LOOP
+#ifdef ONE_FLIP
+         || settings.play == PLAY_FLIP
+#endif
+         ;
 }
 static int fading(void) {
-  return settings.play == PLAY_GATE || settings.play == PLAY_FADE;
+  return settings.play == PLAY_GATE || settings.play == PLAY_FADE
+#ifdef ONE_FLIP
+         || settings.play == PLAY_FLIP
+#endif
+         ;
 }
 static void queue_trigger(uint32_t manual) {
   if (!trigger_pending)
@@ -53,6 +105,9 @@ static void stop(void) {
   board_audio_stop();
 }
 static void playback_error(void) {
+#ifdef ONE_FLIP
+  flip_cancel();
+#endif
   stop();
   releasing = release_stop_block = restart_after_release = restart_manual = 0;
   error_state = 1;
@@ -78,8 +133,13 @@ void app_background(void) {
   }
   uint32_t pins = board_pins(), gate = (pins & 0x800u) == 0;
   if (gate && !last_gate && (pins & 0x200u) && !ui.button && !ui.menu &&
-      !ui_events)
-    queue_trigger(0);
+      !ui_events) {
+#ifdef ONE_FLIP
+    if (settings.play == PLAY_FLIP) flip_edge();
+    else
+#endif
+      queue_trigger(0);
+  }
   last_gate = gate;
   static const uint8_t transitions[7][4] = {
       {0, 2, 4, 0}, {3, 0, 1, 16}, {3, 2, 0, 0}, {3, 2, 1, 0},
@@ -105,6 +165,10 @@ static void update_pitch(void) {
   last_pitch = pitch;
 }
 static int select_file(uint32_t which) {
+#ifdef ONE_FLIP
+  flip_cancel();
+  memset(&flip_index, 0, sizeof(flip_index));
+#endif
   stop();
   releasing = release_stop_block = restart_after_release = restart_manual = 0;
   ready = error_state = 0;
@@ -116,6 +180,9 @@ static int select_file(uint32_t which) {
   if (wave_read(&file, &wave, cache, ONE_CACHE_FRAMES, &got, raw, sizeof(raw)))
     goto fail;
   cached_bytes = got * (wave.bits / 8);
+#ifdef ONE_FLIP
+  if (settings.play == PLAY_FLIP && file_index_build(&file, &flip_index)) goto fail;
+#endif
   update_pitch();
   ready = 1;
   board_led(0);
@@ -133,6 +200,44 @@ static void begin_release(uint32_t restart) {
   }
   restart_after_release = restart;
 }
+#ifdef ONE_FLIP
+static void arm_audio(uint32_t manual) {
+  envelope.gain = fading() ? 0 : 32768;
+  envelope.target = 32768;
+  if (fading()) {
+    envelope_apply(&envelope, audio, ONE_CACHE_FRAMES);
+    if (settings.play != PLAY_FLIP)
+      envelope_tail(audio, ONE_CACHE_FRAMES, 0, wave.bytes / (wave.bits / 8));
+  }
+  stream_frame = ONE_CACHE_FRAMES;
+  if (manual)
+    (void)recall_save(&recall, &fs, &entries[index], index);
+  if (ui.menu || (ui_events & (UI_ENTER | UI_COMMIT)))
+    return;
+  ring_start(&ring);
+  board_audio_start(audio);
+  PROFILE(profile_start(wave.rate, wave.bits, settings.play, settings.cv,
+                        pitch_divider(last_pitch, wave.rate, settings.cv)));
+  dma_last_offset = board_audio_offset();
+  dma_last_time = board_millis();
+  board_led(2);
+}
+static void flip_resume(void) {
+  uint32_t frame = flip_frame, reverse = flip_requested;
+  flip_pending = 0; flip_restarting = 1;
+  int failed = flip_fill(frame, reverse);
+  flip_restarting = 0;
+  if (failed) {
+    PROFILE(profile_error(PROF_READ_ERROR));
+    playback_error();
+    if (!card.ready) mounted = 0;
+    return;
+  }
+  /* Coalesce edges during refill without starting the obsolete direction. */
+  if (flip_pending || selection_delta || ui.menu || ui_events) return;
+  arm_audio(0);
+}
+#endif
 static void trigger(void) {
   uint32_t manual = trigger_manual;
   trigger_pending = trigger_manual = 0;
@@ -169,6 +274,16 @@ static void trigger(void) {
   stop();
   releasing = release_stop_block = restart_after_release = restart_manual = 0;
   error_state = 0;
+#ifdef ONE_FLIP
+  if (settings.play == PLAY_FLIP) {
+    flip_playing = flip_restarting = 1;
+    flip_pending = flip_requested = flip_frame = 0;
+    int failed = flip_fill(0, 0);
+    flip_restarting = 0;
+    if (failed) { PROFILE(profile_error(PROF_READ_ERROR)); playback_error(); if (!card.ready) mounted = 0; return; }
+    if (flip_pending || selection_delta || ui.menu || ui_events) return;
+  } else
+#endif
   if (looping()) {
     uint32_t frame =
         seek_random ? random_below(&random_state, wave.bytes / (wave.bits / 8))
@@ -189,6 +304,9 @@ static void trigger(void) {
     wave.remaining = wave.bytes - cached_bytes;
     audio_copy(audio, cache, ONE_CACHE_FRAMES * 2u);
   }
+#ifdef ONE_FLIP
+  arm_audio(manual);
+#else
   envelope.gain = fading() ? 0 : 32768;
   envelope.target = 32768;
   if (fading()) {
@@ -207,6 +325,7 @@ static void trigger(void) {
   dma_last_offset = board_audio_offset();
   dma_last_time = board_millis();
   board_led(2);
+#endif
 }
 static void mount_card(void) {
   stop();
@@ -259,6 +378,10 @@ static void mount_card(void) {
   error_state = 1;
 }
 void app_init(void) {
+#ifdef ONE_FLIP
+  flip_cancel();
+  memset(&flip_index, 0, sizeof(flip_index));
+#endif
   PROFILE(profile_init());
   memset(&ring, 0, sizeof(ring));
   settings_default(&settings);
@@ -289,6 +412,9 @@ void app_tick(void) {
   uint32_t events = ui_events;
   ui_events = 0;
   if (events & (UI_ENTER | UI_COMMIT)) {
+#ifdef ONE_FLIP
+    flip_cancel();
+#endif
     stop();
     trigger_pending = trigger_manual = manual_gate = 0;
     releasing = release_stop_block = restart_after_release = restart_manual = 0;
@@ -297,6 +423,9 @@ void app_tick(void) {
   if (events & UI_COMMIT) {
     settings.play = ui.play;
     settings.cv = ui.cv;
+#ifdef ONE_FLIP
+    if (ready && settings.play == PLAY_FLIP && select_file(index)) error_state = 1;
+#endif
     if (ready)
       update_pitch();
     board_led(0);
@@ -319,6 +448,13 @@ void app_tick(void) {
       error_state = 1;
   }
   if (events & UI_CLICK) {
+#ifdef ONE_FLIP
+    if (settings.play == PLAY_FLIP && (flip_playing || trigger_pending)) {
+      flip_cancel(); stop(); trigger_pending = trigger_manual = 0;
+      releasing = release_stop_block = restart_after_release = restart_manual = 0;
+      board_led(0);
+    } else
+#endif
     if (settings.play == PLAY_GATE && manual_gate) {
       manual_gate = 0;
       if (ring.running)
@@ -347,6 +483,21 @@ void app_tick(void) {
       queue_trigger(manual);
     }
   }
+#ifdef ONE_FLIP
+  if (settings.play == PLAY_FLIP && flip_playing && flip_pending) {
+    if (ring.running) flip_fade_out();
+    else if (flip_fading) {
+      if (board_audio_offset() >= 256u * 8u) {
+        board_audio_stop(); PROFILE(profile_stop(board_millis()));
+        flip_fading = 0;
+        flip_resume();
+      } else if ((uint32_t)(board_millis() - dma_last_time) >= 1000u) {
+        PROFILE(profile_error(PROF_DMA_ERROR));
+        playback_error();
+      }
+    } else flip_resume();
+  }
+#endif
   if (trigger_pending &&
       (settings.cv != CV_SELECT ||
        (uint32_t)(board_millis() - trigger_time) >= settings.delay_ms))
@@ -367,7 +518,16 @@ void app_tick(void) {
     uint32_t half = (ring.pending & 1u) ? 0 : 1, got = ONE_HALF_FRAMES;
     if (!staging_ready) {
       PROFILE_BEGIN(read_ahead);
-      int failed = looping() ? wave_read_loop(&file, &wave, staging,
+#ifdef ONE_FLIP
+      flip_staging_frame = flip_cursor;
+      int failed = settings.play == PLAY_FLIP ?
+          wave_read_direction(&file, &wave, &flip_index, &flip_cursor, flip_reverse,
+                              staging, ONE_HALF_FRAMES, raw, sizeof(raw)) :
+          looping() ? wave_read_loop
+#else
+      int failed = looping() ? wave_read_loop
+#endif
+                              (&file, &wave, staging,
                                               ONE_HALF_FRAMES, raw, sizeof(raw))
                              : wave_read(&file, &wave, staging, ONE_HALF_FRAMES,
                                          &got, raw, sizeof(raw));
@@ -394,9 +554,16 @@ void app_tick(void) {
       playback_error();
       return;
     }
-    if (fading()) {
+    if (fading()
+#ifdef ONE_FLIP
+        && (settings.play != PLAY_FLIP || envelope.gain != 32768u || envelope.target != 32768u)
+#endif
+        ) {
       PROFILE_BEGIN(render);
       envelope_apply(&envelope, staging, ONE_HALF_FRAMES);
+#ifdef ONE_FLIP
+      if (settings.play != PLAY_FLIP)
+#endif
       envelope_tail(staging, ONE_HALF_FRAMES, stream_frame,
                     wave.bytes / (wave.bits / 8));
       PROFILE_END(PROF_ENVELOPE, render);
@@ -410,6 +577,9 @@ void app_tick(void) {
     stream_frame += ONE_HALF_FRAMES;
     PROFILE_BEGIN(copy);
     audio_copy(audio + half * ONE_HALF_FRAMES * 2, staging, ONE_HALF_FRAMES * 2u);
+#ifdef ONE_FLIP
+    if (settings.play == PLAY_FLIP) flip_half[half] = flip_staging_frame;
+#endif
     board_audio_publish();
     PROFILE_END(PROF_COPY, copy);
     PROFILE(profile_margin(half));
@@ -427,7 +597,11 @@ void app_tick(void) {
     board_led(error_state == 2 ? ((board_millis() / 250u) & 1u) : 1u);
   PROFILE(profile_idle(&fs, board_millis(),
       !ring.running && !trigger_pending && !ui.menu && !ui.button &&
-      !ui_events && !selection_delta && (board_pins() & 0x200u)));
+      !ui_events && !selection_delta && (board_pins() & 0x200u)
+#ifdef ONE_FLIP
+      && !flip_pending && !flip_restarting && !flip_fading
+#endif
+      ));
 }
 void standalone_main(void) {
   board_init();

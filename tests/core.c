@@ -611,7 +611,14 @@ static uint32_t host_pins = 0xaa0, host_adc = 128, host_offset, host_starts,
                 host_stops, host_led, host_pitch, host_rate, host_active,
                 host_unsafe;
 static uint32_t host_transfer_advance, host_transfer_budget;
+static const uint32_t *host_audio;
+#ifdef ONE_FLIP
+static uint32_t host_flip_edges, host_flip_inject, host_flip_captured;
+#endif
 static void audio_progress_on_transfer(void) {
+#ifdef ONE_FLIP
+  if (host_flip_edges && !host_active) { host_pins ^= 0x800u; --host_flip_edges; }
+#endif
   if (host_active) {
     uint32_t advance = host_transfer_advance;
     if (host_transfer_budget && advance > host_transfer_budget)
@@ -623,9 +630,14 @@ static void audio_progress_on_transfer(void) {
         host_transfer_advance = 0;
     }
   }
+#ifdef ONE_FLIP
+  if (host_active && host_flip_inject) {
+    host_flip_captured = host_audio[(host_offset / 8u) * 2u];
+    host_pins &= ~0x800u; host_flip_inject = 0;
+  }
+#endif
 }
 static CvMode host_mode;
-static const uint32_t *host_audio;
 const SdIo board_sd_io = {&app_card, xfer, select_mock, speed_mock, time_mock, bulk_mock};
 static int audio_is_active(void) { return host_active != 0; }
 #ifdef ONE_PROFILE
@@ -1237,20 +1249,20 @@ static void test_ui(void) {
   t += 400;
   CHECK(ui_poll(&u, 1, 0, 128, t, &s) == UI_ENTER && u.menu);
   CHECK(!ui_poll(&u, 1, 1, 128, t, &s) && u.play == PLAY_GATE);
-  CHECK(!ui_poll(&u, 1, -2, 128, t, &s) && u.play == PLAY_RANDOM_LOOP);
+  CHECK(!ui_poll(&u, 1, -2, 128, t, &s) && u.play == (PlayMode)(PLAY_COUNT - 1));
   CHECK(!ui_poll(&u, 1, 0, 900, t, &s) && u.cv == CV_FREE && u.kind == 0); /* FILE gesture locks out LFO edits. */
   CHECK(!poll_ui(&u, 0, 0, 900, &t, &s));
   CHECK(!poll_ui(&u, 0, 0, 900, &t, &s));
   CHECK(poll_ui(&u, 0, 0, 900, &t, &s) == UI_COMMIT && !u.menu);
   /* Every mode can be selected in either direction, with no PLAY click. */
-  for (uint32_t mode = 0; mode < 8; mode++) {
+  for (uint32_t mode = 0; mode < PLAY_COUNT; mode++) {
     s.play = (PlayMode)mode;
     ui_init(&u, 0, 500, t, &s);
     for (uint32_t i = 0; i < 3; i++)
       CHECK(!poll_ui(&u, 1, 0, 500, &t, &s));
     t += 400;
     CHECK(poll_ui(&u, 1, 1, 500, &t, &s) == UI_ENTER);
-    CHECK(u.play == (PlayMode)((mode + 1) % 8));
+    CHECK(u.play == (PlayMode)((mode + 1) % PLAY_COUNT));
     CHECK(!poll_ui(&u, 1, -1, 500, &t, &s) && u.play == (PlayMode)mode);
     u.kind = 0;
     u.led_time = 0;
@@ -1262,7 +1274,7 @@ static void test_ui(void) {
   }
   /* Every displayed selection begins at pulse one after a settling pause,
    * with a full count and gap, even across timer wrap. */
-  for (uint32_t mode = 0; mode < 8; mode++) {
+  for (uint32_t mode = 0; mode < PLAY_COUNT; mode++) {
     s.play = (PlayMode)mode;
     ui_init(&u, 0, 500, 0xfffffff0u, &s);
     u.button = 1;
@@ -1719,6 +1731,185 @@ static void test_front_panel_and_remember(void) {
   CHECK(host_mode == CV_SELECT && !host_starts);
 }
 
+#ifdef ONE_FLIP
+static void test_reverse_index(void) {
+  for (uint32_t type = 16; type <= 32; type += 16) {
+    for (uint32_t fragmented = 0; fragmented <= 1; ++fragmented) {
+      clear_disk();
+      uint32_t fat = type == 16 ? 1u : 32u;
+      boot(block(0), type == 16 ? 5000 : 70000, type == 16 ? 20 : 600,
+           fat, type == 16 ? 32 : 0, 1);
+      uint32_t clusters[70];
+      for (uint32_t i = 0; i < 70; ++i) clusters[i] = fragmented ? 3u + i * 37u % 101u : i + 3u;
+      for (uint32_t i = 0; i < 70; ++i) {
+        uint32_t next = i == 69 ? (type == 16 ? 0xffffu : 0x0fffffffu) : clusters[i+1];
+        if (type == 16) put16(block(fat) + clusters[i]*2u, next);
+        else put32(block(fat) + clusters[i]*4u, next);
+      }
+      Fat f; File file; FileIndex index;
+      Entry e = {clusters[0],70u*512u,32,{0}};
+      CHECK(!fat_mount(&f,disk,0) && f.type == type);
+      for (uint32_t i=0; i<70; ++i) {
+        uint8_t *p=block(f.data+(clusters[i]-2u)*f.spc);
+        for (uint32_t j=0; j<512; ++j) p[j]=(uint8_t)((i*512u+j)*17u+3u);
+      }
+      CHECK(!file_open(&file,&f,&e) && !file_index_build(&file,&index));
+      CHECK(index.count <= 32 && index.contiguous == !fragmented);
+      uint8_t data[128]; uint32_t got;
+      for (uint32_t i=70; i; --i) {
+        uint32_t position=(i-1u)*512u+117u;
+        CHECK(!file_seek_indexed(&file,&index,position));
+        CHECK(!file_read(&file,data,sizeof(data),&got) && got==sizeof(data));
+        for (uint32_t j=0;j<got;++j) CHECK(data[j]==(uint8_t)((position+j)*17u+3u));
+        uint32_t saved=file.cluster;
+        CHECK(!file_seek(&file,position) && file.cluster==saved);
+      }
+      uint8_t window[700], boundary[1024];
+      for(uint32_t i=68;i;i-=2) {
+        uint32_t position=(i-1u)*512u+117u;
+        CHECK(!file_seek_indexed(&file,&index,position));
+        CHECK(!file_read_window(&file,&index,window,sizeof(window),boundary));
+        for(uint32_t j=0;j<sizeof(window);++j)
+          CHECK(window[j]==(uint8_t)((position+j)*17u+3u));
+      }
+      CHECK(!file_seek_indexed(&file,&index,file.size));
+      CHECK(file_seek_indexed(&file,&index,file.size+1u)<0);
+      uint32_t last=clusters[69];
+      if(type==16) put16(block(fat)+last*2u,clusters[0]);
+      else put32(block(fat)+last*4u,clusters[0]);
+      f.fat_lba=0xffffffffu;
+      CHECK(file_index_build(&file,&index)<0 && !index.count);
+      if(type==16) put16(block(fat)+clusters[10]*2u,0xffffu);
+      else put32(block(fat)+clusters[10]*4u,0x0fffffffu);
+      f.fat_lba=0xffffffffu;
+      CHECK(file_index_build(&file,&index)<0);
+    }
+  }
+}
+static void test_reverse_wave(void) {
+  static uint32_t output[ONE_CACHE_FRAMES*2u+2u];
+  static uint8_t scratch[ONE_CACHE_FRAMES*3u], second_scratch[ONE_CACHE_FRAMES*3u];
+  const uint32_t lengths[]={1,37,1025,5000};
+  for (uint32_t bits=16;bits<=24;bits+=8) {
+    for (uint32_t k=0;k<4;++k) {
+      uint32_t length=lengths[k];
+      feature_disk("# test\nFlip\nQuantize\nShort",0,length,bits);
+      Fat f; File file; Entry e; Wave w; FileIndex index; Settings settings;
+      CHECK(!fat_mount(&f,disk,0));
+      CHECK(settings_load(&f,&settings)==1 && settings.play==PLAY_FLIP);
+      CHECK(fat_find(&f,"A.wav",&e)==1 && !file_open(&file,&f,&e));
+      CHECK(!wave_open(&file,&w) && !file_index_build(&file,&index));
+      for (uint32_t reverse=0;reverse<2;++reverse) {
+        uint32_t cursor=length-1u, start=cursor;
+        output[0]=0x12345678;output[ONE_CACHE_FRAMES*2u+1u]=0x87654321;
+        CHECK(!wave_read_direction(&file,&w,&index,&cursor,reverse,output+1,
+                                   ONE_CACHE_FRAMES,scratch,sizeof(scratch)));
+        for(uint32_t i=0;i<ONE_CACHE_FRAMES;++i) {
+          uint32_t frame=reverse ? (start+length-(i%length))%length : (start+i)%length;
+          CHECK(output[1+i*2u]==sample_word(1,frame) && output[2+i*2u]==sample_word(1,frame));
+        }
+        CHECK(cursor==wave_frame_offset(start,ONE_CACHE_FRAMES,length,reverse));
+        CHECK(output[0]==0x12345678 && output[ONE_CACHE_FRAMES*2u+1u]==0x87654321);
+      }
+      if(length==5000) {
+        uint32_t cursor=4999;
+        CHECK(!file_index_build(&file,&index));
+        for(uint32_t block_index=0;block_index<4;++block_index) {
+          uint32_t before=reads,start=cursor;
+          uint8_t *raw=block_index==3 ? second_scratch : scratch;
+          CHECK(!wave_read_direction(&file,&w,&index,&cursor,1,output+1,
+                                     ONE_HALF_FRAMES,raw,sizeof(scratch)));
+          for(uint32_t i=0;i<ONE_HALF_FRAMES;++i)
+            CHECK(output[1+i*2u]==sample_word(1,start-i));
+          /* Warm reverse windows share their boundary without an extra read. */
+          if(block_index==1 || block_index==2) CHECK(reads-before==ONE_HALF_FRAMES*(bits/8u)/512u);
+        }
+      }
+    }
+  }
+}
+static void flip_finish_transition(uint32_t starts) {
+  for(uint32_t i=0;i<12 && host_starts<starts+2u;++i) {
+    app_card.n=0;
+    if(host_active) advance_half(); else app_tick();
+  }
+  CHECK(host_active && host_starts==starts+2u && host_led==2);
+}
+static void test_flip_transport(void) {
+  for(uint32_t bits=16;bits<=24;bits+=8) {
+    feature_disk("# test\nFlip\nQuantize\nShort",0,5000,bits);
+    feature_mount();
+    pulse();CHECK(!host_active && !host_starts); /* gate never starts transport */
+    host_pins|=0x800u;app_tick();
+    click_play();CHECK(host_active && host_starts==1);
+    CHECK(host_audio[0]==0 && host_audio[512]==sample_word(1,256));
+    host_offset=123u*8u;
+    pulse();
+    CHECK(host_starts==2 && host_audio[510]==0);
+    for(uint32_t i=512;i<ONE_CACHE_FRAMES*2u;++i) CHECK(host_audio[i]==0);
+    flip_finish_transition(1);
+    for(uint32_t i=256;i<ONE_CACHE_FRAMES;++i)
+      CHECK(host_audio[i*2u]==sample_word(1,(123u+5000u-i)%5000u));
+    app_card.n=0; advance_half();
+    host_offset=ONE_HALF_FRAMES*8u+77u*8u;
+    uint32_t captured=(123u+10000u-ONE_HALF_FRAMES-77u)%5000u;
+    pulse();flip_finish_transition(3);
+    for(uint32_t i=256;i<ONE_CACHE_FRAMES;++i)
+      CHECK(host_audio[i*2u]==sample_word(1,(captured+i)%5000u));
+    /* An edge while SPI is priming coalesces without nested card commands. */
+    app_card.n=0;host_offset=99u*8u;pulse();host_flip_edges=2;
+    uint32_t frame=(captured+99u)%5000u;
+    flip_finish_transition(5);
+    CHECK(!host_flip_edges);
+    CHECK(host_audio[512]==sample_word(1,(frame+256u)%5000u));
+    click_play();CHECK(!host_active && host_led==0);
+    pulse();CHECK(!host_active);
+    click_play();CHECK(host_active && host_audio[512]==sample_word(1,256));
+    browse_next();CHECK(!host_active);
+    click_play();CHECK(host_active && host_audio[512]==sample_word(2,256));
+    /* A short file loops safely in both directions too. */
+    feature_disk("# test\nFlip\nFree\nShort",0,37,bits);feature_mount();
+    click_play();host_offset=5u*8u;pulse();flip_finish_transition(1);
+    CHECK(host_audio[512]==sample_word(1,(5u+37u-256u%37u)%37u));
+    click_play();CHECK(!host_active);
+    /* Capture the audible frame when an edge arrives inside a card read. */
+    feature_disk("# test\nFlip\nQuantize\nShort",0,5000,bits);feature_mount();
+    host_pins|=0x800u;click_play();app_card.n=0;advance_half();
+    host_offset=ONE_HALF_FRAMES*8u+400u*8u;
+    host_flip_inject=1;host_transfer_advance=8;
+    app_tick();CHECK(!host_flip_inject);
+    host_transfer_advance=0;
+    uint32_t heard = bits==16 ? (host_flip_captured>>16)-4001u : ((host_flip_captured>>8)-100001u)/37u;
+    flip_finish_transition(1);
+    CHECK(host_audio[512]==sample_word(1,(heard+5000u-256u)%5000u));
+    /* A stationary fade DMA is a recoverable error, not a stuck red light. */
+    host_pins|=0x800u;app_tick();pulse();
+    app_card.time+=1001;app_tick();CHECK(!host_active && host_led==1);
+    host_pins|=0x800u;app_tick();click_play();CHECK(host_active);
+    /* Card failure during reverse priming stops and takes the recovery path. */
+    app_card.n=0;host_pins|=0x800u;app_tick();pulse();
+    app_card.token_bad=1;advance_half();CHECK(!host_active);
+    app_card.token_bad=0;app_card.n=0;app_card.time+=1001;app_tick();
+    click_play();CHECK(host_active);
+    click_play();CHECK(!host_active);
+  }
+  /* Enter Flip from Trigger using the existing held-PLAY/FILE menu. */
+  feature_disk("# test\nTrigger\nQuantize\nShort",0,5000,16);feature_mount();
+  host_pins&=~0x200u;
+  for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
+  app_card.time+=400;app_tick();
+  const uint32_t backwards[]={1,0,2,3};
+  for(uint32_t i=0;i<4;++i) {
+    host_pins=(host_pins&~0xa0u)|((backwards[i]&1u)<<5)|((backwards[i]&2u)<<6);app_tick();
+  }
+  host_pins|=0x200u;
+  for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
+  click_play();CHECK(host_active);host_offset=100u*8u;pulse();flip_finish_transition(1);
+  CHECK(host_audio[512]==sample_word(1,(100u+5000u-256u)%5000u));
+  click_play();CHECK(!host_active);
+}
+#endif
+
 int main(void) {
   test_fat();
   test_wave();
@@ -1745,6 +1936,11 @@ int main(void) {
   test_fade_gate_read_ahead();
   test_click_overlapping_file_browse();
   test_build_info_write_failure_does_not_block_playback();
+#ifdef ONE_FLIP
+  test_reverse_index();
+  test_reverse_wave();
+  test_flip_transport();
+#endif
   printf("standalone core: %u checks passed\n", checks);
   return 0;
 }

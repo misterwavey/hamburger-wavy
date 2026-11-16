@@ -72,3 +72,6 @@ The build-23 bank probe fills 48 KiB with a project-generated index-dependent wo
 
 
 Build 24 relocates existing project application objects and constants into the hardware-tested extension bank. Its new low-flash per-page CRC32 checker and generated expected values are project-written and derived from the linked application, with no imported vendor implementation. Standard build-21 outputs remain unchanged. The generated linker/header and source hashes are archived with each candidate. Hardware playback/timing regression for the new placement is pending.
+
+
+Extended build 25 adds project-written bidirectional PCM streaming, a bounded selected-file FAT index, a shared-sector cache within existing scratch space, and a Flip transport driven by DMA position snapshots. No vendor implementation or data is introduced. The standalone reverse PCM tests, fragmented FAT16/FAT32 fixtures and generated chirp are original project work. Retained legacy build/probe targets compile the new mode out; the extended candidate enables it explicitly. See flip.md for transitions, resource limits and pending hardware validation.

@@ -1,0 +1,4 @@
+# Hamburger Wavy configuration
+Flip
+Quantize
+Short

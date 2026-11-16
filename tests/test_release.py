@@ -345,6 +345,21 @@ class ReleaseTests(unittest.TestCase):
                     self.assertEqual(m.read(dst+i*8+4),expected)
                 self.assertEqual(m.read(dst-1,1),0xa5)
                 self.assertEqual(m.read(dst+frames*8,1),0x5a)
+        if 'pcm_decode_reverse' in symbols:
+            for bits in (16,24):
+                for frames in (0,1,37,1024,2048):
+                    m=CPU(image);src=0xa0001001;dst=0xa0006004;width=bits//8
+                    data=bytes((i*173+91)&255 for i in range(frames*width))
+                    for i,b in enumerate(data):m.poke(src+i,b,1)
+                    m.poke(dst-1,0xa5,1);m.poke(dst+frames*8,0x5a,1)
+                    self.assertEqual(m.run(symbols['pcm_decode_reverse'],src,bits,dst,frames),0)
+                    for i in range(frames):
+                        first=(frames-1-i)*width
+                        expected=int.from_bytes(data[first:first+width],'little')<<(32-bits)
+                        self.assertEqual(m.read(dst+i*8),expected)
+                        self.assertEqual(m.read(dst+i*8+4),expected)
+                    self.assertEqual(m.read(dst-1,1),0xa5)
+                    self.assertEqual(m.read(dst+frames*8,1),0x5a)
         m=CPU(image)
         self.assertEqual(m.run(symbols['pcm_decode'],0xa0001000,8,0xa0006000,1),0xffffffff)
 
@@ -504,7 +519,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(manifest['resources']['combined_text_bytes'],layout['.text']['bytes']+layout['.app_extension']['bytes'])
             self.assertEqual(manifest['resources']['combined_text_free'],80964-manifest['resources']['combined_text_bytes'])
             if profiling:
-                report={'build':24}
+                report={'build':25}
                 attach_build_info(report,out/'manifest.json',ROOT/'build/extended/manifest.json')
                 self.assertEqual(report['profiling_overhead_bytes']['combined_text'],
                                  report['profiling_overhead_bytes']['main_text']+report['profiling_overhead_bytes']['extension_text'])
@@ -540,6 +555,21 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual((root/('build/extended/profile' if profiling else 'build/extended')/'image.hex').read_bytes(),(out/'image.hex').read_bytes())
         invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--extended','--flash-bank'],capture_output=True,text=True)
         self.assertNotEqual(invalid.returncode,0)
+
+    def test_flip_core_under_sanitizers(self):
+        cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
+        if not cc:self.skipTest('no host C compiler')
+        sources=[ROOT/'tests/core.c',*[ROOT/'firmware'/f'{name}.c' for name in
+                 ('fat','wave','sd','ring','memory','app','advertise','settings','policy','ui','recall')]]
+        for profile in (False,True):
+            binary=ROOT/('build/flip-profile-test' if profile else 'build/flip-core-test')
+            flags=['-DONE_FLIP=1']+(['-DONE_PROFILE=1',str(ROOT/'firmware/profile.c')] if profile else [])
+            result=subprocess.run([cc,'-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-fno-builtin',
+                '-fsanitize=address,undefined','-I'+str(ROOT/'build'),*flags,*map(str,sources),'-o',str(binary)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            result=subprocess.run([str(binary)],capture_output=True,text=True,
+                env=dict(os.environ,ASAN_OPTIONS='halt_on_error=1',UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1'))
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')

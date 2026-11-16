@@ -50,6 +50,14 @@ int fat_build_info(Fat *, uint32_t);
 #ifdef ONE_PROFILE
 int fat_profile_write(Fat *, const uint8_t[1024]);
 #endif
+typedef struct {
+  uint32_t first, size, stride, count, contiguous;
+  uint32_t cluster[32], boundary_lba[2], boundary_slot;
+  uint8_t *boundary_owner;
+} FileIndex;
+int file_index_build(File *, FileIndex *);
+int file_seek_indexed(File *, const FileIndex *, uint32_t);
+int file_read_window(File *, FileIndex *, void *, uint32_t, uint8_t *);
 int file_open(File *, Fat *, const Entry *);
 int file_seek(File *, uint32_t);
 int file_read(File *, void *, uint32_t, uint32_t *);
@@ -61,6 +69,10 @@ int wave_read(File *, Wave *, uint32_t *, uint32_t, uint32_t *, uint8_t *,
               uint32_t);
 int wave_seek_frame(File *, Wave *, uint32_t);
 int wave_read_loop(File *, Wave *, uint32_t *, uint32_t, uint8_t *, uint32_t);
+uint32_t wave_frame_offset(uint32_t, uint32_t, uint32_t, uint32_t);
+int wave_read_direction(File *, Wave *, FileIndex *, uint32_t *, uint32_t,
+                        uint32_t *, uint32_t, uint8_t *, uint32_t);
+int pcm_decode_reverse(const uint8_t *, uint32_t, uint32_t *, uint32_t);
 
 typedef enum {
   PLAY_TRIGGER,
@@ -70,7 +82,13 @@ typedef enum {
   PLAY_SEQUENCE,
   PLAY_COMBO,
   PLAY_RANDOM_SEQUENCE,
-  PLAY_RANDOM_LOOP
+  PLAY_RANDOM_LOOP,
+  PLAY_FLIP,
+#ifdef ONE_FLIP
+  PLAY_COUNT
+#else
+  PLAY_COUNT = PLAY_FLIP
+#endif
 } PlayMode;
 typedef enum { CV_FREE, CV_QUANTIZE, CV_SELECT } CvMode;
 typedef struct {

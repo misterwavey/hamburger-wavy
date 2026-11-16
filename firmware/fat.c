@@ -152,13 +152,116 @@ int file_open(File *r, Fat *f, const Entry *e) {
 int file_seek(File *r, uint32_t pos) {
   if (pos > r->size)
     return -1;
+#ifdef ONE_FLIP
+  if (pos < r->pos && (pos >> 9) / r->fs->spc < r->cluster_index) {
+#else
   if (pos < r->pos) {
+#endif
     r->cluster = r->first;
     r->cluster_index = 0;
   }
   r->pos = pos;
   return 0;
 }
+#ifdef ONE_FLIP
+/* Build only while stopped. Validate the allocated chain with a bounded
+ * traversal and Brent cycle detection; checkpoints cover logical file data. */
+int file_index_build(File *r, FileIndex *index) {
+  memset(index, 0, sizeof(*index));
+  Fat *f = r->fs;
+  if (!r->size || !f->spc) return -1;
+  uint32_t need = ((r->size - 1u) >> 9) / f->spc + 1u;
+  if (need > f->clusters) return -1;
+  index->boundary_lba[0] = index->boundary_lba[1] = 0xffffffffu;
+  index->stride = (need + 31u) / 32u;
+  index->contiguous = 1;
+  uint32_t cluster = r->first, anchor = cluster, power = 1, span = 0;
+  for (uint32_t i = 0; i < f->clusters; ++i) {
+    if (i < need && i % index->stride == 0)
+      index->cluster[index->count++] = cluster;
+    uint32_t next;
+    if (next_cluster(f, cluster, &next)) goto fail;
+    if (!next) {
+      if (i + 1u < need) goto fail;
+      index->first = r->first; index->size = r->size;
+      return 0;
+    }
+    if (i + 1u < need && next != cluster + 1u) index->contiguous = 0;
+    cluster = next;
+    if (cluster == anchor) goto fail;
+    if (++span == power) { anchor = cluster; span = 0; power <<= 1; }
+  }
+fail:
+  memset(index, 0, sizeof(*index));
+  return -1;
+}
+int file_seek_indexed(File *r, const FileIndex *index, uint32_t pos) {
+  if (pos > r->size || index->first != r->first || index->size != r->size ||
+      !index->count || !index->stride) return -1;
+  uint32_t target = ((pos == r->size && pos ? pos - 1u : pos) >> 9) / r->fs->spc;
+  uint32_t cluster, current;
+  if (index->contiguous) {
+    cluster = r->first + target; current = target;
+    if (cluster < 2 || cluster - 2u >= r->fs->clusters) return -1;
+  } else {
+    uint32_t slot = target / index->stride;
+    if (slot >= index->count) return -1;
+    cluster = index->cluster[slot]; current = slot * index->stride;
+    if (r->cluster_index <= target && r->cluster_index >= current) {
+      cluster = r->cluster; current = r->cluster_index;
+    }
+    while (current < target) {
+      uint32_t next;
+      if (next_cluster(r->fs, cluster, &next) || !next) return -1;
+      cluster = next; ++current;
+    }
+  }
+  r->cluster = cluster; r->cluster_index = current; r->pos = pos;
+  return 0;
+}
+/* Two boundary sectors live in the caller's otherwise unused scratch tail.
+ * Preserve the first sector of this window without replacing the previous
+ * window's first sector until its final shared-sector read is complete. */
+int file_read_window(File *r, FileIndex *index, void *output, uint32_t length,
+                      uint8_t *boundary) {
+  if (r->pos > r->size || length > r->size - r->pos) return -1;
+  Fat *f = r->fs; uint8_t *out = output; uint32_t first = 1;
+  if (index->boundary_owner != boundary) {
+    index->boundary_lba[0] = index->boundary_lba[1] = 0xffffffffu;
+    index->boundary_owner = boundary;
+  }
+  uint32_t slot = index->boundary_slot ^ 1u;
+  while (length) {
+    if (file_seek_indexed(r,index,r->pos)) return -1;
+    uint32_t lba;
+    if (cluster_lba(f,r->cluster,&lba)) return -1;
+    lba += (r->pos >> 9) % f->spc;
+    const uint8_t *data;
+    if (lba == index->boundary_lba[0]) data = boundary;
+    else if (lba == index->boundary_lba[1]) data = boundary + 512;
+    else {
+      if (sector(f,lba)) return -1;
+      data = f->cache;
+    }
+    if (first) {
+      if (data == boundary) index->boundary_slot = 0;
+      else if (data == boundary + 512) index->boundary_slot = 1;
+      else {
+        memcpy(boundary + slot * 512u,data,512);
+        index->boundary_lba[slot] = lba; index->boundary_slot = slot;
+        data = boundary + slot * 512u;
+      }
+      first = 0;
+    }
+    uint32_t offset = r->pos & 511u, count = 512u - offset;
+    if (count > length) count = length;
+    memcpy(out,data+offset,count);
+    r->pos += count; out += count; length -= count;
+  }
+  return 0;
+}
+
+#endif
 int file_read(File *r, void *output, uint32_t length, uint32_t *got) {
   Fat *f = r->fs;
   uint8_t *out = output;

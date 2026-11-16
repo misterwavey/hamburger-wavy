@@ -9,7 +9,7 @@ import zlib
 
 METRICS = ('sd', 'prefetch', 'decode', 'envelope', 'copy', 'refill_work')
 MODES = ('Trigger', 'Gate', 'Fade', 'Loop', 'Sequence', 'Combo',
-         'Random Sequence', 'Random Loop')
+         'Random Sequence', 'Random Loop', 'Flip')
 CV_MODES = ('Free', 'Quantize', 'Select File')
 SCALARS = ('build', 'ticks_per_us', 'plays', 'timer_pair_min', 'wall_lo',
            'wall_hi', 'service_gap_max', 'min_slack_frames', 'report_failures', 'saturated')

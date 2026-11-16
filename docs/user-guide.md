@@ -8,6 +8,8 @@ Up to 256 files or playlist entries are supported. Names up to 13 ASCII characte
 
 ## Playback modes
 
+The extended build-25 candidate adds Flip (9); the retained legacy build-21 images expose modes 1–8.
+
 | Red count | Mode | Behavior |
 | --- | --- | --- |
 | 1 | Trigger | Each PLAY tap or gate trigger plays from the beginning once. |
@@ -18,6 +20,7 @@ Up to 256 files or playlist entries are supported. Names up to 13 ASCII characte
 | 6 | Combo | Advances one file on each trigger, then loops it. |
 | 7 | Random Sequence | Chooses a random file per trigger; repeats are allowed. |
 | 8 | Random Loop | Loops a file; subsequent triggers jump to random frame positions within it. |
+| 9 | Flip (extended build 25) | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |
 
 Fade/Gate ramps are short 256-sample linear envelopes: about 5.3 ms at 48 kHz before pitch changes. They mainly suppress clicks, rather than providing long musical fades. Buffering adds release/retrigger latency. Random seeking and file changes require SD access and can take longer than cached Trigger playback. Overlapping voices are not implemented.
 

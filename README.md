@@ -76,3 +76,5 @@ An optional [flash-layout experiment](docs/flash-layout.md) builds a separate bu
 `make flash-bank` prepares the next separate experiment, build 23, to verify a 48 KiB extension bank and execute code near both ends. Its first hardware trial verified the full bank and executed both endpoint routines; rollback to build 21 also succeeded after this larger trial. See the flash-layout guide.
 
 `make extended` / `make extended-profile` build the separate build-24 candidate with real application code/constants in the verified bank. A 95.2-second maximum-pitch profiling run recorded no errors and matched build-21 refill timing; envelope and normal-build regressions remain pending. The flash-layout guide gives resource figures. See [reverse playback feasibility](docs/reverse-playback.md) for the sample-reading and RAM work that feature would require.
+
+The extended build-25 candidate adds [Flip](docs/flip.md): PLAY starts/stops and GATE edges reverse the running sample from its captured playback position. It is experimental and requires a hardware trial. The original rising chirp generator and staged test instructions make direction changes audible.
