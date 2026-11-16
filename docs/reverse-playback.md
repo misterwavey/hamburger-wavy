@@ -4,7 +4,7 @@ Reverse playback is not implemented in build 24. The larger verified flash bank 
 
 ## What the measurements support
 
-Build 21 sustained maximum-quantized-pitch 96 kHz/24-bit forward looping for 152.681 seconds with no recorded errors. Fade and manual Gate also passed their tested high-rate runs. This establishes a useful streaming baseline on the tested card, not reverse performance. Moving real code into the extension bank in build 24 still needs a hardware timing regression before relying on the previous margins.
+Build 21 sustained maximum-quantized-pitch 96 kHz/24-bit forward looping for 152.681 seconds with no recorded errors. Fade and manual Gate also passed their tested high-rate runs. This establishes a useful streaming baseline on the tested card, not reverse performance. Build 24 then completed a 95.183-second maximum-pitch Loop run without recorded errors; its 5.996 ms mean refill and 6.691 ms minimum observed margin closely match build 21. Envelope and normal-build regressions on the new layout are still pending.
 
 The extended normal build leaves 53188 bytes of combined code/constants capacity, while static RAM remains 55712 bytes. It retains the 8192-byte minimum stack reserve and only 1632 bytes of static growth budget; profiling leaves 304 bytes of static growth budget. Extra flash is room for implementation, not room to cache an entire recording. W9624 alone contains 25.92 MB of PCM audio.
 

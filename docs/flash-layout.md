@@ -128,3 +128,12 @@ A low-flash checker validates CRC32 for each of the 48 bank pages through its un
 The combined limit is 80964 bytes. Code-space gains do not change RAM or sample-stream throughput. Placement can affect instruction timing, so build 24 needs playback and profiling regression on hardware despite unchanged sample logic, buffer sizes, SD clock and deadline guard.
 
 First install the extended profiling image with the AGNT2-only Loop/Quantize configuration under `build/extended/bench-loop`, run at fixed maximum pitch for at least one minute, stop with FILE, wait five seconds, power down and mount. A fresh build-24 ONEPROF.TXT is needed; ONEBUILD.TXT alone cannot distinguish the normal and profiling variants. Analyse with `build/extended/profile/manifest.json` and baseline `build/extended/manifest.json`. Keep the archived build-21 image available for rollback. After streaming/envelope checks, test the extended normal image's file changes and retriggers before adopting this layout as the default.
+
+
+### Build 24 real-application hardware results
+
+The initial CRC-valid report recorded 8 starts and 8.808 seconds of playback with no errors, but its worst/margin contexts used divider 794, so it was a short lower-pitch check. The initial report was preserved; its build-record file was not archived.
+
+The subsequent fresh CRC-valid report recorded one start and 95.183 seconds of Loop/Quantize PCM24/96000 Hz playback. Both worst-work and tightest-margin contexts used maximum quantized pitch, divider 667 (approximately 143928 output frames/s). Ring, late-commit, stationary-DMA, read and copy-overlap errors were all zero; previous report-write failures were zero. ONEBUILD.TXT identifies build 24. This establishes a successful sustained run with real application functions and constants in the verified upper bank, not a complete mode/card regression.
+
+Completed refill work averaged 5.996 ms (worst 7.353 ms), essentially matching build 21's 5.998 ms average. Minimum observed margin was 963 frames, about 6.691 ms, also matching the baseline. All 78610 SD attempts were below 1 ms (mean 866.40 us, worst 941.21 us). Longest observed background-service gap was 852 us. Stack watermark remained 1696 bytes, with 6792 untouched above the unchanged profiling static allocation. The placement change shows no material measured timing regression for this workload. Fade/Gate and normal-build file/retrigger checks on the new layout remain outstanding; staged configs are in build/extended/bench-fade and bench-gate.
