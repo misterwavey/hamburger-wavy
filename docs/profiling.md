@@ -10,7 +10,7 @@ From the repository:
 make profile
 ```
 
-The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 20; the diagnostic manifest has `profiling: true`.
+The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 21; the diagnostic manifest has `profiling: true`.
 
 Install the diagnostic using the usual SD update procedure:
 
@@ -21,7 +21,7 @@ cmp build/profile/image.hex "/Volumes/TTA ONE/image.hex"
 diskutil eject "/Volumes/TTA ONE"
 ```
 
-Startup remains one second blue. `ONEBUILD.TXT` should show build 20. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
+Startup remains one second blue. `ONEBUILD.TXT` should show build 21. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.
 
 ## Collect a report
 
@@ -172,3 +172,16 @@ Normal main code/constants use 27472 bytes (4340 free); profiling uses 31812 (ze
 Larger buffers can increase loop-trigger preparation latency because twice as much initial audio is read before playback starts. Buffered envelope/retrigger scheduling and the block-rounded end-of-playback interval can also lengthen. Trigger-mode starts still use the preloaded cache. Existing mode/light choices are retained; the effects on feel need a hardware check after the throughput trial.
 
 Install the build-20 profiling image and retain the AGNT2-only playlist and Loop/Quantize config. Set maximum pitch before starting and leave it there, so the report is a clean comparison. Aim for one minute of looping; if it stays playing, turn FILE to stop. Whether it stops itself or you stop it, wait one second before powering down and mounting. Check that the fresh report identifies build 20. Hardware performance remains unmeasured.
+
+
+## Build 20 hardware result and build 21 overlapped CRC trial
+
+The CRC-valid build-20 report recorded 2.726 seconds of playback, ending with one late-commit rejection. The other error counters were zero. Mean completed refill time was 7.016 ms (worst 8.045 ms); mean prefetch was 6.863 ms (worst 7.891 ms). SD reads averaged 1.044 ms (worst 1.128 ms). Minimum slack was 117 frames, approximately 813 us at divider 667, below the unchanged 128-frame guard. The tightest half-buffer period was 7.115 ms. Worst-work context used divider 707, so the run contains different pitch observations. Larger buffers did not establish adequate sustained margin. Stack watermark was 1680 bytes, with 6808 bytes untouched.
+
+Build 21 moves the existing, exhaustively verified CRC16 recurrence into the bulk SPI receive loop. After reading a byte, the next dummy transmit starts before the current byte is stored and added to the checksum. The callback returns that checksum on success; the SD driver still compares it with both received CRC bytes. There is no separate 512-byte checksum pass. The fallback byte transport computes the same checksum during its read loop. Write checksums and all read-error handling remain enabled. The receive loop also counts down instead of calculating an indexed next-byte bound.
+
+The compiled MIPS SPI model checks both immediately ready and delayed receive flags, independent Python CRC results, zero-length input, output/checksum boundary guards, exact wire-byte counts, control-poll cadence and a partial-transfer timeout across timer wrap. The generic protocol tests retain bad-CRC and transport-failure cases for bulk and fallback paths. The CRC helper is shared project code, still checked over all 16777216 state/byte pairs.
+
+Mount parsing, reserved-file allocation and stopped-audio profile writes use compiler size optimisation to keep the diagnostic within the existing layout. Streaming file reads retain their existing optimisation settings. Normal main code/constants use 27248 bytes (4564 free), profiling 31508 (304 free). RAM, buffer sizes, 12 MHz SD clock, update coverage and the 128-frame copy guard are unchanged from build 20. Hardware speedup is not yet measured.
+
+Install the build-21 profiling image, retain the AGNT2-only playlist and Loop/Quantize config, and repeat maximum-pitch playback without moving the pitch control during the run. Aim for one minute. Turn FILE to stop if necessary, wait one second, then power down and mount. The fresh report must identify build 21.

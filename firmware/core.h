@@ -14,7 +14,8 @@ typedef struct {
   void (*select)(void *, int);
   void (*speed)(void *, int);
   uint32_t (*millis)(void *);
-  int (*read_bytes)(void *, uint8_t *, uint32_t); /* Optional bulk receive. */
+  /* Optional bulk receive; returns CRC16 with seed zero on success. */
+  int (*read_bytes)(void *, uint8_t *, uint32_t, uint16_t *);
 } SdIo;
 typedef struct {
   const SdIo *io;

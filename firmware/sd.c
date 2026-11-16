@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "core.h"
 #include "profile.h"
+#include "sd_crc.h"
 static int tx(Sd *s, uint8_t v) { return s->io->xfer(s->io->ctx, v); }
 static void release(Sd *s) {
   s->io->select(s->io->ctx, 0);
@@ -108,13 +109,6 @@ fail:
   release(s);
   return -1;
 }
-/* Expand the x^16+x^12+x^5+1 recurrence one byte at a time. The folded
- * high byte removes both flash-table lookups; CRC checking stays enabled. */
-static inline __attribute__((always_inline)) uint16_t crc16_byte(uint16_t crc, uint8_t byte) {
-  uint32_t x = (crc >> 8) ^ byte;
-  x ^= x >> 4;
-  return (uint16_t)((crc << 8) ^ (x << 12) ^ (x << 5) ^ x);
-}
 
 int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
   Sd *s = ctx;
@@ -136,18 +130,17 @@ int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
   } while (s->io->millis(s->io->ctx) - begin < 250);
   if (token != 0xfe)
     goto fail;
+  uint16_t crc = 0;
   if (s->io->read_bytes) {
-    if (s->io->read_bytes(s->io->ctx, out, 512)) goto fail;
+    if (s->io->read_bytes(s->io->ctx, out, 512, &crc)) goto fail;
   } else {
     for (unsigned i = 0; i < 512; ++i) {
       int b = tx(s, 255);
       if (b < 0) goto fail;
       out[i] = (uint8_t)b;
+      crc = crc16_byte(crc, (uint8_t)b);
     }
   }
-  uint16_t crc = 0;
-  for (unsigned i = 0; i < 512; ++i)
-    crc = crc16_byte(crc, out[i]);
   int high = tx(s, 255), low = tx(s, 255);
   if (high < 0 || low < 0 || crc != ((uint16_t)high << 8 | (uint16_t)low))
     goto fail;

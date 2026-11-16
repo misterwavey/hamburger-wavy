@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Checks that require only this source tree and ordinary build tools."""
 import json
+import binascii
 import math
 import os
 from pathlib import Path
@@ -237,10 +238,11 @@ class ReleaseTests(unittest.TestCase):
         image = read_hex(ROOT/'build/image.hex')
         _, symbols, _, _ = extract(ROOT/'build/hamburger-wavy.elf')
         class SpiCPU(CPU):
-            def __init__(self, stuck_after=None):
+            def __init__(self, stuck_after=None, delay=0):
                 super().__init__(image)
                 self.pending=False; self.clocks=0; self.received=0
                 self.polls=[]; self.stuck_after=stuck_after
+                self.delay=delay;self.ready_at=0
                 self.hooks[symbols['app_background']]=self.background
             def background(self, cpu, *args):
                 self.polls.append((self.received,self.pending))
@@ -252,9 +254,10 @@ class ReleaseTests(unittest.TestCase):
                 if self.pending or value!=255:
                     raise AssertionError('extra outstanding byte or non-dummy transmit')
                 self.pending=True; self.clocks+=1
+                self.ready_at=self.steps+self.delay
             def read(self,address,n=4):
                 if address==0xbf805a10:
-                    return int(self.pending and (self.stuck_after is None or
+                    return int(self.pending and self.steps>=self.ready_at and (self.stuck_after is None or
                                                 self.received<self.stuck_after))
                 if address==0xbf805a20:
                     if not self.pending: raise AssertionError('receive without clock')
@@ -265,24 +268,37 @@ class ReleaseTests(unittest.TestCase):
                 return super().read(address,n)
         for length in (0,1,63,64,65,512):
             for seed in (0,7):
-                m=SpiCPU(); destination=0xa0001000
+                m=SpiCPU(); destination=0xa0001000;checksum=0xa0000802
+                m.poke(checksum-1,0xa5,1);m.poke(checksum+2,0x5a,1)
                 m.poke(symbols['spi_poll'],seed)
                 m.poke(destination-1,0xa5,1);m.poke(destination+length,0x5a,1)
-                self.assertEqual(m.run(symbols['spi_read_bytes'],0,destination,length),0)
+                self.assertEqual(m.run(symbols['spi_read_bytes'],0,destination,length,checksum),0)
                 self.assertEqual((m.clocks,m.received,m.pending),(length,length,False))
                 self.assertEqual([m.read(destination+i,1) for i in range(length)],
                                  [(i*7+3)&255 for i in range(length)])
                 self.assertEqual(m.read(destination-1,1),0xa5)
                 self.assertEqual(m.read(destination+length,1),0x5a)
+                data=bytes((i*7+3)&255 for i in range(length))
+                self.assertEqual(m.read(checksum,2),binascii.crc_hqx(data,0))
+                self.assertEqual(m.read(checksum-1,1),0xa5)
+                self.assertEqual(m.read(checksum+2,1),0x5a)
                 expected=[i for i in range(1,length+1) if (seed+i)%64==0]
                 self.assertEqual([n for n,_ in m.polls],expected)
                 self.assertEqual([pending for n,pending in m.polls],
                                  [n<length for n in expected])
                 self.assertEqual(m.read(symbols['spi_poll']),seed+length)
+        # Exercise actual receive waiting as well as immediately-ready bytes.
+        m=SpiCPU(delay=40)
+        self.assertEqual(m.run(symbols['spi_read_bytes'],0,0xa0001000,512,0xa0000802),0)
+        self.assertEqual((m.clocks,m.received,m.pending),(512,512,False))
+        data=bytes((i*7+3)&255 for i in range(512))
+        self.assertEqual(m.read(0xa0000802,2),binascii.crc_hqx(data,0))
         m=SpiCPU(stuck_after=17);m.steps=0xfffffff0
-        self.assertEqual(m.run(symbols['spi_read_bytes'],0,0xa0001000,512,
+        m.poke(0xa0000802,0x5aa5,2)
+        self.assertEqual(m.run(symbols['spi_read_bytes'],0,0xa0001000,512,0xa0000802,
                                budget=200000),0xffffffff)
         self.assertEqual((m.clocks,m.received),(18,17))
+        self.assertEqual(m.read(0xa0000802,2),0x5aa5)
         for words in (0,1,3,4,5,1024,2048,4096):
             m=CPU(image);source=0xa0001004;destination=0xa0006004
             for i in range(words):m.poke(source+i*4,(i*0x1020305)&0xffffffff)

@@ -20,6 +20,10 @@ static int bpb(const uint8_t *p) {
          !(p[13] & (p[13] - 1)) && p[13] <= 128 && u16(p + 14) && p[16] &&
          p[16] <= 2;
 }
+/* Mount-time parsing is kept compact; streaming reads retain speed tuning. */
+#if defined(__clang__)
+__attribute__((minsize))
+#endif
 int fat_mount(Fat *f, BlockRead read, void *ctx) {
   memset(f, 0, sizeof(*f));
   f->read = read;
@@ -404,6 +408,10 @@ static int invalidate_fsinfo(Fat *f) {
   }
   return 0;
 }
+/* Reserved-file allocation occurs only while audio is stopped. */
+#if defined(__clang__)
+__attribute__((minsize))
+#endif
 static int reserved_area(Fat *f, const char *name, const char *short_name,
                          uint32_t sectors, uint32_t lbas[2]) {
   Entry e;
@@ -559,6 +567,10 @@ int fat_build_info(Fat *f, uint32_t number) {
 }
 
 #ifdef ONE_PROFILE
+/* Reports are written only while audio is stopped. */
+#if defined(__clang__)
+__attribute__((minsize))
+#endif
 int fat_profile_write(Fat *f, const uint8_t data[1024]) {
   uint32_t lbas[2], zero = 1, own = 1;
   if (reserved_area(f, "ONEPROF.TXT", "ONEPROF TXT", 2, lbas)) return -1;

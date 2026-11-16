@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "platform.h"
 #include "profile.h"
+#include "sd_crc.h"
 static uint32_t clock_last, clock_ms, spi_poll;
 static uint32_t count(void) {
   uint32_t value;
@@ -85,27 +86,30 @@ static int spi_xfer(void *ctx, uint8_t byte) {
   }
   return (int)(REG(0xbf805a20) & 255u);
 }
-/* One byte outstanding at a time. Start the next transfer before doing the
- * store/poll work, avoiding a function-pointer call for every payload byte.
- * Each <=64-byte span has a bounded timeout; no card/bus clock change. */
-static int spi_read_bytes(void *ctx, uint8_t *out, uint32_t length) {
+/* One outstanding byte: CRC arithmetic overlaps the next wire transfer.
+ * Poll controls every 64 bytes; bound each span's wait and retain 12 MHz. */
+static int spi_read_bytes(void *ctx, uint8_t *out, uint32_t length,
+                          uint16_t *checksum) {
   (void)ctx;
-  if (!length) return 0;
-  uint32_t start=count(), poll=spi_poll;
-  REG(0xbf805a20)=255;
-  for (uint32_t i=0; i<length; ++i) {
-    while (!(REG(0xbf805a10)&1u)) {
-      if (count()-start>120000u) { spi_poll=poll; return -1; }
+  uint16_t crc = 0;
+  if (!length) { *checksum = crc; return 0; }
+  uint32_t start = count(), poll = spi_poll;
+  REG(0xbf805a20) = 255;
+  do {
+    while (!(REG(0xbf805a10) & 1u)) {
+      if (count() - start > 120000u) { spi_poll = poll; return -1; }
     }
-    uint8_t value=(uint8_t)REG(0xbf805a20);
-    if (i+1u<length) REG(0xbf805a20)=255;
-    out[i]=value;
-    if ((++poll&63u)==0) {
+    uint8_t value = (uint8_t)REG(0xbf805a20);
+    if (--length) REG(0xbf805a20) = 255;
+    *out++ = value;
+    crc = crc16_byte(crc, value);
+    if ((++poll & 63u) == 0) {
       app_background();
-      start=count();
+      start = count();
     }
-  }
-  spi_poll=poll;
+  } while (length);
+  spi_poll = poll;
+  *checksum = crc;
   return 0;
 }
 static void spi_select(void *ctx, int selected) {

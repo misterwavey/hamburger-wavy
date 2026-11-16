@@ -477,7 +477,8 @@ static int xfer(void *ctx, uint8_t b) {
   }
   return 255;
 }
-static int bulk_mock(void *ctx, uint8_t *out, uint32_t length) {
+static int bulk_mock(void *ctx, uint8_t *out, uint32_t length, uint16_t *checksum) {
+  uint16_t crc = 0;
   Mock *m=ctx;
   ++m->bulk_calls;
   for (uint32_t i=0; i<length; ++i) {
@@ -485,8 +486,12 @@ static int bulk_mock(void *ctx, uint8_t *out, uint32_t length) {
     int value=xfer(ctx,255);
     if (value<0) return -1;
     out[i]=(uint8_t)value;
+    crc ^= (uint16_t)value << 8;
+    for (unsigned bit=0; bit<8; ++bit)
+      crc=(uint16_t)((crc & 0x8000u) ? (crc << 1) ^ 0x1021u : crc << 1);
     ++m->bulk_bytes;
   }
+  *checksum=crc;
   return 0;
 }
 static void select_mock(void *ctx, int yes) {
