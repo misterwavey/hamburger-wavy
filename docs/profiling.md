@@ -190,3 +190,12 @@ Install the build-21 profiling image, retain the AGNT2-only playlist and Loop/Qu
 ### First build-21 playback observation
 
 The user reports sustained looping at maximum pitch. On the next card mount, image.hex matched the build-21 profiling artifact and ONEBUILD.TXT identified build 21, but ONEPROF.TXT remained byte-identical to the previous build-20 report. This is qualitative playback evidence only; there is no fresh timing/error measurement from that run. The cause of the missing report is not established. Repeat playback followed by a FILE turn with PLAY released, leave the module powered and idle for several seconds, then collect the report before drawing timing conclusions or changing firmware.
+
+
+### Build 21 sustained maximum-pitch result
+
+A fresh CRC-valid build-21 report recorded 152.681 seconds of playback, one start and zero ring, late-commit, stationary-DMA, read or copy-overlap errors. Worst-work and tightest-margin contexts both identified Loop/Quantize, PCM24 at 96000 Hz, divider 667 (approximately 143928 output frames/s). There were no previous report-write failures. This confirms sustained operation for this file/card/settings run, not every mode, card or sample.
+
+Across 21459 completed refills, mean work was 5.998 ms and worst 7.351 ms, against a 7.115 ms half-buffer period. Mean prefetch was 5.845 ms and worst 7.196 ms. All 128815 SD attempts were below 1 ms (mean 866.53 us, worst 945.96 us). Minimum observed pre/post-copy margin was 963 frames, about 6.691 ms; read-ahead absorbed the occasional refill exceeding a single half period. The maximum observed background-service gap was 853.33 us. Stack watermark was 1696 bytes, leaving 6792 bytes untouched above the 57040-byte static allocation; the watermark remains a sampled lower bound on stack use.
+
+Mean completed-refill work occupied 84.31% of observed playback time, including SD waits and excluding other work/discarded prefills. It is not CPU utilisation or a guarantee of 15.69% available DSP capacity. The mean refill-period difference is about 1.116 ms; worst-case timing and different modes still require care. Next measurements should cover Fade/Gate envelope work and other rates/bit depths, followed by normal-build regression checks for playback, file changes and larger-buffer retrigger timing.

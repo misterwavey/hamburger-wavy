@@ -60,3 +60,6 @@ Build 20 doubles the project's audio buffer sizes and uses project-written separ
 
 
 Build 21 shares the existing project-written folded CRC16 helper between the SD driver and bulk SPI receiver. The receiver calculates the checksum while receiving, and the driver retains the received-CRC comparison; no vendor code or library routine is added. Compiled MIPS checks compare received checksums against an independent Python CRC implementation, with delayed readiness and timeout cases. Mount parsing and stopped-audio allocation/report code use size optimisation. Build 20's hardware report still recorded a deadline miss; build 21 hardware performance awaits measurement.
+
+
+Build 21 subsequently completed a CRC-valid 152.681-second maximum-quantized-pitch Loop/PCM24/96 kHz hardware run with zero recorded streaming errors. Mean completed refill work was 5.998 ms; the profiling guide records the measured margins and limits. This is validation of the tested file/card/settings combination, not a complete mode/rate/card matrix or formal timing proof.
