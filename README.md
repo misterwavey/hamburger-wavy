@@ -2,7 +2,7 @@
 
 THIS CUSTOM FIRMWARE FOR THE DISCONTINUED TIPTOP AUDIO ONE EURORACK MODULE IS NOT AFFILIATED WITH TIPTOP AUDIO IN ANY WAY. IF YOU USE THIS FIRMWARE, DO NOT APPROACH TIPTOP AUDIO FOR SUPPORT. THEY ARE AN AWESOME COMPANY AND DON'T NEED ANY HEADACHES CAUSED BY THIS PROJECT.
 
-This is an unofficial sampler firmware for the Tiptop Audio ONE module, built from source for its PIC32MX170F256B. Eight playback modes, chromatic pitch quantization, random file selection and random loop seeking. Licensed under GPLv3; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+This is an unofficial sampler firmware for the Tiptop Audio ONE module, built from source for its PIC32MX170F256B. Ten playback modes in the extended build, including gate/CV-controlled direction changes, chromatic pitch quantization, random file selection and random loop seeking. Licensed under GPLv3; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 This repository contains the application, build tools, tests and documentation. No vendor firmware, boot/debug stub, extracted pitch tables or sample library is supplied. The module's existing updater is required. See [provenance](docs/provenance.md) for what was learned through reverse engineering and what is included.
 
@@ -14,7 +14,14 @@ You need Python 3.11 or newer, LLVM Clang with the MIPS backend, and LLD with EL
 make
 ```
 
-Output is `build/image.hex`, with an ELF, generated pitch tables and a build manifest alongside it. Nothing is copied to a card automatically. The builder rejects unresolved symbols, unexpected allocated sections, out-of-range code/RAM, boot-debug payload and changed hardware configuration words.
+The default target retains legacy build 21 (eight modes). For current build 30 with Flip and CV Flip, use:
+
+```sh
+make extended          # build/extended/image.hex
+make extended-profile  # build/extended/profile/image.hex
+```
+
+Default output is `build/image.hex`, with an ELF, generated pitch tables and a build manifest alongside it. Nothing is copied to a card automatically. The builder rejects unresolved symbols, unexpected allocated sections, out-of-range code/RAM, boot-debug payload and changed hardware configuration words.
 
 On macOS, install LLVM and LLD with Homebrew if needed. Apple's bundled Clang alone generally lacks the required target. On other systems, use an LLVM distribution with the MIPS target. Explicit tool paths are supported:
 
@@ -71,16 +78,10 @@ See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD
 
 ## Validation status
 
-Current build 21 offers normal and optional profiling images. It retains build 20's 1024-frame audio halves and specialised PCM decoding, and overlaps SD CRC calculation with SPI reception after build 20 still missed high-pitch refill deadlines. A profiling run sustained 152.7 seconds of maximum-pitch 96 kHz/24-bit looping with zero recorded errors; the larger buffers use more RAM and can increase loop-trigger preparation and envelope/retrigger scheduling latency. The [profiling guide](docs/profiling.md) records measurements and testing instructions. Earlier user trials cover playback, quantization, random sequencing, mode feedback and Fade read-ahead. Subsequent maximum-pitch Fade and manual Gate profiling runs also recorded zero errors. A complete mode/card/rate matrix has not been reported. See [provenance](docs/provenance.md) for the initial source-export verification.
+Retained legacy build 21 offers normal and optional profiling images. It retains build 20's 1024-frame audio halves and specialised PCM decoding, and overlaps SD CRC calculation with SPI reception after build 20 still missed high-pitch refill deadlines. A profiling run sustained 152.7 seconds of maximum-pitch 96 kHz/24-bit looping with zero recorded errors; the larger buffers use more RAM and can increase loop-trigger preparation and envelope/retrigger scheduling latency. The [profiling guide](docs/profiling.md) records measurements and testing instructions. Earlier user trials cover playback, quantization, random sequencing, mode feedback and Fade read-ahead. Subsequent maximum-pitch Fade and manual Gate profiling runs also recorded zero errors. A complete mode/card/rate matrix has not been reported. See [provenance](docs/provenance.md) for the initial source-export verification.
 
 Hamburger Wavy is independent of Tiptop Audio and is not endorsed by the manufacturer. Hardware/product names identify compatibility.
 
-An optional [flash-layout experiment](docs/flash-layout.md) builds a separate build-22 image to test one extra application page. Its first hardware trial verified and executed that page, and rollback to build 21 also succeeded. Standard builds remain build 21.
+Current extended build 30 includes [Flip](docs/flip.md) and [CV Flip](docs/cv-flip.md). Flip uses gate edges to reverse the running sample with 512-frame fades; CV Flip uses calibrated CV polarity at native speed. Build-30 manual and LFO trials on 96 kHz/24-bit material recorded zero streaming errors. Maximum modulation rate and transition latency remain unmeasured. The release suite passes 20 software tests.
 
-`make flash-bank` prepares the next separate experiment, build 23, to verify a 48 KiB extension bank and execute code near both ends. Its first hardware trial verified the full bank and executed both endpoint routines; rollback to build 21 also succeeded after this larger trial. See the flash-layout guide.
-
-`make extended` / `make extended-profile` build the separate build-24 candidate with real application code/constants in the verified bank. A 95.2-second maximum-pitch profiling run recorded no errors and matched build-21 refill timing; envelope and normal-build regressions remain pending. The flash-layout guide gives resource figures. See [reverse playback feasibility](docs/reverse-playback.md) for the sample-reading and RAM work that feature would require.
-
-The extended build-25 candidate adds [Flip](docs/flip.md): PLAY starts/stops and GATE edges reverse the running sample from its captured playback position. Its first 48 kHz/16-bit hardware run sounded good to the user and recorded zero streaming errors; a subsequent maximum-pitch 96 kHz/24-bit run also recorded zero errors. Rapid-clock and transition-latency limits remain to be measured. The original rising chirp generator and staged test instructions make direction changes audible.
-
-Extended build 28 is the current click-reduction candidate for Flip. It fades the running stream to zero before stopping DMA and uses 512-frame ramps, with deadline and DMA/ring synchronisation fixes for regressions seen in builds 26–27. Timing-race regression tests pass; a subsequent maximum-pitch 96 kHz/24-bit hardware run recorded 31 starts/resumes with zero errors and was reported working great. Build 25 remains an archived fallback.
+The extended application uses the additional 48 KiB bank verified in earlier flash experiments. See [flash layout and trial history](docs/flash-layout.md), [Flip implementation/results](docs/flip.md), and [future control ideas](docs/reverse-playback.md). The standalone flash probes remain available for reproducing those earlier checks; they are separate from the playback images.

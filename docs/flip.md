@@ -1,6 +1,6 @@
 # Flip: interrupt playback direction
 
-Flip was introduced in extended build 25; the current extended build-28 candidate improves its transition fades with deadline and DMA/ring synchronisation guards  (`make extended` or `make extended-profile`). It is not enabled in the retained legacy build-21 targets. It loops a file and reverses direction from a captured playback position when GATE rises. It does not restart the file at each gate.
+Flip was introduced in extended build 25; current extended build 30 retains build 28’s improved transition fades with deadline and DMA/ring synchronisation guards (`make extended` or `make extended-profile`). It is not enabled in the retained legacy build-21 targets. It loops a file and reverses direction from a captured playback position when GATE rises. It does not restart the file at each gate.
 
 ## Controls
 
@@ -42,7 +42,7 @@ A selected Flip file receives a stopped-audio FAT-chain scan with bounded cycle 
 
 Reverse blocks are read in ordinary forward byte order and decoded with frame order reversed, preserving little-endian PCM16/24 samples. Short files and wraps can split a requested output block into several reads. Two boundary sectors are cached in the unused tail of the existing raw-input buffer when space permits. This avoids an extra shared-sector read on steady reverse windows without allocating another audio buffer. Cache ownership is invalidated when the scratch buffer changes or a full-size prime overwrites that tail.
 
-The normal/profiling images keep the existing audio buffers, SD clock, CRC verification, DMA deadline guard and minimum 8 KiB stack reserve. New code is in the verified upper-bank layout. Hardware validation of Flip remains pending.
+The normal/profiling images keep the existing audio buffers, SD clock, CRC verification, DMA deadline guard and minimum 8 KiB stack reserve. New code is in the verified upper-bank layout. Build 28’s hardware run validated the tested high-rate Flip workload; those fades are retained in build 30. See the hardware results below. For polarity-controlled direction, see [CV Flip](cv-flip.md).
 
 ## First hardware check
 

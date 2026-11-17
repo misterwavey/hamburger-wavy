@@ -31,7 +31,7 @@ The switching thresholds are five raw ADC counts either side of the captured zer
 
 ## Hardware check
 
-Use the existing long rising `FLIP96.wav` chirp and a playlist containing only that file. Test PLAY stop/start, both DC polarities, zero stability, slow LFO, then faster LFO. Stop with PLAY, wait five seconds, power down and mount the card to collect `ONEPROF.TXT`. This build needs its first hardware run. Restore the staged build-28 rollback image if required.
+Use the existing long rising `FLIP96.wav` chirp and a playlist containing only that file. Test PLAY stop/start, both DC polarities, zero stability, slow LFO, then faster LFO. Stop with PLAY, wait five seconds, power down and mount the card to collect `ONEPROF.TXT`. Manual and LFO hardware runs are recorded below. Restore the staged build-28 rollback image if required.
 
 ## Roll back this trial
 

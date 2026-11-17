@@ -8,7 +8,7 @@ Up to 256 files or playlist entries are supported. Names up to 13 ASCII characte
 
 ## Playback modes
 
-The extended build-25 candidate adds Flip (9); the retained legacy build-21 images expose modes 1–8.
+Extended build 30 provides modes 1–10. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
 
 | Red count | Mode | Behavior |
 | --- | --- | --- |
@@ -20,11 +20,28 @@ The extended build-25 candidate adds Flip (9); the retained legacy build-21 imag
 | 6 | Combo | Advances one file on each trigger, then loops it. |
 | 7 | Random Sequence | Chooses a random file per trigger; repeats are allowed. |
 | 8 | Random Loop | Loops a file; subsequent triggers jump to random frame positions within it. |
-| 9 | Flip (extended build 25) | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |
+| 9 | Flip | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |
+| 10 | CV Flip | PLAY starts/stops; positive CV selects forward and negative selects reverse at native speed. Near zero, keeps its last direction. GATE is ignored. Calibrate first; see below. |
 
 Fade/Gate ramps are short 256-sample linear envelopes: about 5.3 ms at 48 kHz before pitch changes. They mainly suppress clicks, rather than providing long musical fades. Buffering adds release/retrigger latency. Random seeking and file changes require SD access and can take longer than cached Trigger playback. Overlapping voices are not implemented.
 
+Flip and CV Flip use 512-frame transition fades. These reduce direction-change clicks; they are not overlapping crossfades, and buffering/refill adds response delay.
+
+## CV Flip calibration
+
+Select playback mode 10, or put `CV Flip` on line 2 of `config.txt` (example: [cv-flip.txt](../examples/config/cv-flip.txt)).
+
+1. Centre the pitch knob and patch a steady 0 V from your bipolar CV source.
+2. Hold PLAY for at least half a second without turning either control, then release. Playback stops and the current input becomes the zero reference.
+3. Tap PLAY to start. Positive CV plays forward, negative plays reverse; approximately ±0.05 V around zero retains the last direction.
+
+A reverse start begins at the end of the sample. Zero holds direction rather than stopping. Calibration survives file selection but resets on power-up, so repeat it each session. Keep the knob at its calibrated position, or move it deliberately to bias the switching threshold. Keep CV steady during calibration: large movement while PLAY is held can enter CV-mode editing instead.
+
+CV Flip always uses native sample speed and overrides Free/Quantize/Select File behaviour. The third config line is still required, but does not change that behaviour. FILE browsing stops playback; GATE is ignored. See [CV Flip](cv-flip.md) for details and hardware results. Signed variable speed and position chopping are future ideas, not implemented controls.
+
 ## CV modes
+
+These apply to playback modes 1–9; CV Flip uses the direction controls above.
 
 | Blue count | Mode | Behavior |
 | --- | --- | --- |
