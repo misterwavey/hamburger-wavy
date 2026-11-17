@@ -698,3 +698,33 @@ int fat_profile_write(Fat *f, const uint8_t data[1024]) {
   return 0;
 }
 #endif
+
+#ifdef ONE_CV_DIAG
+/* Reports are written only while audio is stopped. */
+#if defined(__clang__)
+__attribute__((minsize))
+#endif
+int fat_cv_write(Fat *f, const uint8_t data[1024]) {
+  uint32_t lbas[2], zero = 1, own = 1;
+  if (reserved_area(f, "ONECV.TXT", "ONECV   TXT", 2, lbas)) return -1;
+  f->cache_lba = f->fat_lba = 0xffffffffu;
+  const char *magic = "Hamburger Wavy CV 1\n";
+  for (uint32_t sector_index = 0; sector_index < 2; ++sector_index) {
+    if (f->read(f->ctx, lbas[sector_index], f->cache)) return -1;
+    if (!sector_index)
+      for (uint32_t i = 0; magic[i]; ++i)
+        if (f->cache[i] != (uint8_t)magic[i]) own = 0;
+    for (uint32_t i = 0; i < 512; ++i) if (f->cache[i]) zero = 0;
+  }
+  if (!zero && !own) return -1;
+  for (uint32_t sector_index = 0; sector_index < 2; ++sector_index) {
+    const uint8_t *expected = data + sector_index * 512u;
+    if (write_sector(f, lbas[sector_index], expected) ||
+        f->read(f->ctx, lbas[sector_index], f->cache)) return -1;
+    for (uint32_t i = 0; i < 512; ++i)
+      if (f->cache[i] != expected[i]) return -1;
+  }
+  f->cache_lba = f->fat_lba = 0xffffffffu;
+  return 0;
+}
+#endif

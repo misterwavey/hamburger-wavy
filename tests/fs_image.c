@@ -33,5 +33,14 @@ int main(int argc, char **argv) {
   if (fat_find(&fs,"ONEPROF.TXT",&entry)!=1 || entry.size!=1024 ||
       file_open(&file,&fs,&entry) || file_read(&file,readback,1024,&got) ||
       got!=1024 || memcmp(readback,report,1024)) return 12;
+#ifdef ONE_CV_DIAG
+  memset(report,' ',sizeof(report));
+  memcpy(report,"Hamburger Wavy CV 1\n",sizeof("Hamburger Wavy CV 1\n")-1);
+  if(fat_cv_write(&fs,report))return 13;
+  if(fat_mount(&fs,read_block,f))return 14;
+  fs.write=write_block;
+  if(fat_find(&fs,"ONECV.TXT",&entry)!=1 || entry.size!=1024 || file_open(&file,&fs,&entry) ||
+     file_read(&file,readback,1024,&got) || got!=1024 || memcmp(readback,report,1024))return 15;
+#endif
   return fclose(f) ? 8 : 0;
 }

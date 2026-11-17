@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from build import extract, template
 from analyze_profile import parse_report, attach_build_info
+from analyze_cv import parse_report as parse_cv
 from mips32 import CPU
 
 
@@ -191,7 +192,7 @@ class ReleaseTests(unittest.TestCase):
         if not Path(cc).exists():cc=shutil.which('clang')
         binary=ROOT/'build/fs-image-test'
         sources=[ROOT/'tests/fs_image.c',*[ROOT/'firmware'/f'{n}.c' for n in ('fat','recall','memory')]]
-        subprocess.run([cc,'-DONE_PROFILE=1','-std=c11','-O1','-Wall','-Wextra','-Werror','-fno-builtin',*[str(p) for p in sources],'-o',str(binary)],check=True,capture_output=True,text=True)
+        subprocess.run([cc,'-DONE_PROFILE=1','-DONE_CV_DIAG=1','-std=c11','-O1','-Wall','-Wextra','-Werror','-fno-builtin',*[str(p) for p in sources],'-o',str(binary)],check=True,capture_output=True,text=True)
         with tempfile.TemporaryDirectory() as tmp:
             for kind in (16,32):
                 total=131072;spc=4 if kind==16 else 1
@@ -584,6 +585,51 @@ class ReleaseTests(unittest.TestCase):
             result=subprocess.run([str(binary)],capture_output=True,text=True,
                 env=dict(os.environ,ASAN_OPTIONS='halt_on_error=1',UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1'))
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_cv_diagnostic_capture_and_controller(self):
+        cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
+        flags=[cc,'-std=c11','-O1','-g','-Wall','-Wextra','-Werror','-fno-builtin',
+               '-fsanitize=address,undefined','-DONE_CV_DIAG=1','-DONE_BUILD_NUMBER=29']
+        binary=ROOT/'build/cv-test';fixture=ROOT/'build/cv-test-report.txt'
+        result=subprocess.run([*flags,str(ROOT/'tests/cv_diag.c'),str(ROOT/'firmware/cv_capture.c'),
+            str(ROOT/'firmware/cv_diag.c'),str(ROOT/'firmware/memory.c'),'-o',str(binary)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        result=subprocess.run([str(binary),str(fixture)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        raw=fixture.read_bytes();report=parse_cv(raw)
+        self.assertEqual(report['build'],29);self.assertEqual(len(report['captures']),12)
+        for row in report['captures']:
+            self.assertEqual((row['samples'],row['mean'],row['standard_deviation'],row['at_full_scale']),(5000,1023,0,5000))
+        with self.assertRaises(ValueError):parse_cv(raw[:512])
+        damaged=bytearray(raw);damaged[120]^=1
+        with self.assertRaises(ValueError):parse_cv(bytes(damaged))
+        # Exercise the real reserved-file writer/foreign-file checks with the existing disk model.
+        sources=[ROOT/'tests/core.c',*[ROOT/'firmware'/f'{name}.c' for name in
+            ('fat','wave','sd','ring','memory','app','advertise','settings','policy','ui','recall')]]
+        result=subprocess.run([*flags,'-I'+str(ROOT/'build'),*map(str,sources),'-o',str(ROOT/'build/cv-fat-test')],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        result=subprocess.run([str(ROOT/'build/cv-fat-test')],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_cv_diagnostic_image_and_rebuild(self):
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--cv-diag'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        out=ROOT/'build/cv-diag';image=read_hex(out/'image.hex');_,contract=template(ROOT/'board/update-layout.json')
+        self.assertEqual(set(image),set(contract));payload,symbols,_,_=extract(out/'hamburger-wavy.elf')
+        self.assertNotIn('app_tick',symbols);self.assertNotIn('audio',symbols)
+        self.assertIn('cv_diag_tick',symbols);self.assertIn('cv_stats_add',symbols)
+        for address,byte in image.items():self.assertEqual(byte,payload.get(address,255))
+        for address in image:
+            if address>=0x1fc00000:self.assertEqual(image[address],read_hex(ROOT/'build/image.hex')[address])
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            for name in ('firmware','tools','board'):
+                shutil.copytree(ROOT/name,root/name,ignore=shutil.ignore_patterns('__pycache__'))
+            result=subprocess.run([sys.executable,str(root/'tools/build.py'),'--cv-diag'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual((root/'build/cv-diag/image.hex').read_bytes(),(out/'image.hex').read_bytes())
+        invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--cv-diag','--extended'],capture_output=True,text=True)
+        self.assertNotEqual(invalid.returncode,0)
 
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')

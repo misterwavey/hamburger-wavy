@@ -42,6 +42,8 @@ Optional original 440 Hz test WAVs can be generated with `python3 tools/generate
 
 `make profile` builds an optional diagnostic at `build/profile/image.hex`, leaving the normal image separate. It measures streaming/refill timing, observed buffer margin and stack watermark, then writes `ONEPROF.TXT` only after playback stops. See [profiling instructions and limitations](docs/profiling.md), and analyse a collected report with `python3 tools/analyze_profile.py ONEPROF.TXT`.
 
+A separate `make cv-diag` image captures raw pitch/CV readings without audio. See [CV diagnostic instructions](docs/cv-diagnostic.md).
+
 ## Install
 
 This is experimental replacement firmware. Preserve your existing firmware and card files separately. The application does not include the resident updater or a full recovery image. See [hardware and update limits](docs/provenance.md#hardware-and-update-limits).

@@ -97,16 +97,17 @@ def write_image(spec,memory,path):
  path.write_bytes((spec['line_ending'].join(output)+spec['line_ending']).encode('ascii'))
 
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--cc');ap.add_argument('--ld');ap.add_argument('--out',type=Path);modes=ap.add_mutually_exclusive_group();modes.add_argument('--profile',action='store_true');modes.add_argument('--flash-probe',action='store_true');modes.add_argument('--flash-bank',action='store_true');ap.add_argument('--extended',action='store_true');args=ap.parse_args()
- if args.extended and (args.flash_probe or args.flash_bank):ap.error("--extended cannot be combined with flash probes")
+ ap=argparse.ArgumentParser();ap.add_argument('--cc');ap.add_argument('--ld');ap.add_argument('--out',type=Path);modes=ap.add_mutually_exclusive_group();modes.add_argument('--profile',action='store_true');modes.add_argument('--flash-probe',action='store_true');modes.add_argument('--flash-bank',action='store_true');modes.add_argument('--cv-diag',action='store_true');ap.add_argument('--extended',action='store_true');args=ap.parse_args()
+ if args.extended and (args.flash_probe or args.flash_bank or args.cv_diag):ap.error("--extended cannot be combined with probe/CV diagnostic modes")
  probe=args.flash_probe or args.flash_bank
  extension_size=0xc000 if args.flash_bank or args.extended else 1024
- out=args.out or (ROOT/'build/extended/profile' if args.extended and args.profile else ROOT/'build/extended' if args.extended else ROOT/'build/flash-bank' if args.flash_bank else ROOT/'build/flash-probe' if args.flash_probe else ROOT/'build/profile' if args.profile else ROOT/'build');out.mkdir(parents=True,exist_ok=True)
+ out=args.out or (ROOT/'build/cv-diag' if args.cv_diag else ROOT/'build/extended/profile' if args.extended and args.profile else ROOT/'build/extended' if args.extended else ROOT/'build/flash-bank' if args.flash_bank else ROOT/'build/flash-probe' if args.flash_probe else ROOT/'build/profile' if args.profile else ROOT/'build');out.mkdir(parents=True,exist_ok=True)
  pitch_report=generate_pitch(out)
  cc=tool(args.cc,['/usr/local/opt/llvm/bin/clang','/opt/homebrew/opt/llvm/bin/clang','clang'])
  ld=tool(args.ld,['ld.lld',*Path.home().glob('.rustup/toolchains/*/lib/rustlib/*/bin/rust-lld')])
  flags=['-I'+str(out),'--target=mipsel-none-elf','-march=mips32r2','-mabi=32','-mno-abicalls','-fno-pic','-G0','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-jump-tables','-Os','-fstack-usage','-Wall','-Wextra','-Werror']
  if args.profile:flags+=['-DONE_PROFILE=1']
+ if args.cv_diag:flags+=['-DONE_CV_DIAG=1','-DONE_BUILD_NUMBER=29']
  if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_BUILD_NUMBER=28']
  if probe:flags+=['-DONE_FLASH_PROBE=1','-DONE_BUILD_NUMBER='+('23' if args.flash_bank else '22')]
  if args.flash_bank:flags+=['-DONE_FLASH_BANK=1']
@@ -161,7 +162,9 @@ def main():
      'ASSERT(SIZEOF(.flash_probe_high)<=0xf0,"High flash probe overflow")\n'+
      '.flash_probe_tail 0x9d01fff0')
   linker=out/'flash-probe.ld';linker.write_text(text)
- sources=sorted(p for p in (ROOT/'firmware').iterdir() if p.suffix in ('.c','.S'));objects=[]
+ sources=sorted(p for p in (ROOT/'firmware').iterdir() if p.suffix in ('.c','.S'))
+ if args.cv_diag:sources=[p for p in sources if p.stem in ('advertise','cv_capture','cv_diag','fat','memory','platform','policy','sd','start')]
+ objects=[]
  for src in sources:
   obj=out/(src.stem+'.o');subprocess.run([cc,*flags,'-c',str(src),'-o',str(obj)],check=True);objects.append(str(obj))
  elf=out/'hamburger-wavy.elf';subprocess.run([ld,'-flavor','gnu','-m','elf32ltsmip','-T',str(linker),*objects,'-o',str(elf)],check=True)
@@ -203,6 +206,7 @@ def main():
  build_number=int(re.search(r'^#define ONE_BUILD_NUMBER (\d+)$',(ROOT/'firmware/build.h').read_text(),re.M)[1])
  if probe:build_number=23 if args.flash_bank else 22
  if args.extended:build_number=28
+ if args.cv_diag:build_number=29
  report=dict(profiling=args.profile,project='Hamburger Wavy',licence='GPL-3.0-only',build_number=build_number,status='EXPERIMENTAL — COMPLETE APPLICATION, NOT HARDWARE VALIDATED',source_built=True,
              features=dict(config_txt=True,playlist_txt=True,playback_modes=['Trigger','Gate','Fade','Loop','Sequence','Combo','Random Sequence','Random Loop']+(['Flip'] if args.extended else []),cv_modes=['Free','Quantize','Select File'],cv_select_delays_ms=dict(Short=0,Medium=2,Long=10),front_panel_modes=True,last_manual_file_recall='ONESTATE.BIN: two alternating CRC32 sectors; stock status.bin read-only import',build_identification='ONEBUILD.TXT: best-effort on mount, written only if content changes',generated_chromatic_tables=True,fade_ramp_samples=256),
              pitch_quantization=pitch_report,
@@ -242,6 +246,11 @@ def main():
     extension_free=49152-size,combined_text_bytes=layout['.text']['bytes']+size,
     combined_text_limit=80964,combined_text_free=80964-layout['.text']['bytes']-size)
   report['record_layout']+='; verified 48 KiB bank appended before EOF, unused bank bytes 0xff'
+ if args.cv_diag:
+  report['cv_diagnostic']=dict(rows=12,settle_ms=500,window_ms=5000,poll_ms=1,
+    report_file='ONECV.TXT',adc_bits=10,audio_playback=False,hardware_validation='pending')
+  report['features']={'cv_diagnostic':True}
+  report['sd_write_scope']='ONEBUILD.TXT and ONECV.TXT plus their reserved FAT/root/FSInfo allocation; audio remains stopped'
  if args.profile:
   report['sd_write_scope']+='; ONEPROF.TXT (two sectors) and its allocation, only when playback is stopped'
  (out/'manifest.json').write_text(json.dumps(report,indent=2)+'\n')

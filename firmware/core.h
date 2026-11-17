@@ -47,6 +47,9 @@ int fat_list(Fat *, Entry *, uint32_t);
 int fat_find(Fat *, const char *, Entry *); /* 1 found, 0 absent, -1 I/O */
 int fat_state_area(Fat *, uint32_t[2]);
 int fat_build_info(Fat *, uint32_t);
+#ifdef ONE_CV_DIAG
+int fat_cv_write(Fat *, const uint8_t[1024]);
+#endif
 #ifdef ONE_PROFILE
 int fat_profile_write(Fat *, const uint8_t[1024]);
 #endif

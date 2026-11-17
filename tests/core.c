@@ -1476,6 +1476,28 @@ static void test_profile_file(void) {
   CHECK(fat_find(&f,"SAMPLE.WAV",&e)==1 && e.cluster==3);
 }
 #endif
+#ifdef ONE_CV_DIAG
+static void test_cv_file(void) {
+  Fat f;
+  Entry e;
+  uint8_t report[1024];
+  memset(report, ' ', sizeof(report));
+  memcpy(report, "Hamburger Wavy CV 1\n", sizeof("Hamburger Wavy CV 1\n")-1);
+  disk16();
+  memset(block(24), 0x73, 512);
+  CHECK(!fat_mount(&f, disk, 0)); f.write = disk_write;
+  CHECK(!fat_cv_write(&f, report));
+  CHECK(fat_find(&f, "ONECV.TXT", &e) == 1 && e.size == 1024);
+  CHECK(!fat_cv_write(&f, report));
+  for (uint32_t i=0; i<512; ++i) CHECK(block(24)[i]==0x73);
+  uint32_t lba = f.data + (e.cluster-2)*f.spc;
+  memset(block(lba), 'X', 512);
+  uint32_t before=writes;
+  CHECK(fat_cv_write(&f,report)<0 && writes==before);
+  /* A refused foreign report must leave the shared directory cache invalid. */
+  CHECK(fat_find(&f,"SAMPLE.WAV",&e)==1 && e.cluster==3);
+}
+#endif
 static void test_state_allocation(void) {
   Fat f;
   uint32_t area[2];
@@ -2004,6 +2026,9 @@ int main(void) {
   test_build_info();
 #ifdef ONE_PROFILE
   test_profile_file();
+#endif
+#ifdef ONE_CV_DIAG
+  test_cv_file();
 #endif
   test_front_panel_and_remember();
   test_playback_error_recovery_and_read_ahead();

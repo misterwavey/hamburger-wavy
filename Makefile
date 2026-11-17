@@ -2,7 +2,7 @@
 PYTHON ?= python3
 BUILD_FLAGS ?=
 
-.PHONY: all profile flash-probe flash-bank extended extended-profile test clean
+.PHONY: all profile flash-probe flash-bank extended extended-profile cv-diag test clean
 all:
 	$(PYTHON) tools/build.py $(BUILD_FLAGS)
 
@@ -20,6 +20,9 @@ extended:
 
 extended-profile:
 	$(PYTHON) tools/build.py --extended --profile $(BUILD_FLAGS)
+
+cv-diag:
+	$(PYTHON) tools/build.py --cv-diag $(BUILD_FLAGS)
 
 test: all
 	$(PYTHON) -m unittest discover -s tests -v
