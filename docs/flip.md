@@ -56,3 +56,12 @@ After a useful run, stop with PLAY, release it, wait five seconds, power down an
 Build 25 uses 32016 bytes of combined code/constants normally (48948 free) and 36664 with profiling (44300 free). Static RAM is 55920/57248 bytes, 208 bytes above build 24. The 8 KiB minimum stack reserve is retained; profiling has 96 bytes of static growth budget beyond it. The two-sector boundary cache uses existing scratch space, not an extra 1 KiB static allocation.
 
 The 18-test release suite and final focused checks pass. Sanitizer fixtures cover contiguous/fragmented FAT16/FAT32 files, cycles/truncation, sample order and wraps, scratch-cache ownership changes, warm reverse sector-read counts, PLAY/FILE/menu behaviour, gates during SD reads/refills, stationary fade DMA and card-error recovery. Actual compiled reverse PCM16/24 loops and relocated functions also run in the project's logical MIPS interpreter. These are software checks; Flip sound, timing, rapid-clock behaviour and long fragmented-file performance still need hardware observations.
+
+
+## First hardware result — 2026-11-17
+
+The user reported Flip working very well. A fresh CRC-valid build-25 report recorded 7 streaming starts/resumes and 30.829 seconds of observed playback in Flip/Quantize, PCM16/48000 Hz. Worst-work and tightest-margin contexts both used divider 1335, approximately 71910 output frames/s. Ring, late-commit, stationary-DMA, read and copy-overlap error counters were all zero, as were previous report-write failures.
+
+Completed refill work averaged 5.301 ms and peaked at 7.548 ms, against approximately 14.240 ms per half-buffer. Minimum observed margin was 1012 frames, about 14.073 ms. Six fade-out envelope measurements each took about 197.88 us. These starts can include PLAY restarts and direction resumes; the report is not an edge-by-edge direction trace. It does not measure the stopped refill gap or establish transition latency.
+
+SD attempts averaged 1.153 ms with a 3.766 ms maximum; 7591 attempts were below 1 ms and 1080 between 2 and 5 ms. The existing buffers accommodated these delays. Longest observed service gap was 649 us. Stack watermark was 1704 bytes with 6576 untouched above the 57248-byte static allocation; this remains a sampled lower bound. This validates the reported chirp workload and user-observed flips, not maximum-pitch 96 kHz/24-bit performance or arbitrary rapid clocks/fragmentation. The next stress case uses AGNT2 via build/flip-test/playlist-stress.txt with the same firmware/config.
