@@ -55,3 +55,9 @@ The user completed the trial using manual back-and-forth CV changes rather than 
 Ring, late-commit, stationary-DMA, read and copy-overlap errors were all zero, with no previous report-write failures. Completed refills averaged 6.048 ms and peaked at 9.484 ms, against approximately 10.667 ms per half-buffer. Minimum observed normal publication margin was 1007 frames (10.490 ms). The report excludes stopped refill gaps and does not establish transition latency or click audibility.
 
 SD attempts averaged 877.32 us and peaked at 3.921 ms. Stack watermark was 1712 bytes with 6552 untouched above the 57264-byte static allocation; this is an observed lower bound. These results support the tested manual-CV workload. They do not yet validate LFO crossings, rapid modulation, every calibration/knob position, or arbitrary card fragmentation.
+
+## Second hardware run — LFO trial
+
+After the requested slow bipolar LFO trial, a new CRC-valid build-30 report recorded 52 starts/resumes and 29.622 seconds of CV Flip playback, PCM24/96000 Hz at native speed. Fifty-one fade preparations were measured at approximately 245.83 us each. All five streaming error counters and previous report-write failures were zero.
+
+Completed refills averaged 5.990 ms and peaked at 9.424 ms, within the 10.667 ms half-buffer period. Minimum observed normal publication margin remained 1007 frames (10.490 ms). SD attempts averaged 845.95 us and peaked at 3.777 ms. Stack watermark remained 1712 bytes with 6552 untouched. The report differs from the manual trial and supports repeated automatic direction changes without recorded streaming faults. Exact LFO frequency/amplitude, chatter at zero, sound quality and transition latency were not separately measured; the report does not prove an audible turn for every input crossing or establish a maximum modulation rate.
