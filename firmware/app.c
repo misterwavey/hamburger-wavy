@@ -72,6 +72,9 @@ static void flip_ramp(uint32_t *data, uint32_t down) {
 }
 static int flip_fade_out(void) {
   uint32_t position=board_audio_offset();
+  /* DMA can cross after app_background's poll. Wait for its boundary
+   * bookkeeping before assigning a freshly inactive half. */
+  if (position/(ONE_HALF_FRAMES*8u)!=ring.half) return 0;
   uint32_t remaining=ONE_HALF_FRAMES-(position/8u)%ONE_HALF_FRAMES;
   /* Reserve preparation time as well as the existing publication guard. */
   if (remaining<ONE_HALF_FRAMES/2u) return 0;
@@ -517,7 +520,7 @@ void app_tick(void) {
       if ((half==flip_fade_half && position%(ONE_HALF_FRAMES*8u)>=512u*8u) ||
           (flip_fading==2 && half!=flip_fade_half)) {
         stop();flip_fading=0;flip_resume();
-      } else if (half==flip_fade_half && flip_fading==1) {
+      } else if (half==flip_fade_half && flip_fading==1 && half==ring.half) {
         uint32_t other=half^1u;
         if (!board_audio_commit_safe(other)) { PROFILE(profile_error(PROF_LATE_ERROR));playback_error();return; }
         for(uint32_t i=0;i<ONE_HALF_FRAMES*2u;++i) audio[other*ONE_HALF_FRAMES*2u+i]=0;

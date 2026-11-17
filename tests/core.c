@@ -613,7 +613,7 @@ static uint32_t host_pins = 0xaa0, host_adc = 128, host_offset, host_starts,
 static uint32_t host_transfer_advance, host_transfer_budget;
 static const uint32_t *host_audio;
 #ifdef ONE_FLIP
-static uint32_t host_flip_edges, host_flip_inject, host_flip_captured, host_silent_stop, host_commit_move;
+static uint32_t host_flip_edges, host_flip_inject, host_flip_captured, host_silent_stop, host_commit_move, host_offset_move, host_offset_target;
 #endif
 static void audio_progress_on_transfer(void) {
 #ifdef ONE_FLIP
@@ -712,7 +712,12 @@ void board_audio_start(const uint32_t *data) {
   host_offset = 0;
   host_starts++;
 }
-uint32_t board_audio_offset(void) { return host_offset; }
+uint32_t board_audio_offset(void) {
+#ifdef ONE_FLIP
+  if(host_offset_move && !--host_offset_move) host_offset=host_offset_target;
+#endif
+  return host_offset;
+}
 int board_audio_commit_safe(uint32_t half) {
 #ifdef ONE_FLIP
   if(host_commit_move && !--host_commit_move) host_offset=(ONE_HALF_FRAMES-64u)*8u;
@@ -1932,6 +1937,35 @@ static void test_flip_transport(void) {
   host_offset=ONE_HALF_FRAMES*8u+32u*8u;app_tick();
   host_offset=512u*8u;app_tick();
   CHECK(host_active && host_starts==2 && host_led==2);
+  click_play();CHECK(!host_active);
+  /* Cross either physical half boundary after the poll/edge capture. */
+  for(uint32_t initial=0;initial<2;++initial) {
+    const uint32_t offsets[]={0,64,511};
+    for(uint32_t k=0;k<3;++k) {
+      feature_mount();click_play();
+      if(initial) advance_half();
+      host_offset=((initial+1u)*ONE_HALF_FRAMES-1u)*8u;
+      host_pins|=0x800u;app_tick();
+      host_offset_target=(initial^1u)*ONE_HALF_FRAMES*8u+offsets[k]*8u;
+      host_offset_move=3;
+      host_pins&=~0x800u;app_tick();
+      CHECK(!host_offset_move && host_active && host_starts==1 && host_led==2);
+      app_tick();
+      host_offset=initial*ONE_HALF_FRAMES*8u+512u*8u;app_tick();
+      CHECK(host_active && host_starts==2 && host_led==2);
+      CHECK(host_audio[1024]==sample_word(1,(initial+1u)*ONE_HALF_FRAMES-1u-512u));
+      click_play();CHECK(!host_active);
+    }
+  }
+  /* Cross into the faded half between its ring poll and silence hand-off. */
+  feature_mount();click_play();host_offset=123u*8u;pulse();
+  host_offset=(ONE_HALF_FRAMES-1u)*8u;
+  host_offset_target=ONE_HALF_FRAMES*8u+64u*8u;host_offset_move=2;
+  app_tick();CHECK(!host_offset_move && host_active && host_starts==1);
+  app_tick();
+  host_offset=32u*8u;app_tick();
+  CHECK(host_active && host_starts==2 && host_led==2);
+  CHECK(host_audio[1024]==sample_word(1,(123u+5000u-512u)%5000u));
   click_play();CHECK(!host_active);
   /* Enter Flip from Trigger using the existing held-PLAY/FILE menu. */
   feature_disk("# test\nTrigger\nQuantize\nShort",0,5000,16);feature_mount();

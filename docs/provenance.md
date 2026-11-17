@@ -81,3 +81,6 @@ Extended build 26 changes only the project-written Flip transition scheduling an
 
 
 Extended build 27 corrects the project-written fade-preparation deadline handling introduced in build 26. Preparation uses a typed union view of existing scratch storage, preserves queued decoded audio on deferral, and retains the DMA publication guard. A simulated guard-closing regression case and a late-gate case exercise the fix. No vendor implementation or new RAM buffer is introduced; hardware confirmation remains pending.
+
+
+Extended build 28 adds DMA-half/ring-state agreement checks to the project's fade preparation and silence hand-off. A new regression reproduces build 27's stale-bookkeeping failure by advancing DMA between software observations, and covers both half boundaries and the silent-half hand-off. No vendor code or data are added. Hardware confirmation remains pending; the validated build-25 artifact is retained as rollback.
