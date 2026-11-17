@@ -47,3 +47,11 @@ diskutil eject "/Volumes/TTA ONE"
 ```
 
 Run the usual updater procedure again. The `card-backup` directory is a local bench backup, not part of the source distribution; when preparing your own trial, preserve your own config and playlist before changing them.
+
+## First hardware run — manual CV changes
+
+The user completed the trial using manual back-and-forth CV changes rather than an LFO. A fresh CRC-valid build-30 report recorded 12 starts/resumes and 85.121 seconds of CV Flip playback, PCM24/96000 Hz at native speed (divider 1000). Eleven fade preparations were recorded, each approximately 245.83 us. Starts/resumes and fade preparations are separate counters, not an edge-by-edge direction trace.
+
+Ring, late-commit, stationary-DMA, read and copy-overlap errors were all zero, with no previous report-write failures. Completed refills averaged 6.048 ms and peaked at 9.484 ms, against approximately 10.667 ms per half-buffer. Minimum observed normal publication margin was 1007 frames (10.490 ms). The report excludes stopped refill gaps and does not establish transition latency or click audibility.
+
+SD attempts averaged 877.32 us and peaked at 3.921 ms. Stack watermark was 1712 bytes with 6552 untouched above the 57264-byte static allocation; this is an observed lower bound. These results support the tested manual-CV workload. They do not yet validate LFO crossings, rapid modulation, every calibration/knob position, or arbitrary card fragmentation.
