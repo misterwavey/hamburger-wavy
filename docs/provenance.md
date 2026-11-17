@@ -75,3 +75,6 @@ Build 24 relocates existing project application objects and constants into the h
 
 
 Extended build 25 adds project-written bidirectional PCM streaming, a bounded selected-file FAT index, a shared-sector cache within existing scratch space, and a Flip transport driven by DMA position snapshots. No vendor implementation or data is introduced. The standalone reverse PCM tests, fragmented FAT16/FAT32 fixtures and generated chirp are original project work. Retained legacy build/probe targets compile the new mode out; the extended candidate enables it explicitly. See flip.md for transitions, resource limits and pending hardware validation.
+
+
+Extended build 26 changes only the project-written Flip transition scheduling and ramps. The old stream is faded in an inactive half before being stopped, with zero output checked in host tests and compiled PCM ramp arithmetic checked in the MIPS model. No vendor code/data are added. The hardware click-reduction result remains pending; build 25's latest chirp report recorded no streaming errors despite the reported small clicks.

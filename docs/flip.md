@@ -1,6 +1,6 @@
 # Flip: interrupt playback direction
 
-Flip is available in the extended build-25 candidate (`make extended` or `make extended-profile`). It is not enabled in the retained legacy build-21 targets. It loops a file and reverses direction from a captured playback position when GATE rises. It does not restart the file at each gate.
+Flip was introduced in extended build 25; the current extended build-26 candidate improves its transition fades  (`make extended` or `make extended-profile`). It is not enabled in the retained legacy build-21 targets. It loops a file and reverses direction from a captured playback position when GATE rises. It does not restart the file at each gate.
 
 ## Controls
 
@@ -28,9 +28,11 @@ Existing mode counts 1–8 and LED colours retain their meaning. Playback stays 
 
 ## Transition behaviour
 
-The gate handler records the source frame represented by the current DMA half and offset, rather than the filesystem/read-ahead cursor. Direction changes are serviced after any in-progress SD operation finishes. The first implementation snapshots a short continuation of the currently queued audio, stops the old DMA stream, plays a 256-frame fade to silence, then reads the initial two halves in the requested direction and fades in. The sample wraps at either end and continues looping.
+The gate handler records the source frame represented by the current DMA half and offset, rather than the filesystem/read-ahead cursor. Direction changes are serviced after any in-progress SD operation finishes. In build 26, the old DMA/SPI stream continues until a fade placed in a safely inactive half has played down to zero. A second half is cleared while inactive if needed, so silence follows the ramp. Only then does the code stop DMA, refill from the captured position in the requested direction, and restart with a fade-in. Flip's ramps are 512 output frames; other modes retain their existing 256-frame envelopes.
 
-There is a brief refill gap: this is not a seamless crossfade or sample-accurate scratching implementation. Fade time scales with playback rate, and card access adds latency. That latency needs hardware measurement. New edges during fade/refill update the requested direction without reentering the SD driver; multiple edges can coalesce before playback resumes. Very fast gates may therefore produce interrupted or silent output instead of one fully audible reversal per edge. Begin with slow manual pulses or a 1 Hz clock, then increase the rate to find useful behaviour on the tested sample/card.
+This replaces build 25's stop/restart before the fade-out, which could introduce a discontinuity at full signal level. It aims to reduce the small clicks reported on the chirp. No click reduction has yet been confirmed on hardware for build 26.
+
+There is still a refill gap and a wait for a safe buffer boundary. The new hand-off can add response delay compared with build 25. Fade time scales with playback rate, and card access adds latency. This is not a seamless crossfade or sample-accurate scratching implementation. New edges during fade/refill update requested direction without reentering the SD driver; multiple edges can coalesce before playback resumes. The captured source position is frozen during the transition. Very fast gates may therefore produce interrupted or silent output instead of one fully audible reversal per edge. Begin with slow manual pulses or a 1 Hz clock, then increase the rate to find useful behaviour on the tested sample/card.
 
 PLAY, browsing and menu changes cancel pending flips. Errors use the existing recovery/blue signals. Repriming a flip does not write file-recall state; ordinary manual starts retain the existing recall behaviour.
 
@@ -77,3 +79,12 @@ Card inspection found NOISELONG.wav to be mono PCM24/96000 Hz, approximately 11.
 The user reported the longer noise sample seemed to work, but was a poor listening choice. A fresh CRC-valid report recorded 18 starts/resumes and 40.615 seconds in Flip/Quantize PCM24/96000 Hz, with divider 667 in worst-work and tightest-margin contexts. All streaming errors and previous report-write failures were zero. Seventeen fade-out measurements were recorded. Completed refills averaged 6.096 ms (worst 7.335 ms), against approximately 7.115 ms per half, with 991 frames/6.885 ms minimum observed buffer margin. Read-ahead accommodated the occasional longer refill in this run.
 
 SD attempts averaged 876.63 us and peaked at 1081.83 us. Longest service gap was 649 us; stack watermark remained 1704 bytes with 6576 untouched. This establishes the tested high-rate Flip workload, not arbitrary clock rates or fragmentation. Steady noise does not make direction audible, so it is insufficient for judging transition sound or latency. The generator now also creates FLIP96.wav: an original 30-second mono PCM24/96000 Hz rising chirp, about 20 seconds at maximum quantized pitch, for listening at the same sample format.
+
+
+## Build 26 click-reduction trial
+
+The latest build-25 chirp report recorded 67 starts/resumes, 55.281 seconds and 66 fade-out measurements at PCM24/96000 Hz, maximum quantized pitch (divider 667). All streaming errors and prior report-write failures were zero. Mean refill work was 5.681 ms (worst 6.768 ms), with 999 frames/6.941 ms minimum observed margin. All 46604 SD attempts were below 1 ms. The user's small clicks therefore have no corresponding recorded buffer/read failure in that run; a transition discontinuity is the working hypothesis, not a proven hardware diagnosis.
+
+Build 26 schedules the fade without first stopping/restarting DMA, checks the same inactive-half copy guard before publication, and stops only after the fade output is zero. Ramps increase to 512 frames. Tests check that the active half is unchanged when the request is scheduled, that no stop/restart occurs at that point, that the fade and following samples reach zero, and that the eventual stop occurs at zero output. Compiled positive/negative PCM ramp results and boundary guards are checked in both normal/profiling images. Hardware listening and response-delay comparison remain pending.
+
+Combined code/constants use 32432 bytes normally (48532 free) and 37048 with profiling (43916 free). Static RAM remains 55920/57248 bytes; the existing padding absorbs the new fade-half field, preserving the 8 KiB minimum stack reserve and previous growth budgets. The profiler's refill timings still exclude stopped refill gaps; compare click audibility and control feel by listening or scope.

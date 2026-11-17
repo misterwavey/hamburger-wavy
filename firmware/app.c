@@ -36,12 +36,12 @@ static int32_t selection_delta;
 #ifdef ONE_FLIP
 static FileIndex flip_index;
 static uint32_t flip_playing, flip_restarting, flip_fading, flip_pending, flip_reverse,
-    flip_requested, flip_cursor, flip_frame, flip_half[2], flip_staging_frame;
+    flip_requested, flip_cursor, flip_frame, flip_half[2], flip_staging_frame, flip_fade_half;
 static void flip_cancel(void) {
   flip_playing = flip_restarting = flip_fading = flip_pending = 0;
 }
 static void flip_edge(void) {
-  if (ring.running) {
+  if (ring.running && !flip_fading) {
     uint32_t frame = board_audio_offset() / 8u;
     flip_frame = wave_frame_offset(flip_half[frame / ONE_HALF_FRAMES],
         frame % ONE_HALF_FRAMES, wave.bytes / (wave.bits / 8u), flip_reverse);
@@ -51,21 +51,31 @@ static void flip_edge(void) {
     flip_pending = 1;
   }
 }
-/* Snapshot a short continuation before stopping DMA. Play just this fade
- * and silence while the main loop waits, instead of waiting whole halves. */
-static void flip_fade_out(void) {
-  uint32_t first = (board_audio_offset() / 8u) * 2u;
-  for (uint32_t i = 0; i < 512u; ++i)
-    staging[i] = audio[(first + i) % (ONE_CACHE_FRAMES * 2u)];
-  board_audio_stop(); ring.running = 0; staging_ready = 0;
-  envelope.gain = 32768; envelope.target = 0;
+/* Keep DMA/SPI running until the scheduled fade has actually reached zero. */
+__attribute__((noinline))
+static void flip_ramp(uint32_t *data, uint32_t down) {
+  for (uint32_t i = 0; i < 512u; ++i) {
+    uint32_t gain = (down ? 511u - i : i) * 64u;
+    int64_t value = ((int64_t)((int32_t)data[i * 2u] / 256) * gain) >> 15;
+    data[i * 2u] = data[i * 2u + 1u] = (uint32_t)value << 8;
+  }
+}
+static int flip_fade_out(void) {
+  uint32_t half = 1u - board_audio_offset() / (ONE_HALF_FRAMES * 8u);
+  uint32_t pending = ring.pending & (1u << half);
+  if (!board_audio_commit_safe(half) || (pending && !staging_ready)) return 0;
+  if (!pending) audio_copy(staging,audio+half*ONE_HALF_FRAMES*2u,1024);
   PROFILE_BEGIN(flip_fade);
-  envelope_apply(&envelope, staging, 256);
+  flip_ramp(staging,1);
   PROFILE_END(PROF_ENVELOPE, flip_fade);
-  audio_copy(audio, staging, 512);
-  for (uint32_t i = 512; i < ONE_CACHE_FRAMES * 2u; ++i) audio[i] = 0;
-  flip_fading = 1; dma_last_time = board_millis();
-  board_audio_start(audio);
+  for (uint32_t i=1024;i<ONE_HALF_FRAMES*2u;++i) staging[i]=0;
+  if (!board_audio_commit_safe(half)) return -1;
+  audio_copy(audio+half*ONE_HALF_FRAMES*2u,staging,ONE_HALF_FRAMES*2u);
+  if (pending) flip_half[half]=flip_staging_frame;
+  board_audio_publish();
+  if (pending && ring_commit(&ring,half)) return -1;
+  staging_ready=0;flip_fade_half=half;flip_fading=1;
+  return 1;
 }
 static int flip_fill(uint32_t frame, uint32_t reverse) {
   flip_reverse = reverse; flip_cursor = frame;
@@ -204,10 +214,11 @@ static void begin_release(uint32_t restart) {
 static void arm_audio(uint32_t manual) {
   envelope.gain = fading() ? 0 : 32768;
   envelope.target = 32768;
-  if (fading()) {
+  if (settings.play == PLAY_FLIP) {
+    flip_ramp(audio,0); envelope.gain=32768;
+  } else if (fading()) {
     envelope_apply(&envelope, audio, ONE_CACHE_FRAMES);
-    if (settings.play != PLAY_FLIP)
-      envelope_tail(audio, ONE_CACHE_FRAMES, 0, wave.bytes / (wave.bits / 8));
+    envelope_tail(audio, ONE_CACHE_FRAMES, 0, wave.bytes / (wave.bits / 8));
   }
   stream_frame = ONE_CACHE_FRAMES;
   if (manual)
@@ -485,15 +496,22 @@ void app_tick(void) {
   }
 #ifdef ONE_FLIP
   if (settings.play == PLAY_FLIP && flip_playing && flip_pending) {
-    if (ring.running) flip_fade_out();
-    else if (flip_fading) {
-      if (board_audio_offset() >= 256u * 8u) {
-        board_audio_stop(); PROFILE(profile_stop(board_millis()));
-        flip_fading = 0;
-        flip_resume();
-      } else if ((uint32_t)(board_millis() - dma_last_time) >= 1000u) {
-        PROFILE(profile_error(PROF_DMA_ERROR));
-        playback_error();
+    if (flip_fading) {
+      uint32_t position=board_audio_offset(),half=position/(ONE_HALF_FRAMES*8u);
+      if ((half==flip_fade_half && position%(ONE_HALF_FRAMES*8u)>=512u*8u) ||
+          (flip_fading==2 && half!=flip_fade_half)) {
+        stop();flip_fading=0;flip_resume();
+      } else if (half==flip_fade_half && flip_fading==1) {
+        uint32_t other=half^1u;
+        if (!board_audio_commit_safe(other)) { PROFILE(profile_error(PROF_LATE_ERROR));playback_error();return; }
+        for(uint32_t i=0;i<ONE_HALF_FRAMES*2u;++i) audio[other*ONE_HALF_FRAMES*2u+i]=0;
+        board_audio_publish();
+        if ((ring.pending&(1u<<other)) && ring_commit(&ring,other)) { PROFILE(profile_error(PROF_RING_ERROR));playback_error();return; }
+        flip_fading=2;
+      }
+    } else if (ring.running) {
+      if (flip_fade_out()<0) {
+        PROFILE(profile_error(PROF_LATE_ERROR));playback_error();return;
       }
     } else flip_resume();
   }
@@ -514,7 +532,11 @@ void app_tick(void) {
   }
   /* Read raw decoded audio ahead in every mode. Apply envelopes only when
    * publishing, so a release/retrigger can still affect prefetched data. */
-  if (ring.running) {
+  if (ring.running
+#ifdef ONE_FLIP
+      && !flip_fading
+#endif
+      ) {
     uint32_t half = (ring.pending & 1u) ? 0 : 1, got = ONE_HALF_FRAMES;
     if (!staging_ready) {
       PROFILE_BEGIN(read_ahead);

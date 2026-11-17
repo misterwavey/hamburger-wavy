@@ -613,7 +613,7 @@ static uint32_t host_pins = 0xaa0, host_adc = 128, host_offset, host_starts,
 static uint32_t host_transfer_advance, host_transfer_budget;
 static const uint32_t *host_audio;
 #ifdef ONE_FLIP
-static uint32_t host_flip_edges, host_flip_inject, host_flip_captured;
+static uint32_t host_flip_edges, host_flip_inject, host_flip_captured, host_silent_stop;
 #endif
 static void audio_progress_on_transfer(void) {
 #ifdef ONE_FLIP
@@ -696,6 +696,13 @@ static void test_advertisement(void) {
 }
 
 void board_audio_stop(void) {
+#ifdef ONE_FLIP
+  if (host_silent_stop && host_active) {
+    uint32_t position=(host_offset/8u)*2u;
+    CHECK(host_audio[position]==0 && host_audio[(position+ONE_CACHE_FRAMES*2u-2u)%(ONE_CACHE_FRAMES*2u)]==0);
+    host_silent_stop=0;
+  }
+#endif
   host_stops++;
   host_active = 0;
 }
@@ -1829,11 +1836,11 @@ static void test_reverse_wave(void) {
   }
 }
 static void flip_finish_transition(uint32_t starts) {
-  for(uint32_t i=0;i<12 && host_starts<starts+2u;++i) {
+  for(uint32_t i=0;i<12 && host_starts<starts+1u;++i) {
     app_card.n=0;
     if(host_active) advance_half(); else app_tick();
   }
-  CHECK(host_active && host_starts==starts+2u && host_led==2);
+  CHECK(host_active && host_starts==starts+1u && host_led==2);
 }
 static void test_flip_transport(void) {
   for(uint32_t bits=16;bits<=24;bits+=8) {
@@ -1842,35 +1849,41 @@ static void test_flip_transport(void) {
     pulse();CHECK(!host_active && !host_starts); /* gate never starts transport */
     host_pins|=0x800u;app_tick();
     click_play();CHECK(host_active && host_starts==1);
-    CHECK(host_audio[0]==0 && host_audio[512]==sample_word(1,256));
+    CHECK(host_audio[0]==0 && host_audio[1024]==sample_word(1,512));
     host_offset=123u*8u;
+    uint32_t stops=host_stops,unchanged=host_audio[123u*2u];
     pulse();
-    CHECK(host_starts==2 && host_audio[510]==0);
-    for(uint32_t i=512;i<ONE_CACHE_FRAMES*2u;++i) CHECK(host_audio[i]==0);
-    flip_finish_transition(1);
-    for(uint32_t i=256;i<ONE_CACHE_FRAMES;++i)
+    CHECK(host_starts==1 && host_stops==stops && host_audio[123u*2u]==unchanged);
+    CHECK(host_audio[ONE_HALF_FRAMES*2u+1022u]==0);
+    for(uint32_t i=ONE_HALF_FRAMES*2u+1024u;i<ONE_CACHE_FRAMES*2u;++i) CHECK(host_audio[i]==0);
+    host_silent_stop=1;
+    host_offset=ONE_HALF_FRAMES*8u+511u*8u;app_tick();
+    CHECK(host_starts==1 && host_silent_stop);
+    host_offset=ONE_HALF_FRAMES*8u+512u*8u;app_tick();
+    CHECK(host_starts==2 && host_active && !host_silent_stop);
+    for(uint32_t i=512;i<ONE_CACHE_FRAMES;++i)
       CHECK(host_audio[i*2u]==sample_word(1,(123u+5000u-i)%5000u));
     app_card.n=0; advance_half();
     host_offset=ONE_HALF_FRAMES*8u+77u*8u;
     uint32_t captured=(123u+10000u-ONE_HALF_FRAMES-77u)%5000u;
-    pulse();flip_finish_transition(3);
-    for(uint32_t i=256;i<ONE_CACHE_FRAMES;++i)
+    pulse();flip_finish_transition(2);
+    for(uint32_t i=512;i<ONE_CACHE_FRAMES;++i)
       CHECK(host_audio[i*2u]==sample_word(1,(captured+i)%5000u));
     /* An edge while SPI is priming coalesces without nested card commands. */
     app_card.n=0;host_offset=99u*8u;pulse();host_flip_edges=2;
     uint32_t frame=(captured+99u)%5000u;
-    flip_finish_transition(5);
+    flip_finish_transition(3);
     CHECK(!host_flip_edges);
-    CHECK(host_audio[512]==sample_word(1,(frame+256u)%5000u));
+    CHECK(host_audio[1024]==sample_word(1,(frame+512u)%5000u));
     click_play();CHECK(!host_active && host_led==0);
     pulse();CHECK(!host_active);
-    click_play();CHECK(host_active && host_audio[512]==sample_word(1,256));
+    click_play();CHECK(host_active && host_audio[1024]==sample_word(1,512));
     browse_next();CHECK(!host_active);
-    click_play();CHECK(host_active && host_audio[512]==sample_word(2,256));
+    click_play();CHECK(host_active && host_audio[1024]==sample_word(2,512));
     /* A short file loops safely in both directions too. */
     feature_disk("# test\nFlip\nFree\nShort",0,37,bits);feature_mount();
     click_play();host_offset=5u*8u;pulse();flip_finish_transition(1);
-    CHECK(host_audio[512]==sample_word(1,(5u+37u-256u%37u)%37u));
+    CHECK(host_audio[1024]==sample_word(1,(5u+37u-512u%37u)%37u));
     click_play();CHECK(!host_active);
     /* Capture the audible frame when an edge arrives inside a card read. */
     feature_disk("# test\nFlip\nQuantize\nShort",0,5000,bits);feature_mount();
@@ -1881,14 +1894,16 @@ static void test_flip_transport(void) {
     host_transfer_advance=0;
     uint32_t heard = bits==16 ? (host_flip_captured>>16)-4001u : ((host_flip_captured>>8)-100001u)/37u;
     flip_finish_transition(1);
-    CHECK(host_audio[512]==sample_word(1,(heard+5000u-256u)%5000u));
+    CHECK(host_audio[1024]==sample_word(1,(heard+5000u-512u)%5000u));
     /* A stationary fade DMA is a recoverable error, not a stuck red light. */
     host_pins|=0x800u;app_tick();pulse();
     app_card.time+=1001;app_tick();CHECK(!host_active && host_led==1);
     host_pins|=0x800u;app_tick();click_play();CHECK(host_active);
     /* Card failure during reverse priming stops and takes the recovery path. */
     app_card.n=0;host_pins|=0x800u;app_tick();pulse();
-    app_card.token_bad=1;advance_half();CHECK(!host_active);
+    app_card.token_bad=1;
+    for(uint32_t i=0;i<4 && host_active;++i) advance_half();
+    CHECK(!host_active);
     app_card.token_bad=0;app_card.n=0;app_card.time+=1001;app_tick();
     click_play();CHECK(host_active);
     click_play();CHECK(!host_active);
@@ -1905,7 +1920,7 @@ static void test_flip_transport(void) {
   host_pins|=0x200u;
   for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
   click_play();CHECK(host_active);host_offset=100u*8u;pulse();flip_finish_transition(1);
-  CHECK(host_audio[512]==sample_word(1,(100u+5000u-256u)%5000u));
+  CHECK(host_audio[1024]==sample_word(1,(100u+5000u-512u)%5000u));
   click_play();CHECK(!host_active);
 }
 #endif

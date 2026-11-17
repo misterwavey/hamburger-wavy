@@ -360,6 +360,20 @@ class ReleaseTests(unittest.TestCase):
                         self.assertEqual(m.read(dst+i*8+4),expected)
                     self.assertEqual(m.read(dst-1,1),0xa5)
                     self.assertEqual(m.read(dst+frames*8,1),0x5a)
+        if 'flip_ramp' in symbols:
+            for down in (0,1):
+                for sample in (0,0x60000000,-0x60000000):
+                    m=CPU(image);dst=0xa0006004
+                    for i in range(1024):m.poke(dst+i*4,sample&0xffffffff)
+                    m.poke(dst-1,0xa5,1);m.poke(dst+4096,0x5a,1)
+                    m.run(symbols['flip_ramp'],dst,down)
+                    for i in range(512):
+                        gain=(511-i if down else i)*64
+                        expected=(((sample//256)*gain)>>15)<<8 & 0xffffffff
+                        self.assertEqual(m.read(dst+i*8),expected)
+                        self.assertEqual(m.read(dst+i*8+4),expected)
+                    self.assertEqual(m.read(dst-1,1),0xa5)
+                    self.assertEqual(m.read(dst+4096,1),0x5a)
         m=CPU(image)
         self.assertEqual(m.run(symbols['pcm_decode'],0xa0001000,8,0xa0006000,1),0xffffffff)
 
@@ -519,7 +533,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(manifest['resources']['combined_text_bytes'],layout['.text']['bytes']+layout['.app_extension']['bytes'])
             self.assertEqual(manifest['resources']['combined_text_free'],80964-manifest['resources']['combined_text_bytes'])
             if profiling:
-                report={'build':25}
+                report={'build':26}
                 attach_build_info(report,out/'manifest.json',ROOT/'build/extended/manifest.json')
                 self.assertEqual(report['profiling_overhead_bytes']['combined_text'],
                                  report['profiling_overhead_bytes']['main_text']+report['profiling_overhead_bytes']['extension_text'])
