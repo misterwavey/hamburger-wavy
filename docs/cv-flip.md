@@ -32,3 +32,18 @@ The switching thresholds are five raw ADC counts either side of the captured zer
 ## Hardware check
 
 Use the existing long rising `FLIP96.wav` chirp and a playlist containing only that file. Test PLAY stop/start, both DC polarities, zero stability, slow LFO, then faster LFO. Stop with PLAY, wait five seconds, power down and mount the card to collect `ONEPROF.TXT`. This build needs its first hardware run. Restore the staged build-28 rollback image if required.
+
+## Roll back this trial
+
+Restore both the build-28 image and the card settings saved before this trial, since build 28 does not recognise `CV Flip` in config.txt:
+
+```sh
+cp build/cv-flip-test/rollback-28.hex "/Volumes/TTA ONE/image.hex"
+cp build/cv-flip-test/card-backup/config.txt "/Volumes/TTA ONE/config.txt"
+cp build/cv-flip-test/card-backup/playlist.txt "/Volumes/TTA ONE/playlist.txt"
+sync
+cmp build/cv-flip-test/rollback-28.hex "/Volumes/TTA ONE/image.hex"
+diskutil eject "/Volumes/TTA ONE"
+```
+
+Run the usual updater procedure again. The `card-backup` directory is a local bench backup, not part of the source distribution; when preparing your own trial, preserve your own config and playlist before changing them.
