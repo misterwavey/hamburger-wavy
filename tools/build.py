@@ -107,7 +107,7 @@ def main():
  ld=tool(args.ld,['ld.lld',*Path.home().glob('.rustup/toolchains/*/lib/rustlib/*/bin/rust-lld')])
  flags=['-I'+str(out),'--target=mipsel-none-elf','-march=mips32r2','-mabi=32','-mno-abicalls','-fno-pic','-G0','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-jump-tables','-Os','-fstack-usage','-Wall','-Wextra','-Werror']
  if args.profile:flags+=['-DONE_PROFILE=1']
- if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_BUILD_NUMBER=26']
+ if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_BUILD_NUMBER=27']
  if probe:flags+=['-DONE_FLASH_PROBE=1','-DONE_BUILD_NUMBER='+('23' if args.flash_bank else '22')]
  if args.flash_bank:flags+=['-DONE_FLASH_BANK=1']
  linker=ROOT/'firmware/layout.ld'
@@ -202,7 +202,7 @@ def main():
  memory.update(payload);image=out/'image.hex';write_image(spec,memory,image)
  build_number=int(re.search(r'^#define ONE_BUILD_NUMBER (\d+)$',(ROOT/'firmware/build.h').read_text(),re.M)[1])
  if probe:build_number=23 if args.flash_bank else 22
- if args.extended:build_number=26
+ if args.extended:build_number=27
  report=dict(profiling=args.profile,project='Hamburger Wavy',licence='GPL-3.0-only',build_number=build_number,status='EXPERIMENTAL — COMPLETE APPLICATION, NOT HARDWARE VALIDATED',source_built=True,
              features=dict(config_txt=True,playlist_txt=True,playback_modes=['Trigger','Gate','Fade','Loop','Sequence','Combo','Random Sequence','Random Loop']+(['Flip'] if args.extended else []),cv_modes=['Free','Quantize','Select File'],cv_select_delays_ms=dict(Short=0,Medium=2,Long=10),front_panel_modes=True,last_manual_file_recall='ONESTATE.BIN: two alternating CRC32 sectors; stock status.bin read-only import',build_identification='ONEBUILD.TXT: best-effort on mount, written only if content changes',generated_chromatic_tables=True,fade_ramp_samples=256),
              pitch_quantization=pitch_report,

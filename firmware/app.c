@@ -24,7 +24,17 @@ static uint32_t ui_events, trigger_manual, restart_manual, manual_gate;
 static uint32_t cache[ONE_CACHE_FRAMES * 2] __attribute__((aligned(16)));
 static uint32_t audio[ONE_CACHE_FRAMES * 2] __attribute__((aligned(16)));
 static uint32_t staging[ONE_HALF_FRAMES * 2];
+#ifdef ONE_FLIP
+/* Share existing scratch storage explicitly: fade work must not damage the
+ * decoded staging half if a preparation attempt has to be deferred. */
+static union {
+  uint8_t bytes[ONE_CACHE_FRAMES * 3];
+  uint32_t fade[ONE_CACHE_FRAMES * 3 / 4];
+} raw_store __attribute__((aligned(16)));
+#define raw raw_store.bytes
+#else
 static uint8_t raw[ONE_CACHE_FRAMES * 3];
+#endif
 static uint32_t mounted, ready, file_count, index, base_index, cached_bytes,
     trigger_pending, trigger_time, last_gate;
 static uint32_t encoder_state, retry_time, last_pitch;
@@ -61,16 +71,22 @@ static void flip_ramp(uint32_t *data, uint32_t down) {
   }
 }
 static int flip_fade_out(void) {
-  uint32_t half = 1u - board_audio_offset() / (ONE_HALF_FRAMES * 8u);
-  uint32_t pending = ring.pending & (1u << half);
+  uint32_t position=board_audio_offset();
+  uint32_t remaining=ONE_HALF_FRAMES-(position/8u)%ONE_HALF_FRAMES;
+  /* Reserve preparation time as well as the existing publication guard. */
+  if (remaining<ONE_HALF_FRAMES/2u) return 0;
+  uint32_t half=1u-position/(ONE_HALF_FRAMES*8u);
+  uint32_t pending=ring.pending&(1u<<half);
   if (!board_audio_commit_safe(half) || (pending && !staging_ready)) return 0;
-  if (!pending) audio_copy(staging,audio+half*ONE_HALF_FRAMES*2u,1024);
+  uint32_t *fade=raw_store.fade;
+  audio_copy(fade,pending ? staging : audio+half*ONE_HALF_FRAMES*2u,1024);
   PROFILE_BEGIN(flip_fade);
-  flip_ramp(staging,1);
+  flip_ramp(fade,1);
   PROFILE_END(PROF_ENVELOPE, flip_fade);
-  for (uint32_t i=1024;i<ONE_HALF_FRAMES*2u;++i) staging[i]=0;
-  if (!board_audio_commit_safe(half)) return -1;
-  audio_copy(audio+half*ONE_HALF_FRAMES*2u,staging,ONE_HALF_FRAMES*2u);
+  /* No live or queued audio has changed yet. Missing this window is safe. */
+  if (!board_audio_commit_safe(half)) return 0;
+  audio_copy(audio+half*ONE_HALF_FRAMES*2u,fade,1024);
+  for(uint32_t i=1024;i<ONE_HALF_FRAMES*2u;++i) audio[half*ONE_HALF_FRAMES*2u+i]=0;
   if (pending) flip_half[half]=flip_staging_frame;
   board_audio_publish();
   if (pending && ring_commit(&ring,half)) return -1;

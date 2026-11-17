@@ -613,7 +613,7 @@ static uint32_t host_pins = 0xaa0, host_adc = 128, host_offset, host_starts,
 static uint32_t host_transfer_advance, host_transfer_budget;
 static const uint32_t *host_audio;
 #ifdef ONE_FLIP
-static uint32_t host_flip_edges, host_flip_inject, host_flip_captured, host_silent_stop;
+static uint32_t host_flip_edges, host_flip_inject, host_flip_captured, host_silent_stop, host_commit_move;
 #endif
 static void audio_progress_on_transfer(void) {
 #ifdef ONE_FLIP
@@ -714,6 +714,9 @@ void board_audio_start(const uint32_t *data) {
 }
 uint32_t board_audio_offset(void) { return host_offset; }
 int board_audio_commit_safe(uint32_t half) {
+#ifdef ONE_FLIP
+  if(host_commit_move && !--host_commit_move) host_offset=(ONE_HALF_FRAMES-64u)*8u;
+#endif
   return !host_unsafe && host_offset / (ONE_HALF_FRAMES * 8u) != half &&
          ONE_HALF_FRAMES * 8u - host_offset % (ONE_HALF_FRAMES * 8u) >= 1024u;
 }
@@ -1908,6 +1911,28 @@ static void test_flip_transport(void) {
     click_play();CHECK(host_active);
     click_play();CHECK(!host_active);
   }
+  /* Preparation that loses its safe window must preserve queued raw audio. */
+  feature_disk("# test\nFlip\nQuantize\nShort",0,5000,16);feature_mount();
+  host_pins|=0x800u;click_play();host_offset=123u*8u;
+  uint32_t stops=host_stops;
+  host_commit_move=2;pulse();
+  CHECK(host_active && host_starts==1 && host_stops==stops && host_led==2);
+  host_offset=ONE_HALF_FRAMES*8u+64u*8u;app_tick();
+  CHECK(host_active && host_starts==1 && host_stops==stops && host_led==2);
+  uint32_t word=sample_word(1,ONE_CACHE_FRAMES);
+  uint32_t faded=(uint32_t)((((int64_t)((int32_t)word/256))*32704)>>15)<<8;
+  CHECK(host_audio[0]==faded); /* Original queued frame, faded exactly once. */
+  host_offset=512u*8u;app_tick();
+  CHECK(host_active && host_starts==2 && host_led==2);
+  CHECK(host_audio[1024]==sample_word(1,(123u+5000u-512u)%5000u));
+  click_play();CHECK(!host_active);
+  /* A late gate simply waits for a fresh half instead of preparing too late. */
+  feature_mount();click_play();host_offset=(ONE_HALF_FRAMES-64u)*8u;pulse();
+  CHECK(host_active && host_starts==1 && host_led==2);
+  host_offset=ONE_HALF_FRAMES*8u+32u*8u;app_tick();
+  host_offset=512u*8u;app_tick();
+  CHECK(host_active && host_starts==2 && host_led==2);
+  click_play();CHECK(!host_active);
   /* Enter Flip from Trigger using the existing held-PLAY/FILE menu. */
   feature_disk("# test\nTrigger\nQuantize\nShort",0,5000,16);feature_mount();
   host_pins&=~0x200u;

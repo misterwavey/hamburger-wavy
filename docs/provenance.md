@@ -78,3 +78,6 @@ Extended build 25 adds project-written bidirectional PCM streaming, a bounded se
 
 
 Extended build 26 changes only the project-written Flip transition scheduling and ramps. The old stream is faded in an inactive half before being stopped, with zero output checked in host tests and compiled PCM ramp arithmetic checked in the MIPS model. No vendor code/data are added. The hardware click-reduction result remains pending; build 25's latest chirp report recorded no streaming errors despite the reported small clicks.
+
+
+Extended build 27 corrects the project-written fade-preparation deadline handling introduced in build 26. Preparation uses a typed union view of existing scratch storage, preserves queued decoded audio on deferral, and retains the DMA publication guard. A simulated guard-closing regression case and a late-gate case exercise the fix. No vendor implementation or new RAM buffer is introduced; hardware confirmation remains pending.

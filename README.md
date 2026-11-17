@@ -79,4 +79,4 @@ An optional [flash-layout experiment](docs/flash-layout.md) builds a separate bu
 
 The extended build-25 candidate adds [Flip](docs/flip.md): PLAY starts/stops and GATE edges reverse the running sample from its captured playback position. Its first 48 kHz/16-bit hardware run sounded good to the user and recorded zero streaming errors; a subsequent maximum-pitch 96 kHz/24-bit run also recorded zero errors. Rapid-clock and transition-latency limits remain to be measured. The original rising chirp generator and staged test instructions make direction changes audible.
 
-Extended build 26 is a click-reduction candidate for Flip: it fades the running stream to zero before stopping DMA and uses 512-frame ramps. Hardware listening validation is pending.
+Extended build 27 is the current click-reduction candidate for Flip. It fades the running stream to zero before stopping DMA and uses 512-frame ramps, with safe deferral fixing a late-commit regression seen in build 26. Hardware confirmation is pending.

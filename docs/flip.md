@@ -1,6 +1,6 @@
 # Flip: interrupt playback direction
 
-Flip was introduced in extended build 25; the current extended build-26 candidate improves its transition fades  (`make extended` or `make extended-profile`). It is not enabled in the retained legacy build-21 targets. It loops a file and reverses direction from a captured playback position when GATE rises. It does not restart the file at each gate.
+Flip was introduced in extended build 25; the current extended build-27 candidate improves its transition fades and defers unsafe preparation windows  (`make extended` or `make extended-profile`). It is not enabled in the retained legacy build-21 targets. It loops a file and reverses direction from a captured playback position when GATE rises. It does not restart the file at each gate.
 
 ## Controls
 
@@ -28,7 +28,7 @@ Existing mode counts 1–8 and LED colours retain their meaning. Playback stays 
 
 ## Transition behaviour
 
-The gate handler records the source frame represented by the current DMA half and offset, rather than the filesystem/read-ahead cursor. Direction changes are serviced after any in-progress SD operation finishes. In build 26, the old DMA/SPI stream continues until a fade placed in a safely inactive half has played down to zero. A second half is cleared while inactive if needed, so silence follows the ramp. Only then does the code stop DMA, refill from the captured position in the requested direction, and restart with a fade-in. Flip's ramps are 512 output frames; other modes retain their existing 256-frame envelopes.
+The gate handler records the source frame represented by the current DMA half and offset, rather than the filesystem/read-ahead cursor. Direction changes are serviced after any in-progress SD operation finishes. In build 27, the old DMA/SPI stream continues until a fade placed in a safely inactive half has played down to zero. A second half is cleared while inactive if needed, so silence follows the ramp. Only then does the code stop DMA, refill from the captured position in the requested direction, and restart with a fade-in. Flip's ramps are 512 output frames; other modes retain their existing 256-frame envelopes.
 
 This replaces build 25's stop/restart before the fade-out, which could introduce a discontinuity at full signal level. It aims to reduce the small clicks reported on the chirp. No click reduction has yet been confirmed on hardware for build 26.
 
@@ -88,3 +88,12 @@ The latest build-25 chirp report recorded 67 starts/resumes, 55.281 seconds and 
 Build 26 schedules the fade without first stopping/restarting DMA, checks the same inactive-half copy guard before publication, and stops only after the fade output is zero. Ramps increase to 512 frames. Tests check that the active half is unchanged when the request is scheduled, that no stop/restart occurs at that point, that the fade and following samples reach zero, and that the eventual stop occurs at zero output. Compiled positive/negative PCM ramp results and boundary guards are checked in both normal/profiling images. Hardware listening and response-delay comparison remain pending.
 
 Combined code/constants use 32432 bytes normally (48532 free) and 37048 with profiling (43916 free). Static RAM remains 55920/57248 bytes; the existing padding absorbs the new fade-half field, preserving the 8 KiB minimum stack reserve and previous growth budgets. The profiler's refill timings still exclude stopped refill gaps; compare click audibility and control feel by listening or scope.
+
+
+## Build 26 failure and build 27 deadline fix
+
+The first build-26 report recorded 2 starts and 2.742 seconds of playback before one late-commit rejection. Read, ring, stationary-DMA and copy-overlap counters were zero. Ordinary refill work averaged 5.694 ms and peaked at 6.647 ms; minimum normal publication margin was 999 frames/6.941 ms. Two fade preparations were measured at 245.88 us each. The evidence is consistent with the new fade preparation starting near a boundary and reaching its second safety check too late, rather than inadequate steady streaming throughput. This is a regression in the click-reduction candidate.
+
+Build 27 reserves at least half a buffer before attempting fade preparation. It prepares the 512-frame ramp in a typed view of the existing raw scratch buffer, leaving the decoded staging half untouched. The first 4096 scratch bytes are used; the reverse boundary cache in the final 1024 bytes is preserved. If the publication window closes anyway, preparation is discarded without changing live or queued audio, and the request waits for a later safe window. The DMA write guard remains unchanged and is still checked before any publication. It does not suppress a genuine unsafe streaming write.
+
+New regression tests move the simulated DMA position between the first and second guard checks, then verify continued playback, preserved queued samples and a successful later flip. A separate near-boundary gate case checks deferral without an error. The existing stop-at-zero, active-half preservation, compiled ramps, reverse streaming and recovery checks remain enabled. Normal/profile code use is 32448/37080 bytes combined, with 48516/43884 bytes free. Static RAM is unchanged at 55920/57248 bytes. Hardware confirmation of the deadline fix and click reduction is pending; the proven build-25 profiling image remains the rollback.

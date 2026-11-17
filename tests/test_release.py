@@ -533,7 +533,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(manifest['resources']['combined_text_bytes'],layout['.text']['bytes']+layout['.app_extension']['bytes'])
             self.assertEqual(manifest['resources']['combined_text_free'],80964-manifest['resources']['combined_text_bytes'])
             if profiling:
-                report={'build':26}
+                report={'build':27}
                 attach_build_info(report,out/'manifest.json',ROOT/'build/extended/manifest.json')
                 self.assertEqual(report['profiling_overhead_bytes']['combined_text'],
                                  report['profiling_overhead_bytes']['main_text']+report['profiling_overhead_bytes']['extension_text'])
