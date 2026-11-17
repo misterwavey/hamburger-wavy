@@ -84,3 +84,6 @@ Extended build 27 corrects the project-written fade-preparation deadline handlin
 
 
 Extended build 28 adds DMA-half/ring-state agreement checks to the project's fade preparation and silence hand-off. A new regression reproduces build 27's stale-bookkeeping failure by advancing DMA between software observations, and covers both half boundaries and the silent-half hand-off. No vendor code or data are added. Hardware confirmation remains pending; the validated build-25 artifact is retained as rollback.
+
+
+Build 28 subsequently passed a 32.005-second maximum-quantized-pitch PCM24/96000 Hz Flip hardware run with 31 starts/resumes and zero recorded streaming errors. The user reported it working great. The report and observed limits are recorded in flip.md; residual clicks and transition latency were not separately quantified.
