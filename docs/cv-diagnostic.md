@@ -53,3 +53,20 @@ The report is 1024 bytes with a CRC. The restricted FAT writer creates/updates o
 After preserving the report, copy `build/cv-diag/rollback-28.hex` to the card as `image.hex`, verify it with `cmp`, eject and run the usual updater procedure again. This restores the proven build 28 profiling image.
 
 Host tests exercise capture timing, button handling, timer wrap, full-scale statistics, report integrity, write retries and FAT16/FAT32 filesystems. The diagnostic still needs its first hardware run.
+
+## First hardware measurements
+
+Build 29 captured six rows of 5000 samples each, with no missed polls and a valid report CRC. Assuming the requested row order and the substituted −0.5/+0.5 V settings:
+
+| Setting | Mean raw ADC | Observed range |
+| --- | --- | --- |
+| Unplugged, knob CCW | 1012.857 | 1012–1013 |
+| Unplugged, knob centre | 323.388 | 323–324 |
+| Unplugged, knob CW | 0 | 0 |
+| Patched 0 V, knob centre | 327.202 | 327–328 |
+| Patched −0.5 V, knob centre | 377.213 | 377–378 |
+| Patched +0.5 V, knob centre | 277.643 | 276–279 |
+
+These observations support bipolar CV detection around a fixed knob position: positive CV lowers the ADC reading and negative CV raises it. Based on nominal source settings, sensitivity is approximately 99.57 counts/V; the midpoint of the two endpoints (327.428) is within 0.23 count of the patched-zero capture. Actual measured voltages were not supplied, so this is not a calibrated voltage conversion.
+
+The knob and CV share one reading. Its zero-voltage baseline changes with knob position, and the CW capture is already at the ADC floor. A direction mode therefore needs a defined knob bias or an explicit zero calibration, with hysteresis. These data do not establish the safe electrical input limits or the transfer function over the full knob/CV range.
