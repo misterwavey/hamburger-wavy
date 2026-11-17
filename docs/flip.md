@@ -65,3 +65,8 @@ The user reported Flip working very well. A fresh CRC-valid build-25 report reco
 Completed refill work averaged 5.301 ms and peaked at 7.548 ms, against approximately 14.240 ms per half-buffer. Minimum observed margin was 1012 frames, about 14.073 ms. Six fade-out envelope measurements each took about 197.88 us. These starts can include PLAY restarts and direction resumes; the report is not an edge-by-edge direction trace. It does not measure the stopped refill gap or establish transition latency.
 
 SD attempts averaged 1.153 ms with a 3.766 ms maximum; 7591 attempts were below 1 ms and 1080 between 2 and 5 ms. The existing buffers accommodated these delays. Longest observed service gap was 649 us. Stack watermark was 1704 bytes with 6576 untouched above the 57248-byte static allocation; this remains a sampled lower bound. This validates the reported chirp workload and user-observed flips, not maximum-pitch 96 kHz/24-bit performance or arbitrary rapid clocks/fragmentation. The next stress case uses AGNT2 via build/flip-test/playlist-stress.txt with the same firmware/config.
+
+
+### Longer stress material
+
+Card inspection found NOISELONG.wav to be mono PCM24/96000 Hz, approximately 11.92 seconds at native speed and 7.95 seconds at maximum quantized pitch. It is a longer alternative to AGNT2 (approximately 1.82 seconds at that setting). The local build/flip-test/playlist-stress.txt and playlist-long.txt now select NOISELONG.wav. The card's W9624 tone is longer still, but its steady pitch is less useful for hearing direction changes. No user audio is copied into this source distribution.
