@@ -92,6 +92,8 @@ int settings_load(Fat *fs, Settings *out) {
 #ifdef ONE_FLIP
   else if (equal(text, "FLIP"))
     s.play = PLAY_FLIP;
+  else if (equal(text, "CV FLIP"))
+    s.play = PLAY_CV_FLIP;
 #endif
   else
     return -2;

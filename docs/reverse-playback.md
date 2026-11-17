@@ -30,3 +30,9 @@ Build 25 implements the first seek improvements for Flip: retain the cursor when
 Reverse sector access can have different timing from forward reads, so the existing profiler must measure it on hardware. The observed forward refill margin is not a guaranteed reverse/DSP budget. Expected samples, EOF/wrap positions, envelopes, retrigger recovery and card-error handling all need tests; musical latency and transition quality need listening or scope checks.
 
 Build 25 adds 208 bytes of static RAM for Flip/index state, leaving 48948 normal code bytes free. The index and boundary-cache implementation are software tested; the first chirp hardware run sounded good to the user and had zero recorded errors. A subsequent maximum-pitch 96 kHz/24-bit Flip run also had zero errors; transition latency and rapid-clock limits still need measurement.
+
+## Control ideas from the disting mk4
+
+The [Expert Sleepers v4.24 manual](https://www.expert-sleepers.co.uk/downloads/manuals/disting_user_manual_4.24.pdf), algorithms I-5/I-6 and J-4/J-8, offers useful comparisons: signed speed through zero, direct playhead scrubbing, CV-set boundaries and crossfaded playback. These are behavioural references, not imported implementation code.
+
+For ONE's controls, possible follow-ups are signed speed on the knob/CV, gate-triggered jumps to a CV-selected position, and a short movable loop window for chopping. Direct continuous scrubbing would need more seeking/buffering work; seamless overlapping crossfades would require a separate resource and scheduling design. Build 30 first isolates polarity-controlled direction at native speed so the control and transition path can be evaluated independently.

@@ -38,6 +38,8 @@ Tests validate the HEX/ELF address contract, generated pitch mathematics, a rebu
 
 Optional original 440 Hz test WAVs can be generated with `python3 tools/generate_test_tones.py`. No audio files are included in the repository.
 
+The extended build also offers [CV Flip](docs/cv-flip.md): calibrated bipolar CV direction control at native sample speed.
+
 ## Measure hardware headroom
 
 `make profile` builds an optional diagnostic at `build/profile/image.hex`, leaving the normal image separate. It measures streaming/refill timing, observed buffer margin and stack watermark, then writes `ONEPROF.TXT` only after playback stops. See [profiling instructions and limitations](docs/profiling.md), and analyse a collected report with `python3 tools/analyze_profile.py ONEPROF.TXT`.

@@ -1869,6 +1869,7 @@ static void flip_finish_transition(uint32_t starts) {
   for(uint32_t i=0;i<12 && host_starts<starts+1u;++i) {
     app_card.n=0;
     if(host_active) advance_half(); else app_tick();
+    app_tick(); /* The foreground runs repeatedly between DMA boundaries. */
   }
   CHECK(host_active && host_starts==starts+1u && host_led==2);
 }
@@ -1995,8 +1996,8 @@ static void test_flip_transport(void) {
   for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
   app_card.time+=400;app_tick();
   const uint32_t backwards[]={1,0,2,3};
-  for(uint32_t i=0;i<4;++i) {
-    host_pins=(host_pins&~0xa0u)|((backwards[i]&1u)<<5)|((backwards[i]&2u)<<6);app_tick();
+  for(uint32_t i=0;i<8;++i) {
+    host_pins=(host_pins&~0xa0u)|((backwards[i%4]&1u)<<5)|((backwards[i%4]&2u)<<6);app_tick();
   }
   host_pins|=0x200u;
   for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
@@ -2004,6 +2005,47 @@ static void test_flip_transport(void) {
   CHECK(host_audio[1024]==sample_word(1,(100u+5000u-512u)%5000u));
   click_play();CHECK(!host_active);
 }
+static void cv_hold_calibrate(uint32_t adc) {
+  host_adc=adc;host_pins&=~0x200u;
+  for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
+  app_card.time+=401;app_tick();
+  host_pins|=0x200u;
+  for(uint32_t i=0;i<3;++i) {++app_card.time;app_tick();}
+  CHECK(!host_active);
+}
+static void cv_value(uint32_t adc) {
+  host_adc=adc;++app_card.time;app_tick();
+}
+static void test_cv_flip_transport(void) {
+  for(uint32_t bits=16;bits<=24;bits+=8) {
+    feature_disk("# test\nCV Flip\nSelect File\nLong",0,5000,bits);
+    feature_mount();
+    cv_hold_calibrate(400);
+    click_play();CHECK(host_active && host_mode==CV_SELECT); /* native speed */
+    CHECK(host_audio[1024]==sample_word(1,512)); /* CV Select never browses */
+    uint32_t starts=host_starts;
+    for(uint32_t adc=396;adc<=404;++adc) cv_value(adc);
+    CHECK(host_starts==starts && host_active);
+    pulse();app_tick();CHECK(host_starts==starts); /* GATE ignored */
+    host_offset=123u*8u;cv_value(405);flip_finish_transition(starts);
+    CHECK(host_audio[1024]==sample_word(1,(123u+5000u-512u)%5000u));
+    starts=host_starts;
+    for(uint32_t adc=404;adc>=396;--adc) cv_value(adc);
+    CHECK(host_starts==starts);
+    host_offset=100u*8u;cv_value(395);flip_finish_transition(starts);
+    starts=host_starts;
+    cv_value(400);advance_half();CHECK(host_starts==starts); /* zero holds forward */
+    click_play();CHECK(!host_active);
+    cv_value(450);click_play();CHECK(host_active);
+    CHECK(host_audio[1024]==sample_word(1,4999u-512u)); /* negative starts from end */
+    click_play();CHECK(!host_active);
+    cv_hold_calibrate(600);click_play();CHECK(host_active);
+    CHECK(host_audio[1024]==sample_word(1,512)); /* new zero resets forward */
+    starts=host_starts;cv_value(450);advance_half();CHECK(host_starts==starts);
+    click_play();CHECK(!host_active);
+  }
+}
+
 #endif
 
 int main(void) {
@@ -2039,6 +2081,7 @@ int main(void) {
   test_reverse_index();
   test_reverse_wave();
   test_flip_transport();
+  test_cv_flip_transport();
 #endif
   printf("standalone core: %u checks passed\n", checks);
   return 0;

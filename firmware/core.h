@@ -88,6 +88,7 @@ typedef enum {
   PLAY_RANDOM_LOOP,
   PLAY_FLIP,
 #ifdef ONE_FLIP
+  PLAY_CV_FLIP,
   PLAY_COUNT
 #else
   PLAY_COUNT = PLAY_FLIP
