@@ -1,6 +1,6 @@
 # Reverse playback feasibility
 
-Build 24 does not implement reverse playback. The extended build-25 candidate now implements [Flip](flip.md), with indexed backward streaming and gate-controlled direction changes. Its first 48 kHz/16-bit hardware run passed with zero recorded errors; higher-rate limits remain unmeasured. The larger verified flash bank makes a fuller implementation easier to fit, but does not itself add sample memory, processing speed or card bandwidth.
+Build 24 does not implement reverse playback. The extended build-25 candidate now implements [Flip](flip.md), with indexed backward streaming and gate-controlled direction changes. Its first 48 kHz/16-bit hardware run passed with zero recorded errors; a subsequent maximum-pitch 96 kHz/24-bit Flip run also had zero errors. The larger verified flash bank makes a fuller implementation easier to fit, but does not itself add sample memory, processing speed or card bandwidth.
 
 ## What the measurements support
 
@@ -29,4 +29,4 @@ Build 25 implements the first seek improvements for Flip: retain the cursor when
 
 Reverse sector access can have different timing from forward reads, so the existing profiler must measure it on hardware. The observed forward refill margin is not a guaranteed reverse/DSP budget. Expected samples, EOF/wrap positions, envelopes, retrigger recovery and card-error handling all need tests; musical latency and transition quality need listening or scope checks.
 
-Build 25 adds 208 bytes of static RAM for Flip/index state, leaving 48948 normal code bytes free. The index and boundary-cache implementation are software tested; the first chirp hardware run sounded good to the user and had zero recorded errors. Transition latency and higher-rate limits still need measurement.
+Build 25 adds 208 bytes of static RAM for Flip/index state, leaving 48948 normal code bytes free. The index and boundary-cache implementation are software tested; the first chirp hardware run sounded good to the user and had zero recorded errors. A subsequent maximum-pitch 96 kHz/24-bit Flip run also had zero errors; transition latency and rapid-clock limits still need measurement.

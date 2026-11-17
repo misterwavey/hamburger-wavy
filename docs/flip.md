@@ -70,3 +70,10 @@ SD attempts averaged 1.153 ms with a 3.766 ms maximum; 7591 attempts were below 
 ### Longer stress material
 
 Card inspection found NOISELONG.wav to be mono PCM24/96000 Hz, approximately 11.92 seconds at native speed and 7.95 seconds at maximum quantized pitch. It is a longer alternative to AGNT2 (approximately 1.82 seconds at that setting). The local build/flip-test/playlist-stress.txt and playlist-long.txt now select NOISELONG.wav. The card's W9624 tone is longer still, but its steady pitch is less useful for hearing direction changes. No user audio is copied into this source distribution.
+
+
+### 96 kHz/24-bit hardware result
+
+The user reported the longer noise sample seemed to work, but was a poor listening choice. A fresh CRC-valid report recorded 18 starts/resumes and 40.615 seconds in Flip/Quantize PCM24/96000 Hz, with divider 667 in worst-work and tightest-margin contexts. All streaming errors and previous report-write failures were zero. Seventeen fade-out measurements were recorded. Completed refills averaged 6.096 ms (worst 7.335 ms), against approximately 7.115 ms per half, with 991 frames/6.885 ms minimum observed buffer margin. Read-ahead accommodated the occasional longer refill in this run.
+
+SD attempts averaged 876.63 us and peaked at 1081.83 us. Longest service gap was 649 us; stack watermark remained 1704 bytes with 6576 untouched. This establishes the tested high-rate Flip workload, not arbitrary clock rates or fragmentation. Steady noise does not make direction audible, so it is insufficient for judging transition sound or latency. The generator now also creates FLIP96.wav: an original 30-second mono PCM24/96000 Hz rising chirp, about 20 seconds at maximum quantized pitch, for listening at the same sample format.
