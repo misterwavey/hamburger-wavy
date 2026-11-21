@@ -1,0 +1,5 @@
+# Hamburger Wavy: knob/CV sweeps a resonant band-pass
+Loop
+Filter
+Bandpass 5
+Resonance 6

@@ -9,13 +9,17 @@ import zlib
 
 METRICS = ('sd', 'prefetch', 'decode', 'envelope', 'copy', 'refill_work')
 MODES = ('Trigger', 'Gate', 'Fade', 'Loop', 'Sequence', 'Combo',
-         'Random Sequence', 'Random Loop', 'Flip', 'CV Flip')
-CV_MODES = ('Free', 'Quantize', 'Select File')
+         'Random Sequence', 'Random Loop', 'Flip', 'CV Flip', 'Tape', 'Chop')
+CV_MODES = ('Free', 'Quantize', 'Select File', 'Colour', 'Filter', 'Rate')
+OPTIONAL_METRICS = ('colour', 'filter', 'mod', 'phaser')  # builds 33, 35 and 47 onwards
 SCALARS = ('build', 'ticks_per_us', 'plays', 'timer_pair_min', 'wall_lo',
-           'wall_hi', 'service_gap_max', 'min_slack_frames', 'report_failures', 'saturated')
-ROWS = dict(stack_static_used_free=3, last=5, worst_work=5, min_slack=5,
+           'wall_hi', 'service_gap_max', 'min_slack_frames', 'report_failures', 'saturated',
+           'sd_retries')
+OPTIONAL_SCALARS = ('sd_retries',)  # build 46 onwards
+OPTIONAL_ROWS = ('encoder', 'select', 'encoder_log', 'encoder_log16', 'debounce', 'debounce2', 'read_fail', 'chop')  # build 38: steps, recovered, dropped; 39 onwards: steps, recovered, guessed
+ROWS = dict(stack_static_used_free=3, encoder=3, select=2, encoder_log=32, debounce=2, debounce2=3, encoder_log16=16, read_fail=6, chop=7, last=5, worst_work=5, min_slack=5,
             errors_ring_late_dma_read_copy=5, sd_hist=8,
-            **{name: 5 for name in METRICS})
+            **{name: 5 for name in METRICS + OPTIONAL_METRICS})
 
 
 def context(values):
@@ -56,12 +60,12 @@ def parse_report(raw):
         if any(n > 0xffffffff for n in numbers):
             raise ValueError('out-of-range counter')
         fields[name] = numbers[0] if name in SCALARS else numbers
-    if set(fields) != set(SCALARS) | set(ROWS) or not fields['ticks_per_us']:
+    if set(fields) | set(OPTIONAL_METRICS) | set(OPTIONAL_ROWS) | set(OPTIONAL_SCALARS) != set(SCALARS) | set(ROWS) or not fields['ticks_per_us']:
         raise ValueError('missing required profile fields')
     scale = fields['ticks_per_us']
     wall = (fields['wall_hi'] << 32) | fields['wall_lo']
     metrics = {}
-    for name in METRICS:
+    for name in METRICS + tuple(n for n in OPTIONAL_METRICS if n in fields):
         count, low, high, minimum, maximum = fields[name]
         total = high << 32 | low
         if (not count and any((total,minimum,maximum))) or (count and
@@ -90,6 +94,23 @@ def parse_report(raw):
                                       '<=10ms','<=50ms','>50ms'), fields['sd_hist'])),
                 errors=dict(zip(('ring','late_commit','dma_stall','read','copy_overlap'),
                                 fields['errors_ring_late_dma_read_copy'])),
+                encoder=dict(zip(('steps','recovered','dropped' if fields['build'] == 38 else 'guessed'),
+                                 fields['encoder']))
+                    if 'encoder' in fields else None,
+                debounce=dict(zip(('raw_pin_changes','longest_bridged_high_ms'), fields['debounce']))
+                    if 'debounce' in fields else
+                    dict(zip(('raw_pin_changes','longest_bridged_high_us','shortest_hold_us'), fields['debounce2']))
+                    if 'debounce2' in fields else None,
+                select=dict(zip(('steps_accepted','selections'), fields['select']))
+                    if 'select' in fields else None,
+                encoder_log=[dict(ms=round((v >> 4)*0.016, 3), saturated=(v >> 4) == 4095,
+                                  ab=v & 3, playing=bool(v & 4), step=bool(v & 8))
+                             for v in fields.get('encoder_log') or fields.get('encoder_log16')]
+                            if 'encoder_log' in fields or 'encoder_log16' in fields else None,
+                read_fail=dict(zip(('site','card_ready','sd_reason','sd_value','frame','reverse'),
+                                   fields['read_fail'])) if 'read_fail' in fields else None,
+                chop=fields.get('chop'),
+                sd_retries=fields.get('sd_retries'),
                 previous_report_failures=fields['report_failures'],
                 saturated=bool(fields['saturated']))
 
@@ -145,6 +166,35 @@ def summary(report):
     lines.append('Stack watermark is a lower bound on use, not a proven worst-case stack bound.')
     lines.append('SD read-attempt histogram: '+json.dumps(report['sd_histogram']))
     lines.append('Errors: '+json.dumps(report['errors']))
+    if report.get('encoder'):
+        lines.append('FILE encoder since power-up: '+json.dumps(report['encoder'])+
+                     ' (recovered/guessed/dropped = clicks where a quadrature state went unseen)')
+    if report.get('chop') and report['chop'][0]:
+        c = report['chop']
+        print(f'Chop gates since power-up: {c[0]}; last six, oldest first (ms since previous gate, knob/CV reading, position as % of file, path):')
+        for v in c[1:][-min(c[0], 6):]:
+            adc, units = v & 1023, v >> 11
+            gap = '>16368' if units == 1023 else str(units * 16)
+            print(f"  {gap:>7}  adc {adc:4d}  {100 * (1023 - adc) / 1023:5.1f}%  {'jump while playing' if v & 1024 else 'start from stopped'}")
+    if report.get('read_fail') and report['read_fail']['site']:
+        r = report['read_fail']
+        site = {1:'prefetch',2:'flip resume',3:'flip start'}.get(r['site'], str(r['site']))
+        reason = {0:'none recorded',1:'command response',2:'token transfer timeout',3:'wrong data token',
+                  4:'data transfer timeout',5:'CRC mismatch'}.get(r['sd_reason'], str(r['sd_reason']))
+        lines.append(f"Last read error: at {site}, card {'still ready (not an SD failure)' if r['card_ready'] else 'marked failed'}, "
+                     f"last SD failure: {reason} (value {r['sd_value']}), frame {r['frame']}, "
+                     f"{'reverse' if r['reverse'] else 'forward'}")
+    if report.get('sd_retries') is not None:
+        lines.append(f"Sector reads retried after a failure: {report['sd_retries']}")
+    if report.get('select'):
+        lines.append('FILE selection: '+json.dumps(report['select']))
+    if report.get('debounce'):
+        lines.append('FILE contact filter: '+json.dumps(report['debounce']))
+    if report.get('encoder_log'):
+        lines.append(('Last filtered FILE pin changes' if report.get('debounce') else 'Last raw FILE pin changes')+', oldest first (ms since previous, AB, P=playing, *=step):')
+        for e in report['encoder_log']:
+            lines.append(f"  {'>' if e['saturated'] else ' '}{e['ms']:8.3f}  {e['ab']>>1}{e['ab']&1}"
+                         f"  {'P' if e['playing'] else '-'} {'*' if e['step'] else ''}")
     lines.append(f"Previous report-write failures: {report['previous_report_failures']}")
     wall_us = report['playback_seconds'] * 1e6
     if wall_us:

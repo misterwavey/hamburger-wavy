@@ -1,0 +1,5 @@
+# Hamburger Wavy: knob/CV sweeps filter cutoff
+Loop
+Filter
+Resonance 6
+Drive 6

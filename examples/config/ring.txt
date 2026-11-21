@@ -1,0 +1,6 @@
+# Hamburger Wavy: fixed ring modulation
+Loop
+Quantize
+Short
+Ring 9
+Rate 5

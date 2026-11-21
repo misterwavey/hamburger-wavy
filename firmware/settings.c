@@ -40,10 +40,62 @@ static int equal(const char *a, const char *b) {
   }
   return !*a && !*b;
 }
+#ifdef ONE_COLOUR
+/* "KEY n" with a single digit; returns 1 and scales 0..9 to 0..255. */
+static int amount(const char *text, const char *key, uint32_t *value) {
+  while (*text == ' ' || *text == '\t')
+    text++;
+  while (*key) {
+    char c = *text++;
+    if (c >= 'a' && c <= 'z')
+      c -= 32;
+    if (c != *key++)
+      return 0;
+  }
+  if (*text != ' ' && *text != '\t')
+    return 0;
+  while (*text == ' ' || *text == '\t')
+    text++;
+  if (*text < '0' || *text > '9' || text[1])
+    return 0;
+  *value = (uint32_t)(*text - '0') * 255u / 9u;
+  return 1;
+}
+#endif
+static int effect_line(const char *text, Settings *s) {
+#ifdef ONE_COLOUR
+  /* The last cutoff line sets both the cutoff and the filter's output. */
+  if (amount(text, "FILTER", &s->filter) || amount(text, "LOWPASS", &s->filter)) {
+    s->shape = FILTER_LOW;
+    return 1;
+  }
+  if (amount(text, "HIGHPASS", &s->filter)) {
+    s->shape = FILTER_HIGH;
+    return 1;
+  }
+  if (amount(text, "BANDPASS", &s->filter)) {
+    s->shape = FILTER_BAND;
+    return 1;
+  }
+  return amount(text, "DRIVE", &s->drive) || amount(text, "CRUSH", &s->crush) ||
+         amount(text, "RESONANCE", &s->resonance) ||
+         amount(text, "TREMOLO", &s->tremolo) || amount(text, "RING", &s->ring) ||
+         amount(text, "RATE", &s->rate) || amount(text, "WAH", &s->wah) ||
+         amount(text, "PHASER", &s->phaser);
+#else
+  (void)text;
+  (void)s;
+  return 0;
+#endif
+}
 void settings_default(Settings *s) {
   s->play = PLAY_TRIGGER;
   s->cv = CV_QUANTIZE; /* Match the stock boot default without config.txt. */
   s->delay_ms = 0;
+#ifdef ONE_COLOUR
+  s->drive = s->crush = s->filter = s->resonance = s->shape = 0;
+  s->tremolo = s->ring = s->rate = s->wah = s->phaser = 0;
+#endif
 }
 int settings_load(Fat *fs, Settings *out) {
   Entry e;
@@ -94,6 +146,10 @@ int settings_load(Fat *fs, Settings *out) {
     s.play = PLAY_FLIP;
   else if (equal(text, "CV FLIP"))
     s.play = PLAY_CV_FLIP;
+  else if (equal(text, "TAPE"))
+    s.play = PLAY_TAPE;
+  else if (equal(text, "CHOP"))
+    s.play = PLAY_CHOP;
 #endif
   else
     return -2;
@@ -108,13 +164,22 @@ int settings_load(Fat *fs, Settings *out) {
     s.cv = CV_QUANTIZE;
   else if (equal(text, "SELECT FILE"))
     s.cv = CV_SELECT;
+#ifdef ONE_COLOUR
+  else if (equal(text, "COLOUR") || equal(text, "COLOR"))
+    s.cv = CV_COLOUR;
+  else if (equal(text, "FILTER"))
+    s.cv = CV_FILTER;
+  else if (equal(text, "RATE"))
+    s.cv = CV_RATE;
+#endif
   else
     return -2;
   n = line(&f, text, sizeof(text));
   if (n < 0)
     return n;
   if (n && text[0] && text[0] != '#') {
-    if (equal(text, "SHORT"))
+    if (effect_line(text, &s)) {
+    } else if (equal(text, "SHORT"))
       s.delay_ms = 0;
     else if (equal(text, "MEDIUM"))
       s.delay_ms = 2;
@@ -123,6 +188,16 @@ int settings_load(Fat *fs, Settings *out) {
     else
       return -2;
   }
+#ifdef ONE_COLOUR
+  /* Later lines: effect amounts are recognised; anything else stays ignored. */
+  for (unsigned extra = 0; extra < 8 && n == 1; extra++) {
+    n = line(&f, text, sizeof(text));
+    if (n < 0)
+      return n;
+    if (n == 1)
+      (void)effect_line(text, &s);
+  }
+#endif
   *out = s;
   return 1;
 }

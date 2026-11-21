@@ -1,0 +1,4 @@
+# Hamburger Wavy: knob/CV sets the phaser speed
+Loop
+Rate
+Phaser 7

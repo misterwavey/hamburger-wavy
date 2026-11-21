@@ -1,0 +1,6 @@
+# Hamburger Wavy: phaser
+Loop
+Quantize
+Short
+Phaser 7
+Rate 3

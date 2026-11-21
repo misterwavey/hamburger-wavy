@@ -1,0 +1,8 @@
+# Hamburger Wavy: slow wah on a resonant band-pass
+Loop
+Quantize
+Short
+Bandpass 5
+Resonance 6
+Wah 6
+Rate 4

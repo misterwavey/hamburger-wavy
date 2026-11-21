@@ -1,0 +1,4 @@
+# Hamburger Wavy: knob/CV sweeps ring mod rate
+Loop
+Rate
+Ring 9

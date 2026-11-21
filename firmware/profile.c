@@ -17,6 +17,12 @@ static struct {
   uint32_t errors[PROF_ERRORS], histogram[8];
   uint32_t context[5], worst[5], tightest[5], slack, slack_weight;
   uint32_t stack[3];
+#ifdef ONE_TOLERANT_ENCODER
+  uint32_t encoder[3], select[2], debounce[3], edge_tick, edge_at;
+  uint16_t edges[16];
+  uint32_t read_fail[6], sd_retries;
+  uint32_t chop[7], chop_tick;
+#endif
   char text[1024];
 } p;
 static void increment(uint32_t *n) {
@@ -117,6 +123,39 @@ static REPORT_SIZE void row(const char *name, const uint32_t *values, uint32_t n
   }
   append("\n", at);
 }
+#ifdef ONE_TOLERANT_ENCODER
+/* Last 16 filtered FILE pin changes: time since the previous change in 16 us units
+ * (saturating at 4095), then stepped, playing and the two pin bits. */
+void profile_encoder_edge(uint32_t ab, uint32_t playing, uint32_t stepped) {
+  uint32_t now = board_ticks(), units = (now - p.edge_tick) / 384u;
+  p.edge_tick = now;
+  if (units > 4095u) units = 4095u;
+  p.edges[p.edge_at++ & 15u] =
+      (uint16_t)(units << 4 | (stepped ? 8u : 0u) | (playing ? 4u : 0u) | (ab & 3u));
+}
+void profile_chop(uint32_t adc, uint32_t jumped) {
+  uint32_t now = board_ticks(), units = (now - p.chop_tick) / 384000u;
+  p.chop_tick = now;
+  if (units > 1023u) units = 1023u;
+  for (uint32_t i = 1; i < 6u; ++i) p.chop[i] = p.chop[i + 1u];
+  p.chop[6] = units << 11 | (jumped ? 1024u : 0u) | (adc & 1023u);
+  increment(p.chop);
+}
+void profile_count(uint32_t which) { increment(p.select + which); }
+void profile_sd_fail(uint32_t reason, uint32_t value) {
+  p.read_fail[2] = reason; p.read_fail[3] = value;
+}
+void profile_sd_retry(void) { increment(&p.sd_retries); }
+void profile_read_fail(uint32_t site, uint32_t ready, uint32_t frame, uint32_t reverse) {
+  p.read_fail[0] = site; p.read_fail[1] = ready; p.read_fail[4] = frame; p.read_fail[5] = reverse;
+}
+void profile_debounce(uint32_t raw, uint32_t bridged, uint32_t hold) {
+  p.debounce[0] = raw; p.debounce[1] = bridged; p.debounce[2] = hold;
+}
+void profile_encoder(uint32_t steps, uint32_t recovered, uint32_t guessed) {
+  p.encoder[0] = steps; p.encoder[1] = recovered; p.encoder[2] = guessed;
+}
+#endif
 REPORT_SIZE void profile_idle(Fat *fs, uint32_t now, uint32_t allowed) {
   if (!allowed || p.playing || !p.dirty || now - p.stopped < 250u) return;
   p.dirty = 0; /* One attempt per stop; no repeated idle write failures. */
@@ -134,11 +173,28 @@ REPORT_SIZE void profile_idle(Fat *fs, uint32_t now, uint32_t allowed) {
   field("report_failures=", p.failed_reports, &at);
   field("saturated=", p.saturated, &at);
   row("stack_static_used_free", p.stack, 3, &at);
+#ifdef ONE_TOLERANT_ENCODER
+  row("encoder", p.encoder, 3, &at); /* steps, recovered, guessed since boot */
+  row("select", p.select, 2, &at);
+  row("debounce2", p.debounce, 3, &at); /* raw changes, longest bridged high us, shortest hold us */
+  field("sd_retries=", p.sd_retries, &at);
+  row("read_fail", p.read_fail, 6, &at); /* site, card ready, sd reason, value, frame, reverse */
+  row("chop", p.chop, 7, &at);
+  append("encoder_log16", &at);
+  for (uint32_t i = 0; i < 16u; ++i) {
+    append(",", &at); number(p.edges[(p.edge_at + i) & 15u], &at);
+  }
+  append("\n", &at);
+#endif
   row("last", p.context, 5, &at); row("worst_work", p.worst, 5, &at);
   row("min_slack", p.tightest, 5, &at);
   row("errors_ring_late_dma_read_copy", p.errors, PROF_ERRORS, &at);
   row("sd_hist", p.histogram, 8, &at);
-  static const char *const names[PROF_METRICS] = {"sd","prefetch","decode","envelope","copy","refill_work"};
+  static const char *const names[PROF_METRICS] = {"sd","prefetch","decode","envelope","copy","refill_work"
+#ifdef ONE_COLOUR
+      ,"colour","filter","mod","phaser"
+#endif
+  };
   for (uint32_t i = 0; i < PROF_METRICS; ++i) {
     Metric *m = p.m + i;
     uint32_t fields[5] = {m->count,m->low,m->high,m->minimum,m->maximum};

@@ -110,29 +110,60 @@ fail:
   return -1;
 }
 
+#if defined(ONE_PROFILE) && defined(ONE_TOLERANT_ENCODER)
+#define SD_FAIL(reason, value) profile_sd_fail(reason, value)
+#define SD_RETRY() profile_sd_retry()
+#else
+#define SD_RETRY() do {} while (0)
+#define SD_FAIL(reason, value) do {} while (0)
+#endif
+#ifdef ONE_SD_RETRY
+/* One failed sector read gets a second attempt before the card is given up:
+ * a single bad transfer would otherwise stop playback and force a remount. */
+static int read_sector(void *ctx, uint32_t lba, uint8_t *out);
 int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
+  Sd *s = ctx;
+  if (!s->ready || (!s->high_capacity && lba > 0x7fffffu))
+    return -1;
+  if (!read_sector(ctx, lba, out))
+    return 0;
+  SD_RETRY();
+  s->ready = 1;
+  return read_sector(ctx, lba, out);
+}
+static int read_sector(void *ctx, uint32_t lba, uint8_t *out) {
+#else
+int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
+#endif
   Sd *s = ctx;
   if (!s->ready)
     return -1;
   if (!s->high_capacity && lba > 0x7fffffu)
     return -1;
   PROFILE_BEGIN(read_sector);
-  if (command(s, 17, s->high_capacity ? lba : lba << 9))
+  int response = command(s, 17, s->high_capacity ? lba : lba << 9);
+  if (response) {
+    SD_FAIL(1, (uint32_t)response);
     goto fail;
+  }
   uint32_t begin = s->io->millis(s->io->ctx);
   int token;
   do {
     token = tx(s, 255);
-    if (token < 0)
+    if (token < 0) {
+      SD_FAIL(2, 0);
       goto fail;
+    }
     if (token != 255)
       break;
   } while (s->io->millis(s->io->ctx) - begin < 250);
-  if (token != 0xfe)
+  if (token != 0xfe) {
+    SD_FAIL(3, (uint32_t)token);
     goto fail;
+  }
   uint16_t crc = 0;
   if (s->io->read_bytes) {
-    if (s->io->read_bytes(s->io->ctx, out, 512, &crc)) goto fail;
+    if (s->io->read_bytes(s->io->ctx, out, 512, &crc)) { SD_FAIL(4, 0); goto fail; }
   } else {
     for (unsigned i = 0; i < 512; ++i) {
       int b = tx(s, 255);
@@ -142,8 +173,10 @@ int sd_read(void *ctx, uint32_t lba, uint8_t *out) {
     }
   }
   int high = tx(s, 255), low = tx(s, 255);
-  if (high < 0 || low < 0 || crc != ((uint16_t)high << 8 | (uint16_t)low))
+  if (high < 0 || low < 0 || crc != ((uint16_t)high << 8 | (uint16_t)low)) {
+    SD_FAIL(5, (uint32_t)crc);
     goto fail;
+  }
   release(s);
   PROFILE_END(PROF_SD, read_sector);
   return 0;

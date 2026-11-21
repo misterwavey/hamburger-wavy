@@ -1,0 +1,6 @@
+# Hamburger Wavy: fixed low-pass filter
+Loop
+Quantize
+Short
+Filter 5
+Resonance 6

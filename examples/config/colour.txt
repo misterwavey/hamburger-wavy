@@ -1,0 +1,6 @@
+# Hamburger Wavy colour example: fixed drive and crush
+Loop
+Quantize
+Short
+Drive 4
+Crush 6

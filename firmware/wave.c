@@ -95,6 +95,35 @@ int pcm_decode(const uint8_t *src, uint32_t bits, uint32_t *dst,
   PROFILE_END(PROF_DECODE, decode);
   return 0;
 }
+#ifdef ONE_POLL_DECODE
+/* Decode in short chunks so the caller's controls keep being polled: a whole
+ * 1024-frame PCM24 buffer otherwise runs about a third of a millisecond
+ * unattended. Output is identical to one pcm_decode/pcm_decode_reverse call. */
+#define DECODE_CHUNK 128u
+void (*wave_poll)(void);
+static int decode_polled(const uint8_t *src, uint32_t bits, uint32_t *dst,
+                         uint32_t frames, uint32_t reverse) {
+  if (bits != 16 && bits != 24)
+    return -1;
+  uint32_t width = bits / 8u;
+  for (uint32_t done = 0; done < frames;) {
+    uint32_t count = frames - done < DECODE_CHUNK ? frames - done : DECODE_CHUNK;
+    int error = reverse ?
+        pcm_decode_reverse(src + (frames - done - count) * width, bits,
+                           dst + done * 2u, count) :
+        pcm_decode(src + done * width, bits, dst + done * 2u, count);
+    if (error)
+      return -1;
+    done += count;
+    if (done < frames && wave_poll)
+      wave_poll();
+  }
+  return 0;
+}
+#define DECODE_FORWARD(src, bits, dst, frames) decode_polled(src, bits, dst, frames, 0)
+#else
+#define DECODE_FORWARD(src, bits, dst, frames) pcm_decode(src, bits, dst, frames)
+#endif
 int wave_read(File *f, Wave *w, uint32_t *dst, uint32_t frames, uint32_t *got,
               uint8_t *scratch, uint32_t capacity) {
   *got = 0;
@@ -109,7 +138,7 @@ int wave_read(File *f, Wave *w, uint32_t *dst, uint32_t frames, uint32_t *got,
   uint32_t bytes = count * width, n;
   if (file_read(f, scratch, bytes, &n) || n != bytes)
     return -1;
-  if (pcm_decode(scratch, w->bits, dst, count))
+  if (DECODE_FORWARD(scratch, w->bits, dst, count))
     return -1;
   memset(dst + count * 2, 0, (frames - count) * 8);
   w->remaining -= bytes;
@@ -193,8 +222,12 @@ int wave_read_direction(File *f, Wave *w, FileIndex *index,
     if (boundary) {
       if (file_read_window(f,index,scratch,count*width,boundary)) return -1;
     } else if (file_read(f,scratch,count*width,&got) || got != count*width) return -1;
+#ifdef ONE_POLL_DECODE
+    int error = decode_polled(scratch, w->bits, dst, count, reverse);
+#else
     int error = reverse ? pcm_decode_reverse(scratch, w->bits, dst, count) :
                           pcm_decode(scratch, w->bits, dst, count);
+#endif
     if (error) return -1;
     *frame = wave_frame_offset(*frame, count, total, reverse);
     dst += count * 2u; frames -= count;

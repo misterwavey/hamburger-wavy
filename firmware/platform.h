@@ -13,10 +13,16 @@ void flash_probe_startup(void);
 void board_watchdog(void);
 void board_audio_publish(void);
 uint32_t board_millis(void);
+#ifdef ONE_TOLERANT_ENCODER
+uint32_t board_ticks(void); /* free-running, 24 per microsecond */
+#endif
 uint32_t board_pins(void);
 uint32_t board_adc(void);
 void board_pitch(uint32_t, uint32_t);
 void board_pitch_mode(uint32_t, uint32_t, CvMode);
+#ifdef ONE_FLIP
+void board_pitch_fixed(uint32_t);
+#endif
 void board_led(uint32_t);
 void board_audio_stop(void);
 void board_audio_start(const uint32_t *);

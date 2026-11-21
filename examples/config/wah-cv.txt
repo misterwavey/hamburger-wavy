@@ -1,0 +1,6 @@
+# Hamburger Wavy: knob/CV sets the wah speed
+Loop
+Rate
+Bandpass 5
+Resonance 6
+Wah 6

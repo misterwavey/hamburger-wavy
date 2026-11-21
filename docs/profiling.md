@@ -1,6 +1,6 @@
 # Profiling diagnostics
 
-This optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark. A first short hardware run is recorded below; the included `build/test-profile.txt` fixture remains synthetic regression data.
+This optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark.
 
 ## Build and install
 
@@ -11,6 +11,8 @@ make profile
 ```
 
 The diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 21; the diagnostic manifest has `profiling: true`.
+
+For the extended firmware use `make extended-profile`, which writes `build/extended/profile/image.hex` and reports the extended build number; substitute that path below.
 
 Install the diagnostic using the usual SD update procedure:
 
@@ -44,8 +46,6 @@ The firmware accumulates statistics over the current boot, across triggers, file
 
 ## Suggested test order
 
-For staged Fade/Gate and normal-firmware checks, use the [bench pack instructions](bench.md). They generate original long PCM24 audio, prepare separate configs/playlists and preserve the pre-test card setup locally.
-
 Start with a quick smoke test: one Q480 playback, let it finish, wait, and check the report. Then run:
 
 | Case | Material and activity |
@@ -67,6 +67,7 @@ Repeat the useful cases at 44.1/88.2 kHz and on other cards if available. Native
 - `envelope`: combined envelope and tail rendering for a published half.
 - `copy`: buffer copy and publication barrier.
 - `refill_work`: the corresponding prefetch work plus publication work for completed refills. It excludes the intentional waiting between prefetch and publication, and includes the nested SD/decoder/envelope/copy operations. Do not add the category totals together.
+- `colour`, `filter`, `phaser`, `mod` (extended build): time in each effect stage per processed block.
 
 Each metric has sample count, total, minimum and maximum; the host tool calculates means. The SD histogram uses inclusive upper bounds of 250 us, 500 us, 1/2/5/10/50 ms, then an open-ended final bucket. This supports coarse latency-distribution inspection rather than exact percentiles.
 
@@ -81,8 +82,6 @@ Measured refill-work share includes blocking SD waits and excludes other work an
 Before the first C function runs, the diagnostic fills unused RAM between the linker-defined static-data end and the initial stack top with a pattern. The report scans for the lowest modified word. This gives an observed stack watermark, including startup/mount work and earlier report activity. It is a lower bound on stack use: a reserved but unwritten frame can retain the pattern. The current report write can deepen the stack after its snapshot; a later report can observe that use. Compiler `.su` frame sizes are supplementary, not a full call-chain bound.
 
 The untouched gap is not a guaranteed safe allocation budget. Longer or different workloads may use more stack, and the diagnostic has extra frames. This build keeps the same 8 KiB minimum linker stack reservation and the same application-address limit. Compare normal/profiling manifests for code and static-RAM overhead; do not mistake the diagnostic's small code-space remainder for the normal firmware's headroom.
-
-For build 16, normal main text/constants use 26996 bytes and static RAM 32160 bytes. The diagnostic uses 31500 main-text bytes and 33488 static-RAM bytes, leaving 312 bytes before the fixed reset handler. Total extra source payload is 4544 bytes (including startup instrumentation); extra static RAM is 1328 bytes. These are measured build sizes, not measured hardware timings.
 
 These measurements do not establish whether the resident updater accepts a larger flash layout. That remains a separate investigation.
 
@@ -104,114 +103,6 @@ diskutil eject "/Volumes/TTA ONE"
 
 Install normally. Normal firmware leaves an existing profile report untouched; it may be stale. Delete it on the computer when no longer needed.
 
-## First hardware observation — 2026-11-16
+## Extended build additions
 
-A CRC-valid build-16 report from five playback starts over 11.91 seconds recorded no streaming errors or report-write failures. The card's image matched the profiling artifact; `ONEBUILD.TXT` identified build 16. The last and worst observed contexts were 96 kHz/24-bit Trigger/Quantize, slowed to approximately 57–64 kHz output. No envelope samples were recorded.
-
-| Operation | Mean | Worst |
-| --- | --- | --- |
-| Streaming sector read attempt | 1.528 ms | 4.533 ms |
-| Prefetch/read and decode | 4.976 ms | 9.191 ms |
-| Complete refill work | 5.496 ms | 9.713 ms |
-| PCM decoding | 0.181 ms | 0.182 ms |
-| Half-buffer copying/publication | 0.513 ms | 0.513 ms |
-
-The minimum observed publication margin was 401 frames, about 6.257 ms at its recorded rate. The maximum background-service gap was 0.534 ms. The stack watermark indicated 1696 bytes used and 30344 bytes untouched in the instrumented build. Refill work occupied about 54.2% of observed playback time; this is not CPU utilisation. SD read attempts dominated that work; the report does not separate card wait from driver/CRC/polling overhead.
-
-This short run supports comfortable observed RAM margin and successful read-ahead, not a guarantee at native/highest output rates. At 96 kHz, a 512-frame half lasts 5.333 ms; at highest quantized pitch it lasts about 3.56 ms. The current 5.496 ms mean suggests those conditions need explicit sustained tests and possibly read/copy optimisation before adding substantial audio processing. Run them as separate cases, followed by Fade/Gate to measure the currently unsampled envelope path.
-
-## High-pitch failure observation — 2026-11-16
-
-A second CRC-valid report recorded eight starts over 1.751 seconds, with five ring underruns and three late-commit rejections. There were no SD read errors, stationary-DMA errors, copy-overlap observations or report-write failures. The recorded mode was Trigger/Quantize, not Loop. The short failed starts already demonstrate the throughput limit; they are not a completed sustained-loop test.
-
-At the tightest observation, a 96 kHz/24-bit sample ran at approximately 135785 output frames/s (divider 707). A 512-frame half therefore lasted 3.771 ms. Completed refill work averaged 5.157 ms (minimum 5.006 ms, maximum 6.594 ms). Failed/unused prefetch attempts are excluded from that completed-work metric; prefetch alone reached 7.579 ms. The smallest observed margin was 21 frames, about 155 us. Stack watermark was 1736 bytes, leaving 30304 bytes untouched.
-
-This confirms a streaming/refill scheduling-capacity failure in the diagnostic build at that setting, rather than evidence of corrupt reads or a stalled DMA engine. Mean sector-read attempt time was 1.415 ms and buffer copying remained 0.513 ms per half. The SD/SPI read path and bytewise audio copies are the next optimisation targets. This does not isolate card wait from driver CPU cost, and profiling itself adds overhead. Normal-firmware high-rate limits still need testing; sustained maximum-pitch 96 kHz/24-bit operation is not established as supported.
-
-## Build 17 throughput trial
-
-Build 17 adds an optional bulk-receive transport to the SD driver. The board implementation pipelines one SPI2 byte at a time at the same 12 MHz clock, starts the next byte before storing/polling, and avoids the per-payload-byte function-pointer call. Controls/watchdog continue to be polled every 64 transferred bytes. Each receive span has a bounded timeout; received sector data still undergo CRC16 checking. The ordinary byte transport remains the fallback and is still used for commands, responses and writes.
-
-Audio cache and staging copies now use a typed, four-word-unrolled copy for non-overlapping uint32_t arrays. General-purpose `memcpy` remains byte-safe. Buffer sizes, copy deadline guards, pitch mapping and SD write scope are unchanged. The profiling report formatter uses size optimisation only while stopped, keeping the diagnostic within the existing application layout. Normal code/constants use 27480 bytes (4332 free); the diagnostic uses 31796 bytes (16 free). Static RAM is unchanged at 32160 / 33488 bytes respectively. Hardware speedup remains unmeasured until a new run is collected.
-
-For the next comparison, keep the AGNT2-only playlist and install the build-17 profiling image. Copy `examples/config/loop-quantized.txt` to the card as `config.txt` so the run reliably starts in Loop/Quantize rather than Trigger. Preserve your previous config if needed. Use the same highest-pitch setting that failed in build 16, run for a minute if it remains playing, then turn FILE to stop and wait one second. If it turns blue earlier, stop triggering and let the diagnostic save its failure report. The new report must say build 17; old build-16 data can remain on the card until a new report is successfully written.
-
-Regression coverage includes bulk and fallback card protocols, CRC rejection, partial transfer failure, control polling cadence and timeout wraparound. A narrow MIPS32 instruction model executes the actual linked receive/copy functions to check clock/receive counts, one outstanding byte, guard bytes and poll placement. This is a logical register model, not a cycle-accurate SPI/card simulation. Independent measurements on the module are still required.
-
-## Build 17 hardware result and build 18 CRC trial
-
-A CRC-valid build-17 report recorded one Loop/Quantize start with a 96 kHz/24-bit file at approximately 143928 output frames/s. It stopped after 31.24 ms with one late-commit rejection and no read, stationary-DMA, ring-underrun or copy-overlap errors. Copy time fell to 75.333 us from build 16's roughly 512.6 us. Mean SD read attempt time was 1.137 ms, prefetch 3.812 ms and completed refill work 3.903 ms. The half-buffer period was 3.557 ms; the improvement was insufficient for sustained operation. Minimum observed margin was 112 frames (778 us), below the unchanged 128-frame copy guard. Reducing that guard alone would not correct an average refill slower than the playback period.
-
-Build 18 replaces the CRC16 nibble-table update with a folded polynomial calculation, eliminating both per-byte flash-table reads. The polynomial, initial state, received CRC bytes, CRC comparisons and write CRCs are unchanged. All 65536 CRC states times 256 input bytes were checked against an independent bitwise recurrence (16777216 combinations), alongside the existing normal/instrumented protocol, corruption, transport-failure and filesystem tests. The measured 544 us maximum service gap in the previous run is consistent with a costly software section, but does not by itself isolate that section's duration; hardware measurement is required to quantify the CRC change.
-
-For the next trial install the build-18 profiling image and keep the existing AGNT2-only playlist and Loop/Quantize config. Repeat the same full-pitch run, stop by browsing if it remains playing, wait one second, and collect the report. Normal main code/constants now use 27368 bytes (4444 free); profiling uses 31684 (128 free). RAM is unchanged. No clock, buffer, deadline guard or update-layout change was made.
-
-
-## Build 18 hardware result and build 19 cache-copy trial
-
-The CRC-valid build-18 report recorded 0.487 seconds of playback with one late-commit rejection and no read, ring, stationary-DMA or copy-overlap errors. Mean SD read time fell to 1.026 ms, prefetch to 3.486 ms and completed refill work to 3.565 ms. The tightest half-buffer period remained 3.557 ms at divider 667 (approximately 143928 output frames/s). The worst completed refill was 4.686 ms; pitch varied during this run. These measurements show improvement, but insufficient sustained margin. Stack watermark remained 1680 bytes.
-
-Build 19 adds an alignment-checked word path to the project-written general-purpose memcpy, speeding aligned copies such as the FAT sector cache into the decoder input buffer. Both addresses must be word aligned; unaligned copies and trailing bytes retain byte accesses. A compiler-supported may_alias word type permits access to arbitrary object representations. Host sanitizer and compiled-MIPS tests cover every source/destination alignment combination, tails and boundary guards. This does not change the SD clock, CRC checks, buffer sizes or copy deadline guard.
-
-Normal code/constants use 27464 bytes (4348 free); profiling uses 31780 bytes (32 free). Static RAM is unchanged. All 11 release tests pass. Hardware performance remains unmeasured. Install the build-19 profiling image, retain the AGNT2-only playlist and Loop/Quantize config, and repeat the maximum-pitch run. If playback continues, turn FILE to stop, then wait one second before powering down. A fresh report must identify build 19.
-
-
-## Build 19 hardware result
-
-The CRC-valid report recorded one start and 2.980 seconds of playback, ending with one late-commit rejection. Read, stationary-DMA, ring and copy-overlap counters were zero. Mean completed refill time was 3.535 ms, worst 4.675 ms; mean prefetch was 3.456 ms and worst 4.593 ms. SD reads averaged 1.045 ms (worst 1.120 ms), with all attempts below 2 ms. Minimum slack was 122 frames, approximately 848 us at divider 667, below the unchanged 128-frame guard. Stack watermark remained 1680 bytes.
-
-The mean is now slightly below the tightest 3.557 ms half-buffer period, but leaves only about 22 us before other work and timing variation. Pitch varied: the worst completed refill context used divider 707, while the tightest slack used 667. The report does not record failure position or attribute individual stalls to a loop boundary. AGNT2 contains 261862 frames, lasting about 1.819 seconds at maximum pitch; the observed duration is consistent with crossing a loop boundary and stopping later, rather than proving failure exactly on wrap. More buffering can absorb occasional slow refills, but average throughput margin still needs improvement.
-
-
-## Build 20 buffer and decoder trial
-
-Build 20 doubles each DMA half from 512 to 1024 frames, the whole DMA ring from 1024 to 2048 frames, and the associated initial cache, staging and raw-input buffers. At divider 667 a half lasts approximately 7.115 ms. Each refill now processes twice as much audio: a larger half provides more tolerance of individual delays, not twice the sustainable throughput. The SD clock remains 12 MHz, received sectors retain CRC checks, and the commit guard remains 128 frames (1024 bytes). Profiler margin calculations and the host DMA model now use the actual buffer constants. Build manifests record the buffer sizes.
-
-PCM16 and PCM24 decoding use separate loops selected once per buffer. For 512 frames, the compiled normal-image logical MIPS model executes 5137 steps for PCM16 and 6672 for PCM24, compared with 7182 and 8206 in build 19. This is an instruction-path comparison, not a cycle-accurate speed measurement. Both formats, zero-length input, unaligned input and output boundary guards are checked through the compiled MIPS code. Loop continuity, PCM tails, prefetch, envelope/retrigger behaviour and deadline-error recovery are also exercised under host sanitizers with the larger buffers.
-
-Normal main code/constants use 27472 bytes (4340 free); profiling uses 31812 (zero free in the existing main-text region). Size optimisation of file-header parsing and profiler setup/stop code keeps the diagnostic within the fixed layout. No linker boundary, update coverage or boot configuration is expanded. Static RAM rises to 55712 bytes normally and 57040 with profiling, leaving 9824 and 8496 bytes respectively for the stack, including the existing 8192-byte minimum reserve. This deliberately spends most of the previous RAM headroom on streaming. Future feature work must revisit the buffer/cache allocation rather than assuming the earlier spare RAM remains available.
-
-Larger buffers can increase loop-trigger preparation latency because twice as much initial audio is read before playback starts. Buffered envelope/retrigger scheduling and the block-rounded end-of-playback interval can also lengthen. Trigger-mode starts still use the preloaded cache. Existing mode/light choices are retained; the effects on feel need a hardware check after the throughput trial.
-
-Install the build-20 profiling image and retain the AGNT2-only playlist and Loop/Quantize config. Set maximum pitch before starting and leave it there, so the report is a clean comparison. Aim for one minute of looping; if it stays playing, turn FILE to stop. Whether it stops itself or you stop it, wait one second before powering down and mounting. Check that the fresh report identifies build 20. Hardware performance remains unmeasured.
-
-
-## Build 20 hardware result and build 21 overlapped CRC trial
-
-The CRC-valid build-20 report recorded 2.726 seconds of playback, ending with one late-commit rejection. The other error counters were zero. Mean completed refill time was 7.016 ms (worst 8.045 ms); mean prefetch was 6.863 ms (worst 7.891 ms). SD reads averaged 1.044 ms (worst 1.128 ms). Minimum slack was 117 frames, approximately 813 us at divider 667, below the unchanged 128-frame guard. The tightest half-buffer period was 7.115 ms. Worst-work context used divider 707, so the run contains different pitch observations. Larger buffers did not establish adequate sustained margin. Stack watermark was 1680 bytes, with 6808 bytes untouched.
-
-Build 21 moves the existing, exhaustively verified CRC16 recurrence into the bulk SPI receive loop. After reading a byte, the next dummy transmit starts before the current byte is stored and added to the checksum. The callback returns that checksum on success; the SD driver still compares it with both received CRC bytes. There is no separate 512-byte checksum pass. The fallback byte transport computes the same checksum during its read loop. Write checksums and all read-error handling remain enabled. The receive loop also counts down instead of calculating an indexed next-byte bound.
-
-The compiled MIPS SPI model checks both immediately ready and delayed receive flags, independent Python CRC results, zero-length input, output/checksum boundary guards, exact wire-byte counts, control-poll cadence and a partial-transfer timeout across timer wrap. The generic protocol tests retain bad-CRC and transport-failure cases for bulk and fallback paths. The CRC helper is shared project code, still checked over all 16777216 state/byte pairs.
-
-Mount parsing, reserved-file allocation and stopped-audio profile writes use compiler size optimisation to keep the diagnostic within the existing layout. Streaming file reads retain their existing optimisation settings. Normal main code/constants use 27248 bytes (4564 free), profiling 31508 (304 free). RAM, buffer sizes, 12 MHz SD clock, update coverage and the 128-frame copy guard are unchanged from build 20. Hardware speedup is not yet measured.
-
-Install the build-21 profiling image, retain the AGNT2-only playlist and Loop/Quantize config, and repeat maximum-pitch playback without moving the pitch control during the run. Aim for one minute. Turn FILE to stop if necessary, wait one second, then power down and mount. The fresh report must identify build 21.
-
-
-### First build-21 playback observation
-
-The user reports sustained looping at maximum pitch. On the next card mount, image.hex matched the build-21 profiling artifact and ONEBUILD.TXT identified build 21, but ONEPROF.TXT remained byte-identical to the previous build-20 report. This is qualitative playback evidence only; there is no fresh timing/error measurement from that run. The cause of the missing report is not established. Repeat playback followed by a FILE turn with PLAY released, leave the module powered and idle for several seconds, then collect the report before drawing timing conclusions or changing firmware.
-
-
-### Build 21 sustained maximum-pitch result
-
-A fresh CRC-valid build-21 report recorded 152.681 seconds of playback, one start and zero ring, late-commit, stationary-DMA, read or copy-overlap errors. Worst-work and tightest-margin contexts both identified Loop/Quantize, PCM24 at 96000 Hz, divider 667 (approximately 143928 output frames/s). There were no previous report-write failures. This confirms sustained operation for this file/card/settings run, not every mode, card or sample.
-
-Across 21459 completed refills, mean work was 5.998 ms and worst 7.351 ms, against a 7.115 ms half-buffer period. Mean prefetch was 5.845 ms and worst 7.196 ms. All 128815 SD attempts were below 1 ms (mean 866.53 us, worst 945.96 us). Minimum observed pre/post-copy margin was 963 frames, about 6.691 ms; read-ahead absorbed the occasional refill exceeding a single half period. The maximum observed background-service gap was 853.33 us. Stack watermark was 1696 bytes, leaving 6792 bytes untouched above the 57040-byte static allocation; the watermark remains a sampled lower bound on stack use.
-
-Mean completed-refill work occupied 84.31% of observed playback time, including SD waits and excluding other work/discarded prefills. It is not CPU utilisation or a guarantee of 15.69% available DSP capacity. The mean refill-period difference is about 1.116 ms; worst-case timing and different modes still require care. Next measurements should cover Fade/Gate envelope work and other rates/bit depths, followed by normal-build regression checks for playback, file changes and larger-buffer retrigger timing.
-
-
-### Build 21 Fade stress result
-
-The fresh CRC-valid Fade/Quantize report recorded 35 starts and 73.410 seconds of observed playback, with zero ring, late-commit, stationary-DMA, read or copy-overlap errors and no prior report-write failures. Worst-work and tightest-margin contexts both used PCM24 at 96000 Hz, divider 667 (approximately 143928 output frames/s). The staged playlist contained the original W9624 long tone. This validates the measured run, rather than every Fade workload or subjective retrigger timing.
-
-Envelope/tail work averaged 918.96 us and peaked at 1345.62 us per published half. Completed refill work averaged 6.497 ms (worst 10.192 ms), compared with the 7.115 ms half-buffer period. Minimum observed buffer margin was 580 frames, approximately 4.030 ms. Read-ahead absorbed an isolated slower SD attempt: 61920 attempts were below 1 ms and one was between 2 and 5 ms, with a maximum of 3.873 ms. Longest observed background-service gap was 1.512 ms. Stack watermark remained 1696 bytes, with 6792 untouched. Completed-refill work share was 91.16%, including SD waits; this is not CPU utilisation or a guaranteed feature budget. Gate and normal-build listening/retrigger checks remain outstanding.
-
-
-### Build 21 Gate stress result
-
-A fresh CRC-valid Gate/Quantize report recorded 8 starts and 63.434 seconds of observed playback with zero ring, late-commit, stationary-DMA, read or copy-overlap errors and no prior report-write failures. Worst-work and tightest-margin contexts both used PCM24 at 96000 Hz and divider 667. This confirms the tested manual Gate workload; the report does not establish whether external-gate release was exercised.
-
-Completed refill work averaged 6.521 ms (worst 10.189 ms), and envelope/tail work averaged 919.04 us (worst 1345.62 us). Minimum observed margin was 580 frames, approximately 4.030 ms. Eight of 53496 SD attempts took between 2 and 5 ms, peaking at 3.875 ms; the others were below 1 ms. Read-ahead accommodated these delays in this run. Longest observed background-service gap was 1.511 ms. Stack watermark remained 1696 bytes with 6792 untouched. Completed-refill work share was 91.63%, not CPU utilisation. Loop, Fade and manual Gate now have error-free maximum-quantized-pitch observations on this card; normal-firmware listening/file-change/retrigger checks remain outstanding.
+The extended profiling image adds a few lines to the report, which the analyser prints when present: FILE encoder step counts and the last filtered pin changes, the number of sector reads that were retried, detail of the last failed read, and the last six Chop gates with the knob/CV reading taken at each.

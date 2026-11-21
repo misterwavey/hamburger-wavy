@@ -534,10 +534,26 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(manifest['resources']['combined_text_bytes'],layout['.text']['bytes']+layout['.app_extension']['bytes'])
             self.assertEqual(manifest['resources']['combined_text_free'],80964-manifest['resources']['combined_text_bytes'])
             if profiling:
-                report={'build':30}
+                report={'build':52}
                 attach_build_info(report,out/'manifest.json',ROOT/'build/extended/manifest.json')
                 self.assertEqual(report['profiling_overhead_bytes']['combined_text'],
                                  report['profiling_overhead_bytes']['main_text']+report['profiling_overhead_bytes']['extension_text'])
+            # Execute the actual clock-register encoder and overflow-safe position map.
+            for fixed in (667,1000,1333,2000,4000,43520):
+                m=CPU(image);control=0x44332211;trim=0xaaa55555;observed=[]
+                m.poke(0xbf80f020,control);m.poke(0xbf80f030,trim)
+                if 'profile_pitch' in symbols:
+                    m.hooks[symbols['profile_pitch']]=lambda cpu,value,*args:observed.append(value) or 0
+                m.run(symbols['board_pitch_fixed'],fixed)
+                expected=(control&0x8000ffff&~0x810f)|7|(((fixed>>9)&32767)<<16)|0x9100
+                self.assertEqual(m.read(0xbf80f020),expected)
+                self.assertEqual(m.read(0xbf80f030),(trim&0x7fffff)|((fixed&511)<<23))
+                if profiling:self.assertEqual(observed,[fixed])
+            for frames in (0,1,37,5000,0x7fffffff):
+                for adc in (0,1,327,512,1023,9999):
+                    m=CPU(image)
+                    expected=(frames-1)*(1023-min(adc,1023))//1023 if frames else 0
+                    self.assertEqual(m.run(symbols['cv_frame_offset'],adc,frames),expected)
             # Run the actual compiled CRC body against an independent implementation.
             for data in (bytes(1024),bytes([255])*1024,bytes((i*173+91)&255 for i in range(1024))):
                 m=CPU(image)
@@ -578,7 +594,7 @@ class ReleaseTests(unittest.TestCase):
                  ('fat','wave','sd','ring','memory','app','advertise','settings','policy','ui','recall')]]
         for profile in (False,True):
             binary=ROOT/('build/flip-profile-test' if profile else 'build/flip-core-test')
-            flags=['-DONE_FLIP=1']+(['-DONE_PROFILE=1',str(ROOT/'firmware/profile.c')] if profile else [])
+            flags=['-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1']+(['-DONE_PROFILE=1',str(ROOT/'firmware/profile.c')] if profile else [])
             result=subprocess.run([cc,'-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-fno-builtin',
                 '-fsanitize=address,undefined','-I'+str(ROOT/'build'),*flags,*map(str,sources),'-o',str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -630,6 +646,12 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual((root/'build/cv-diag/image.hex').read_bytes(),(out/'image.hex').read_bytes())
         invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--cv-diag','--extended'],capture_output=True,text=True)
         self.assertNotEqual(invalid.returncode,0)
+
+    def test_example_configs_fit_the_parser_line_buffer(self):
+        # settings.c rejects a whole config whose line exceeds 63 characters.
+        for path in sorted((ROOT/'examples/config').glob('*.txt')):
+            for line in path.read_text().splitlines():
+                self.assertLessEqual(len(line),63,f'{path.name}: {line}')
 
     def test_crc_update_exhaustively(self):
         cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')

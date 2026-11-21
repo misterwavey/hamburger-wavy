@@ -8,7 +8,7 @@ Up to 256 files or playlist entries are supported. Names up to 13 ASCII characte
 
 ## Playback modes
 
-Extended build 30 provides modes 1–10. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
+Extended build 52 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
 
 | Red count | Mode | Behavior |
 | --- | --- | --- |
@@ -22,26 +22,28 @@ Extended build 30 provides modes 1–10. Build with `make extended` (normal) or 
 | 8 | Random Loop | Loops a file; subsequent triggers jump to random frame positions within it. |
 | 9 | Flip | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |
 | 10 | CV Flip | PLAY starts/stops; positive CV selects forward and negative selects reverse at native speed. Near zero, keeps its last direction. GATE is ignored. Calibrate first; see below. |
+| 11 | Tape | Signed CV controls direction and speed; near zero fades to silence and holds position. PLAY starts/stops; GATE ignored. Calibrate as for CV Flip. See [Tape](tape.md). |
+| 12 | Chop | Each gate jumps to the CV-selected position with a short fade, then plays forward at native speed. PLAY starts/stops. See [Chop](chop.md). |
 
 Fade/Gate ramps are short 256-sample linear envelopes: about 5.3 ms at 48 kHz before pitch changes. They mainly suppress clicks, rather than providing long musical fades. Buffering adds release/retrigger latency. Random seeking and file changes require SD access and can take longer than cached Trigger playback. Overlapping voices are not implemented.
 
-Flip and CV Flip use 512-frame transition fades. These reduce direction-change clicks; they are not overlapping crossfades, and buffering/refill adds response delay.
+Flip, CV Flip, Tape and Chop use 512-frame transition fades. These reduce direction-change clicks; they are not overlapping crossfades, and buffering/refill adds response delay.
 
-## CV Flip calibration
+## CV Flip and Tape calibration
 
-Select playback mode 10, or put `CV Flip` on line 2 of `config.txt` (example: [cv-flip.txt](../examples/config/cv-flip.txt)).
+Select mode 10 (`CV Flip`) or 11 (`Tape`), or put that name on line 2 of `config.txt`. Examples: [cv-flip.txt](../examples/config/cv-flip.txt) and [tape.txt](../examples/config/tape.txt).
 
 1. Centre the pitch knob and patch a steady 0 V from your bipolar CV source.
 2. Hold PLAY for at least half a second without turning either control, then release. Playback stops and the current input becomes the zero reference.
-3. Tap PLAY to start. Positive CV plays forward, negative plays reverse; approximately ±0.05 V around zero retains the last direction.
+3. Tap PLAY to start. Positive CV plays forward and negative plays reverse. CV Flip retains the last direction near zero; Tape fades to silence and holds position there.
 
-A reverse start begins at the end of the sample. Zero holds direction rather than stopping. Calibration survives file selection but resets on power-up, so repeat it each session. Keep the knob at its calibrated position, or move it deliberately to bias the switching threshold. Keep CV steady during calibration: large movement while PLAY is held can enter CV-mode editing instead.
+A reverse start begins at the end of the sample. Calibration survives file selection but resets on power-up, so repeat it each session. Keep the knob at its calibrated position, or move it deliberately to bias the switching threshold. Keep CV steady during calibration: large movement while PLAY is held can enter CV-mode editing instead.
 
-CV Flip always uses native sample speed and overrides Free/Quantize/Select File behaviour. The third config line is still required, but does not change that behaviour. FILE browsing stops playback; GATE is ignored. See [CV Flip](cv-flip.md) for details and hardware results. Signed variable speed and position chopping are future ideas, not implemented controls.
+CV Flip always uses native sample speed and overrides Free/Quantize/Select File behaviour. The third config line is still required, but does not change that behaviour. FILE browsing stops playback; GATE is ignored. See [CV Flip](cv-flip.md) for details. [Tape](tape.md) adds signed variable speed and a zero hold. [Chop](chop.md) samples CV position on each gate. These are separate playback modes, not CV-mode options.
 
 ## CV modes
 
-These apply to playback modes 1–9; CV Flip uses the direction controls above.
+These apply to playback modes 1–9. CV Flip, Tape and Chop override them with their dedicated controls.
 
 | Blue count | Mode | Behavior |
 | --- | --- | --- |
@@ -74,9 +76,77 @@ Quantize
 Short
 ```
 
-Line 1 starts with `#`; line 2 is a playback mode; line 3 is a CV mode. Optional line 4 is Select File's settling delay: Short=0 ms, Medium=2 ms, Long=10 ms. Further lines are ignored. `Random` is an alias for Random Sequence; `Looping` aliases Loop and `Quantized` aliases Quantize. Earlier card spellings remain compatibility aliases in the parser.
+Line 1 starts with `#`; line 2 is a playback mode; line 3 is a CV mode. Optional line 4 is Select File's settling delay: Short=0 ms, Medium=2 ms, Long=10 ms. In the extended build, effect lines follow (see [Effects](#effects)) and `Colour`, `Filter` or `Rate` are also accepted as the CV mode. Other further lines are ignored. `Random` is an alias for Random Sequence; `Looping` aliases Loop and `Quantized` aliases Quantize. Earlier card spellings remain compatibility aliases in the parser.
 
 Case differences, surrounding setting whitespace, CRLF/LF and a UTF-8 BOM are accepted. Missing or malformed settings use Trigger/Quantize/Short. An actual read error invokes card recovery. Config files must fit within 4096 bytes.
+
+## Effects
+
+Extended build 52 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.
+
+```text
+# Hamburger Wavy configuration
+Loop
+Quantize
+Short
+Bandpass 5
+Resonance 6
+Wah 6
+Rate 4
+```
+
+| Line | What it does | Details |
+| --- | --- | --- |
+| `Drive n` | Gain into a smooth clipper, 1× to about 16× | [Colour](colour.md) |
+| `Crush n` | Fewer bits (16 down to 4) and a sample hold of 1 to 32 frames | [Colour](colour.md) |
+| `Filter n` | Low-pass cutoff, 1 darkest to 9 brightest (`Lowpass n` is the same) | [Filter](filter.md) |
+| `Highpass n` | High-pass cutoff, 1 removes only the lowest bass, 9 leaves a thin top | [Filter](filter.md) |
+| `Bandpass n` | Band-pass centre, low to high | [Filter](filter.md) |
+| `Resonance n` | Emphasis at the cutoff for any of the three filter shapes | [Filter](filter.md) |
+| `Wah n` | A slow sine sweeps the filter cutoff, up to about 2.5 octaves each way | [Filter](filter.md) |
+| `Phaser n` | Swept notches with feedback; intensity | [Phaser](phaser.md) |
+| `Tremolo n` | Level dips at the `Rate`; depth, 9 reaches silence | [Tremolo and ring modulation](mod.md) |
+| `Ring n` | Multiplies the sound by a sine at the `Rate`; depth. Replaces tremolo if both are present | [Tremolo and ring modulation](mod.md) |
+| `Rate n` | Speed for wah, phaser, tremolo and ring, each on its own scale | below |
+
+Only one of `Filter`, `Highpass` and `Bandpass` applies: the last one in the file. The signal passes through drive and crush, then the filter, the phaser, and tremolo or ring modulation, before the existing fades.
+
+`Rate n` scales (calculated, at the file's native pitch):
+
+| `Rate` | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Wah, phaser (Hz) | 0.125 | 0.2 | 0.31 | 0.5 | 0.79 | 1.3 | 2 | 3.2 | 5 | 8 |
+| Tremolo (Hz) | 1 | 1.4 | 1.9 | 2.7 | 3.5 | 4.8 | 6.7 | 8.8 | 12 | 16 |
+| Ring (Hz) | 16 | 30 | 56 | 107 | 197 | 363 | 682 | 1236 | 2216 | 4096 |
+
+### Effect CV modes
+
+Put one of these on the CV mode line (line 3) to control an effect from the pitch knob/CV. Playback then stays at the file's native pitch, and clockwise or positive CV gives more. They can only be chosen in `config.txt`; picking a CV mode in the held-PLAY menu leaves them until the card is next mounted.
+
+| CV mode | Knob/CV controls |
+| --- | --- |
+| `Colour` | Amount of drive and crush, from clean up to the configured digits (both to 9 if neither line is present) |
+| `Filter` | Cutoff of whichever filter shape is named; with `Wah`, the centre of the sweep |
+| `Rate` | Speed of the wah, phaser, tremolo or ring modulation. With none of those lines present it gives full-depth tremolo |
+
+In CV Flip, Tape and Chop the CV input controls the transport, so the effects use their fixed config values.
+
+### Limits
+
+How many effect stages run depends on the output rate, which rises as a file is pitched up. Drive and crush count as one stage; the filter (with or without wah), the phaser, and tremolo/ring are one each.
+
+| Output rate | Stages that run |
+| --- | --- |
+| Up to 48 kHz | All four |
+| 48 kHz to about 64 kHz | Three: drive/crush gives way first, then tremolo/ring |
+| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser, otherwise tremolo/ring, otherwise drive/crush |
+| Above 96 kHz | None |
+
+A 44.1 or 48 kHz file at native pitch or below gets everything; an 88.2 or 96 kHz file at native pitch gets one stage. Crossing a limit while playing switches a stage on or off with an audible step, most obvious on steady tones.
+
+Filter cutoff, phaser position and all rates are tied to the playback clock, so they move with pitch: pitching a file down an octave lowers the cutoff an octave and halves the rates.
+
+Example files for each effect are in [examples/config](../examples/config).
 
 ## playlist.txt
 

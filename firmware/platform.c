@@ -34,6 +34,21 @@ void board_pitch_mode(uint32_t value, uint32_t rate, CvMode mode) {
   REG(0xbf80f020) |= 0x100;
   REG(0xbf80f020) |= 0x8000;
 }
+#ifdef ONE_FLIP
+void board_pitch_fixed(uint32_t fixed) {
+  PROFILE(profile_pitch(fixed));
+  uint32_t div = fixed >> 9, trim = fixed & 511u;
+  REG(0xbf80f020) &= ~0x100u;
+  REG(0xbf80f020) &= ~0x8000u;
+  REG(0xbf80f020) = (REG(0xbf80f020) & ~15u) | 7u;
+  REG(0xbf80f020) = (REG(0xbf80f020) & 0x8000ffffu) | ((div & 32767u) << 16);
+  REG(0xbf80f030) = (REG(0xbf80f030) & 0x7fffffu) | (trim << 23);
+  REG(0xbf80f020) |= 0x1000;
+  REG(0xbf80f020) |= 0x100;
+  REG(0xbf80f020) |= 0x8000;
+}
+#endif
+
 void board_pitch(uint32_t value, uint32_t rate) {
   board_pitch_mode(value, rate, CV_FREE);
 }
@@ -205,6 +220,9 @@ void standalone_fault(void) {
   }
 }
 
+#if defined(ONE_TOLERANT_ENCODER) && !defined(ONE_PROFILE)
+uint32_t board_ticks(void) { return count(); }
+#endif
 #ifdef ONE_PROFILE
 uint32_t board_ticks(void) { return count(); }
 void board_stack_info(uint32_t out[3]) {

@@ -57,7 +57,7 @@ def extract(path, flash_probe=False, flash_bank=False, extended=False):
   if sec[2]&2 and sec[5]:
    layout[name]={'address':hex(sec[3]),'bytes':sec[5],'zero_fill':sec[1]==8}
    if sec[1]==8:
-    if name!='.bss' or sec[3]!=0xa0000000 or sec[3]+sec[5]>0xa000e000:raise ValueError('invalid RAM layout')
+    if name!='.bss' or sec[3]!=0xa0000000 or sec[3]+sec[5]>(0xa000f000 if extended else 0xa000e000):raise ValueError('invalid RAM layout')
    else:
     if name=='.app_extension':
      if not extended or not (sec[3]==0x9d014000<sec[3]+sec[5]<=0x9d020000):raise ValueError('invalid application extension')
@@ -108,7 +108,7 @@ def main():
  flags=['-I'+str(out),'--target=mipsel-none-elf','-march=mips32r2','-mabi=32','-mno-abicalls','-fno-pic','-G0','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-jump-tables','-Os','-fstack-usage','-Wall','-Wextra','-Werror']
  if args.profile:flags+=['-DONE_PROFILE=1']
  if args.cv_diag:flags+=['-DONE_CV_DIAG=1','-DONE_BUILD_NUMBER=29']
- if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_BUILD_NUMBER=30']
+ if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1','-DONE_BUILD_NUMBER=52']
  if probe:flags+=['-DONE_FLASH_PROBE=1','-DONE_BUILD_NUMBER='+('23' if args.flash_bank else '22')]
  if args.flash_bank:flags+=['-DONE_FLASH_BANK=1']
  linker=ROOT/'firmware/layout.ld'
@@ -124,6 +124,10 @@ def main():
     '.app_extension 0x9d014000 : { '+selectors+' }\n'+
     'ASSERT(SIZEOF(.app_extension)<=0xc000,"Application extension overflow")\n'+
     '.text 0x9d00be00')
+  # Observed stack use is about 1.7 KiB; the extended build reserves 4 KiB.
+  stack='ASSERT(__bss_end<=0xa000e000,"Leave at least 8 KiB for stack")'
+  if stack not in text:raise SystemExit('stack reserve assertion not found')
+  text=text.replace(stack,'ASSERT(__bss_end<=0xa000f000,"Leave at least 4 KiB for stack")')
   linker=out/'extended.ld';linker.write_text(text)
  def expected_header(page,regions=None):
   def mix(value):
@@ -205,10 +209,10 @@ def main():
  memory.update(payload);image=out/'image.hex';write_image(spec,memory,image)
  build_number=int(re.search(r'^#define ONE_BUILD_NUMBER (\d+)$',(ROOT/'firmware/build.h').read_text(),re.M)[1])
  if probe:build_number=23 if args.flash_bank else 22
- if args.extended:build_number=30
+ if args.extended:build_number=52
  if args.cv_diag:build_number=29
  report=dict(profiling=args.profile,project='Hamburger Wavy',licence='GPL-3.0-only',build_number=build_number,status='EXPERIMENTAL — COMPLETE APPLICATION, NOT HARDWARE VALIDATED',source_built=True,
-             features=dict(config_txt=True,playlist_txt=True,playback_modes=['Trigger','Gate','Fade','Loop','Sequence','Combo','Random Sequence','Random Loop']+(['Flip','CV Flip'] if args.extended else []),cv_modes=['Free','Quantize','Select File'],cv_select_delays_ms=dict(Short=0,Medium=2,Long=10),front_panel_modes=True,last_manual_file_recall='ONESTATE.BIN: two alternating CRC32 sectors; stock status.bin read-only import',build_identification='ONEBUILD.TXT: best-effort on mount, written only if content changes',generated_chromatic_tables=True,fade_ramp_samples=256),
+             features=dict(config_txt=True,playlist_txt=True,playback_modes=['Trigger','Gate','Fade','Loop','Sequence','Combo','Random Sequence','Random Loop']+(['Flip','CV Flip','Tape','Chop'] if args.extended else []),cv_modes=['Free','Quantize','Select File']+(['Colour (config.txt only)','Filter (config.txt only)','Rate (config.txt only)'] if args.extended else []),cv_select_delays_ms=dict(Short=0,Medium=2,Long=10),front_panel_modes=True,last_manual_file_recall='ONESTATE.BIN: two alternating CRC32 sectors; stock status.bin read-only import',build_identification='ONEBUILD.TXT: best-effort on mount, written only if content changes',generated_chromatic_tables=True,fade_ramp_samples=256),
              pitch_quantization=pitch_report,
              boot_debug_handler='omitted: no debug-vector bytes distributed; resident flash preservation unverified',
              resident_bootloader='pre-existing, omitted from update; not replaced',image_sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
@@ -223,8 +227,8 @@ def main():
  report['resources']=dict(text_bytes=layout['.text']['bytes'],text_limit=0x7c44,
                           text_free=0x7c44-layout['.text']['bytes'],
                           static_ram_bytes=layout['.bss']['bytes'],ram_total=65536,
-                          minimum_stack_reserve=8192,
-                          static_ram_growth_budget=0xe000-layout['.bss']['bytes'])
+                          minimum_stack_reserve=4096 if args.extended else 8192,
+                          static_ram_growth_budget=(0xf000 if args.extended else 0xe000)-layout['.bss']['bytes'])
  if probe:
   report['flash_probe']=dict(physical_start='0x1d014000',physical_end_exclusive=hex(0x1d014000+extension_size),
     additional_addressed_bytes=extension_size,page_sha256=hashlib.sha256(probe_page).hexdigest(),
@@ -248,6 +252,9 @@ def main():
   report['record_layout']+='; verified 48 KiB bank appended before EOF, unused bank bytes 0xff'
  if args.extended:
   report['cv_flip']=dict(zero_default_adc=327,hysteresis_counts=5,zero_calibration='hold PLAY without moving controls, release',speed='native',gate='ignored',calibration_persistence='RAM only')
+ if args.extended:
+  report['tape']=dict(zero_enter_counts=4,zero_exit_counts=8,counts_per_native_speed=100,maximum_speed=1.5,calibration_persistence='RAM only')
+  report['chop']=dict(position='gate-edge ADC mapped across the file',speed='native',retrigger='fade then jump; latest target wins')
  if args.cv_diag:
   report['cv_diagnostic']=dict(rows=12,settle_ms=500,window_ms=5000,poll_ms=1,
     report_file='ONECV.TXT',adc_bits=10,audio_playback=False,hardware_validation='pending')

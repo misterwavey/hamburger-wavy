@@ -1,0 +1,6 @@
+# Hamburger Wavy: fixed tremolo
+Loop
+Quantize
+Short
+Tremolo 7
+Rate 5
