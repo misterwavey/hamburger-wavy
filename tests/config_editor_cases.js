@@ -224,4 +224,38 @@ for (const bad of [null, {}, { build: '54', file: 'x', sha256: sum }, { build: 5
   { build: 54, file: '/x', sha256: sum }, { build: 54, file: 'https://e.org/x', sha256: sum }, { build: 54, file: 'x', sha256: 'abc' }])
   if (HW.firmwareInfo(bad)) fail('firmwareInfo accepted ' + JSON.stringify(bad));
 
+// 9. The firmware status shown for a card.
+const [img54] = Object.keys(HW.KNOWN_IMAGES).filter((k) => HW.KNOWN_IMAGES[k].build === 54 && !HW.KNOWN_IMAGES[k].kind);
+const offer54 = { sha256: img54, build: 54, label: 'build 54' };
+const offer55 = { sha256: 'd'.repeat(64), build: 55, label: 'build 55' };
+const localFile = { sha256: 'b'.repeat(64), build: null, label: 'image.hex' };
+const fwCase = (args, state, canInstall, pattern) => {
+  const got = HW.firmwareState(...args);
+  if (got.state !== state || got.canInstall !== canInstall || !pattern.test(got.message))
+    fail('firmwareState ' + JSON.stringify(args) + ' gave ' + JSON.stringify(got));
+};
+fwCase([null, null, null, false, false], 'unknown', false, /Open the card/);
+fwCase([53, null, null, true, true], 'unknown', false, /no image\.hex.*last ran build 53/);
+fwCase([53, img54, null, true, true], 'pending', false, /build 54\. It is not installed yet.*last ran build 53/); // no network check needed
+fwCase([54, img54, null, true, true], 'unknown', false, /build 54\. The module is running it/);
+fwCase([null, img54, null, true, true], 'pending', false, /has not run with this card yet/);
+fwCase([53, 'c'.repeat(64), null, true, true], 'unknown', false, /not a released build.*last ran build 53/);
+fwCase([null, null, offer54, false, false], 'nocard', false, /Build 54 is ready/);
+fwCase([53, null, offer54, true, true], 'available', true, /Build 54 is available/);
+fwCase([53, 'c'.repeat(64), offer54, true, true], 'available', true, /Build 54 is available/);
+fwCase([53, null, offer54, false, true], 'available', false, /cannot write/);
+fwCase([53, img54, offer54, true, true], 'pending', false, /not installed yet/);
+fwCase([54, img54, offer54, true, true], 'current', false, /running it/);
+fwCase([54, null, offer54, true, true], 'current', false, /running build 54, the latest/);
+fwCase([55, null, offer54, true, true], 'newer', false, /latest release is build 54/);
+fwCase([54, img54, offer55, true, true], 'available', true, /Build 55 is available/);
+fwCase([null, null, offer54, true, true], 'available', true, /Build 54 is available/);
+fwCase([54, null, localFile, true, true], 'available', true, /image\.hex is available/);
+fwCase([54, 'b'.repeat(64), localFile, true, true], 'pending', false, /image\.hex is on the card/);
+// Nothing may claim the module's last-run build as the card's firmware.
+for (const args of [[53, img54, null, true, true], [53, img54, offer54, true, true]])
+  if (/^The module last ran|Firmware build 53/.test(HW.firmwareState(...args).message)) fail('firmware message leads with the old build');
+if (HW.imageName(img54).text !== '54' || HW.imageName('e'.repeat(64)).text !== '?' || HW.imageName(null).build !== null) fail('imageName');
+if (!/not installed yet/.test(noteText(base, { lists: {}, cardNames: card, build: 53, imageBuild: 54 }))) fail('pending install note');
+if (/update the firmware/.test(noteText(base, { lists: {}, cardNames: card, build: 53, imageBuild: 54 }))) fail('pending install must not say update');
 process.stdout.write(JSON.stringify(cases));
