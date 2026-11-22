@@ -261,7 +261,7 @@ if (/update the firmware/.test(noteText(base, { lists: {}, cardNames: card, buil
 // 10. Plain-language summary.
 if (HW.WAYS.length !== HW.PLAY.length || HW.KNOBS.length !== HW.CV.length) fail('WAYS/KNOBS must cover every mode');
 const d0 = HW.describe(base, { lists: {}, cardNames: card });
-if (d0.sounds !== 'Every sound on the card (5)' || d0.way !== 'Loop' || d0.knob !== 'Pitch, in semitones' || d0.effects !== 'None') fail('describe defaults ' + JSON.stringify(d0));
+if (d0.sounds !== 'Every sound on the card (5)' || d0.way !== 'Play once' || d0.knob !== 'Pitch, in semitones' || d0.effects !== 'None') fail('describe defaults ' + JSON.stringify(d0));
 const d1 = HW.describe(Object.assign({}, base, { play: 4, cv: 5, playlist: 'drums', shape: 'band', cutoff: 5, wah: 6, sweep: 'flanger', mod: 'ring', drive: 3 }),
   { lists: { DRUMS: ['A.wav', 'C.wav'] }, cardNames: card });
 if (d1.sounds !== '2 sounds from drums.txt' || d1.way !== 'Next sound each time' || d1.knob !== 'Effect speed' ||
@@ -274,5 +274,15 @@ if (rw.length !== 1 || !/2 sounds \(B\.wav, C\.wav\) are 96 kHz files/.test(rw[0
 if (HW.rateWarnings(fxState, [{ name: 'A.wav', rate: 48000 }]).length) fail('rateWarnings at 48 kHz');
 if (HW.rateWarnings(base, [{ name: 'B.wav', rate: 96000 }]).length) fail('rateWarnings with no effects');
 if (!/B\.wav is a 96 kHz file/.test(HW.rateWarnings(Object.assign({}, base, { sweep: 'flanger', drive: 2 }), [{ name: 'B.wav', rate: 96000 }])[0])) fail('rateWarnings single file');
+
+// 11. First use.
+for (const [args, want] of [[[false, null, null, false], 'none'], [[true, null, null, false], 'new'], [[true, null, 54, false], 'install'],
+  [[true, 54, 54, false], 'none'], [[true, 53, null, false], 'none'], [[true, null, null, true], 'none'], [[true, null, 54, true], 'none']])
+  if (HW.firstRun(...args) !== want) fail('firstRun ' + JSON.stringify(args));
+const rep = HW.soundsReport([{ name: 'a.wav', wav: { ok: true } }, { name: 'b.WAV', wav: { ok: false, reason: '2 channels; mono only' } },
+  { name: 'c.wav', wav: null }, { name: 'config.txt', wav: null }]);
+if (rep.total !== 3 || rep.playable !== 2 || rep.bad.length !== 1 || rep.text !== 'Card check: 2 of the 3 sounds on this card are in a format the module can play.') fail('soundsReport ' + JSON.stringify(rep));
+if (HW.soundsReport([]).text !== 'Card check: there are no WAV sounds on this card yet.') fail('soundsReport empty');
+if (HW.soundsReport([{ name: 'a.wav', wav: { ok: true } }, { name: 'b.wav', wav: { ok: true } }]).text !== 'Card check: all 2 sounds on this card are in a format the module can play.') fail('soundsReport all');
 
 process.stdout.write(JSON.stringify(cases));

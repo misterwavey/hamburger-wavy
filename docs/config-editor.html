@@ -89,6 +89,29 @@
   .start p { margin: 0 0 1rem; }
   .start .hint { margin-top: 1.1rem; }
 
+  /* First use: three things to do, in order. */
+  .first { border: 1px solid var(--ink); border-top-width: 3px; padding: 1rem 1.2rem 1.1rem; margin-bottom: 1rem; background: var(--panel); border-radius: 0 0 5px 3px; }
+  .first h2 { font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; margin: 0 0 .5rem; font-weight: normal; color: var(--green); }
+  .first > p { margin: 0 0 .8rem; }
+  ol.todo { list-style: none; counter-reset: t; margin: 0 0 1rem; padding: 0; }
+  ol.todo > li { counter-increment: t; position: relative; padding: .7rem 0 .7rem 3rem; border-top: 1px dotted var(--rule); }
+  ol.todo > li::before {
+    content: counter(t); position: absolute; left: 0; top: .7rem; width: 1.9rem; height: 1.9rem; line-height: 1.8rem; text-align: center;
+    border: 1px solid var(--faint); color: var(--faint); border-radius: 50%;
+  }
+  ol.todo > li > b { font-weight: normal; letter-spacing: .04em; }
+  ol.todo > li p { margin: .35rem 0 0; color: var(--faint); font-size: .9rem; }
+  ol.todo > li.now::before { border-color: var(--amber); color: var(--paper); background: var(--amber); }
+  ol.todo > li.now > b { color: var(--amber); }
+  ol.todo > li.now p, ol.todo > li.now ol { color: var(--ink); }
+  ol.todo > li.done::before { content: "\2713"; border-color: var(--green); color: var(--green); }
+  ol.todo > li.done > b { color: var(--green); }
+  ol.todo > li.later { opacity: .55; }
+  ol.how { margin: .4rem 0 0; padding-left: 1.2rem; color: var(--faint); font-size: .9rem; }
+  ol.how li { margin: .15rem 0; }
+  .agree { display: inline-flex; gap: .5rem; align-items: flex-start; cursor: pointer; color: var(--ink); }
+  .agree input { accent-color: var(--amber); width: 1rem; height: 1rem; margin-top: .25rem; }
+
   /* A banner for the one thing that needs doing first. */
   .banner { border: 1px solid var(--accent); border-radius: 2px 6px 3px 5px; padding: .8rem 1rem; margin-bottom: 1rem; background: rgba(210,85,59,.07); }
   .banner p { margin: 0 0 .6rem; }
@@ -274,10 +297,44 @@
     </div>
     <p class="status" id="cardStatus" role="status"></p>
 
+    <p class="hint" id="fwQuiet" hidden><span id="fwQuietText"></span> <button class="plain" id="fwQuietGo" type="button"></button> <span class="status" id="fwQuietStatus" role="status"></span></p>
+
     <div class="banner" id="fwBanner" hidden>
       <p id="fwBannerText"></p>
       <p><button class="primary" id="fwBannerGo" type="button"></button> <span class="status" id="fwBannerStatus" role="status"></span></p>
     </div>
+
+    <section class="first" id="firstRun" hidden>
+      <h2>Getting started</h2>
+      <p id="frIntro"></p>
+      <ol class="todo">
+        <li id="fr1">
+          <b>Keep a way back</b>
+          <p id="fr1Text"></p>
+          <p id="fr1Act"><button id="frBackup" type="button">Save a copy of the card's firmware file</button>
+            <label class="agree" id="frAgreeBox"><input type="checkbox" id="frAgree"> <span>I understand, and I have copied anything I want to keep.</span></label></p>
+        </li>
+        <li id="fr2">
+          <b>Put the firmware on the card</b>
+          <p id="fr2Text"></p>
+          <p><button class="primary big" id="frInstall" type="button"></button> <span class="status" id="frStatus" role="status"></span></p>
+        </li>
+        <li id="fr3">
+          <b>Install it on the module</b>
+          <ol class="how">
+            <li>Eject the card from this computer.</li>
+            <li>Switch the module off and put the card in.</li>
+            <li>Hold PLAY and switch the module on. PLAY flashes quickly while it updates.</li>
+            <li>Wait for the flashing to finish. Do not switch off while it flashes.</li>
+            <li>PLAY then lights blue for a second: the new firmware is running.</li>
+          </ol>
+          <p class="hint">Then bring the card back and open it here to choose your sounds and settings.</p>
+        </li>
+      </ol>
+      <p class="hint" id="frSounds"></p>
+      <ul class="notes" id="frBad"></ul>
+      <p class="hint"><button class="plain" id="frSkip" type="button">My module already has Hamburger Wavy</button></p>
+    </section>
 
     <div id="steps" hidden>
       <section class="step" id="s-sounds">
@@ -543,7 +600,7 @@ const HW = (() => {
   const TRANSPORT_CV = [9, 10, 11]; // CV Flip, Tape, Chop own the CV input
 
   const defaults = () => ({
-    comment: 'Hamburger Wavy configuration', play: 3, cv: 1, delay: 0,
+    comment: 'Hamburger Wavy configuration', play: 0, cv: 1, delay: 0, // as the module starts with no config
     drive: 0, crush: 0, shape: 'low', cutoff: 0, resonance: 0, wah: 0,
     sweep: 'none', sweepAmt: 7, mod: 'none', modAmt: 7, rate: 4, playlist: '',
     sampleRate: 48000, pitch: 0,
@@ -858,6 +915,25 @@ const HW = (() => {
         (kept.length ? 'only ' + list(kept) : 'no effects') + ', so ' + list(dropped) + ' will be skipped on ' + (names.length === 1 ? 'it' : 'them') + '.');
     }
     return out;
+  }
+
+  // ---- First use ----
+  // Where a newcomer's card stands: 'new' (never used with this firmware and no
+  // image on it), 'install' (the image is on the card but the module has not
+  // run it), or 'none' (nothing to guide).
+  function firstRun(hasCard, cardBuild, imageBuild, skipped) {
+    if (!hasCard || skipped || cardBuild) return 'none';
+    return imageBuild ? 'install' : 'new';
+  }
+  // A plain account of the card's sounds. files: [{ name, wav }] as read from the card.
+  function soundsReport(files) {
+    const wavs = files.filter((f) => /\.wav$/i.test(f.name));
+    const bad = wavs.filter((f) => f.wav && f.wav.ok === false).map((f) => ({ name: f.name, reason: f.wav.reason }));
+    const total = wavs.length, playable = total - bad.length;
+    const text = !total ? 'Card check: there are no WAV sounds on this card yet.'
+      : !bad.length ? 'Card check: ' + (total === 1 ? 'the one sound on this card is' : 'all ' + total + ' sounds on this card are') + ' in a format the module can play.'
+      : 'Card check: ' + playable + ' of the ' + total + ' sounds on this card are in a format the module can play.';
+    return { total, playable, bad, text };
   }
 
   // ---- Firmware images ----
@@ -1207,7 +1283,7 @@ const HW = (() => {
   return { PLAY, CV, DELAY, SHAPES, defaults, amount, clampDigit, cleanComment, settings, effectLines,
            generate, parse, stateFrom, analyse, slowHz, tremoloHz, ringHz, cutoffHz, hz, usesRate,
            validListName, entryProblem, BUILD, buildOf, mdRender, mdInline, sha256, hexCheck, firmwareInfo, firmwareState, imageName, cardFirmware, KNOWN_IMAGES,
-           WAYS, KNOBS, TRANSPORT_KNOB, describe, rateWarnings, FIRMWARE_BASE, RELEASES_URL, playlistParse, playlistGenerate, playlistCheck, wavInspect, MAX_FILES, RESERVED };
+           WAYS, KNOBS, TRANSPORT_KNOB, describe, rateWarnings, firstRun, soundsReport, FIRMWARE_BASE, RELEASES_URL, playlistParse, playlistGenerate, playlistCheck, wavInspect, MAX_FILES, RESERVED };
 })();
 /*LOGIC-END*/
 </script>
@@ -1230,6 +1306,7 @@ const HW = (() => {
   let snapshot = null;            // { state, lists, source } as last loaded or saved
   let configProblem = '';
   let firmware = null, fwProblem = '';
+  let skipFirst = false, wayBack = false; // first use: skipped, and step one done
   const learned = {};
 
   const context = () => ({ lists: playing(), cardNames: card ? card.names : null, build: null, imageBuild: null,
@@ -1379,6 +1456,39 @@ const HW = (() => {
       : 'Arrows change the order. + plays a sound again, so random playing picks it more often.';
   }
 
+  const firstState = () => HW.firstRun(!!card, card ? card.build : null, card ? HW.imageName(card.imageSha, learned).build : null, skipFirst);
+  function renderFirst() {
+    const st = firstState();
+    $('firstRun').hidden = st === 'none';
+    if (st === 'none') return;
+    const writable = !!card.handle, hasOld = !!card.imageFile && st === 'new';
+    $('frIntro').textContent = st === 'new'
+      ? 'This card has not been used with Hamburger Wavy before. Three things to do, then you can choose your sounds and settings.'
+      : 'Build ' + HW.imageName(card.imageSha, learned).build + ' is on the card. One thing left: install it on the module.';
+    const set = (id, cls) => { $(id).className = cls; };
+    set('fr1', st === 'install' || wayBack ? 'done' : 'now');
+    set('fr2', st === 'install' ? 'done' : wayBack ? 'now' : 'later');
+    set('fr3', st === 'install' ? 'now' : 'later');
+    $('fr1Text').textContent = st === 'install' ? 'Done.'
+      : hasOld ? 'Installing replaces the firmware inside your module. Your card has a firmware file, image.hex. Save a copy of it first: that file is how you would go back.'
+      : 'Installing replaces the firmware inside your module, and there is no recovery file here. Your card has no firmware file to keep, so to go back you would need the original from elsewhere. Copy your sounds somewhere safe as well.';
+    $('fr1Act').hidden = st === 'install';
+    $('frBackup').hidden = !hasOld; $('frAgreeBox').hidden = hasOld;
+    $('frBackup').textContent = wayBack && hasOld ? 'Copy saved \u2014 save it again' : 'Save a copy of the card\u2019s firmware file';
+    $('frAgree').checked = wayBack && !hasOld;
+    $('fr2Text').textContent = st === 'install' ? 'Done.'
+      : writable ? 'The page fetches build ' + HW.BUILD + ' from GitHub, checks it, and writes it to the card as image.hex.'
+      : 'This browser cannot write to the card. Download build ' + HW.BUILD + ', copy image.hex from it to the top level of the card, then open the card here again.';
+    $('frInstall').hidden = st === 'install';
+    $('frInstall').disabled = !wayBack;
+    $('frInstall').textContent = writable ? 'Put build ' + HW.BUILD + ' on the card' : 'Download build ' + HW.BUILD;
+    const report = HW.soundsReport(card.files);
+    $('frSounds').textContent = report.text + (report.bad.length ? ' These are not:' : '');
+    $('frBad').innerHTML = '';
+    for (const b of report.bad.slice(0, 8)) $('frBad').append(el('li', '', b.name + ' \u2014 ' + b.reason));
+    if (report.bad.length > 8) $('frBad').append(el('li', '', 'and ' + (report.bad.length - 8) + ' more'));
+  }
+
   function renderFirmware() {
     const st = HW.firmwareState(card ? card.build : null, card ? card.imageSha : null, firmware, !!(card && card.handle), !!card, learned);
     $('fwCard').textContent = st.message;
@@ -1389,8 +1499,15 @@ const HW = (() => {
 
     // The banner: shown only when the firmware needs the user's attention.
     const banner = $('fwBanner');
-    banner.hidden = true;
-    if (!card) return;
+    banner.hidden = true; $('fwQuiet').hidden = true;
+    if (!card || firstState() !== 'none') return;
+    // No firmware file on the card, but the module is already up to date:
+    // nothing is needed, so say so quietly and offer it anyway.
+    if (!card.imageSha && card.build >= HW.BUILD) {
+      $('fwQuiet').hidden = false;
+      $('fwQuietText').textContent = 'There is no firmware file on this card. Your module last ran build ' + card.build + ', so it does not need one.';
+      $('fwQuietGo').textContent = card.handle ? 'Put build ' + HW.BUILD + ' on the card anyway' : 'Download build ' + HW.BUILD;
+    }
     const image = HW.imageName(card.imageSha, learned);
     const writable = !!card.handle;
     const go = $('fwBannerGo');
@@ -1413,7 +1530,7 @@ const HW = (() => {
     const transport = !!HW.TRANSPORT_KNOB[state.play];
     const dirty = !!card && unsaved();
 
-    $('start').hidden = started; $('steps').hidden = !started;
+    $('start').hidden = started; $('steps').hidden = !started || firstState() === 'new';
 
     // Card control.
     const sd = $('openCard');
@@ -1421,12 +1538,12 @@ const HW = (() => {
     $('cardDot').hidden = !dirty;
     if (!card) {
       $('cardBig').textContent = 'Open'; $('cardSmall').textContent = 'card';
-      sd.title = 'Open the sample card'; sd.setAttribute('aria-label', 'Open the sample card');
+      sd.setAttribute('aria-label', 'Open the sample card');
     } else {
       const image = HW.imageName(card.imageSha, learned);
       $('cardBig').textContent = image.text; $('cardSmall').textContent = dirty ? 'unsaved' : 'firmware';
       const said = image.detail + (dirty ? ' There are changes not yet saved to the card.' : '') + ' Click to read the card again.';
-      sd.title = said; sd.setAttribute('aria-label', said);
+      sd.setAttribute('aria-label', said);
     }
     // The trace follows the card: none, steady, or changes waiting.
     const mood = !card ? 'off' : dirty ? 'pending' : '';
@@ -1496,8 +1613,9 @@ const HW = (() => {
     $('warnings').innerHTML = '';
     for (const text of warns) $('warnings').append(el('li', '', text));
     const writable = !!(card && card.handle);
-    $('saveCard').hidden = !writable; $('saveCard').disabled = writable && !dirty;
-    $('saveCard').textContent = writable && !dirty ? 'Saved on the card' : 'Save to card';
+    const worthSaving = dirty || (card && card.noConfig);
+    $('saveCard').hidden = !writable; $('saveCard').disabled = writable && !worthSaving;
+    $('saveCard').textContent = writable && !worthSaving ? 'Saved on the card' : 'Save to card';
     $('download').hidden = writable;
     $('undo').hidden = !(snapshot && (card ? dirty : HW.generate(state) !== HW.generate(snapshot.state)));
 
@@ -1520,6 +1638,7 @@ const HW = (() => {
     }
     renderSounds();
     renderFirmware();
+    renderFirst();
   }
 
   // ---------- sounds ----------
@@ -1591,14 +1710,15 @@ const HW = (() => {
   async function readCard(files, handle, label) {
     const out = [];
     lists = { PLAYLIST: [] }; configProblem = '';
-    let loaded = false, build = null, imageSha = null;
+    let loaded = false, build = null, imageSha = null, imageFile = null;
+    wayBack = false;
     for (const f of files.filter((x) => !x.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name))) {
       const entry = { name: f.name, wav: null };
       if (/\.wav$/i.test(f.name)) {
         try { entry.wav = HW.wavInspect(new Uint8Array(await f.file.slice(0, 65536).arrayBuffer()), f.file.size); }
         catch (e) { entry.wav = { ok: null, reason: 'could not be read' }; }
       } else if (f.name.toUpperCase() === 'IMAGE.HEX' && f.file.size <= 2000000) {
-        try { imageSha = HW.sha256(new Uint8Array(await f.file.arrayBuffer())); } catch (e) { imageSha = null; }
+        try { imageSha = HW.sha256(new Uint8Array(await f.file.arrayBuffer())); imageFile = f.file; } catch (e) { imageSha = null; }
       } else if (/\.txt$/i.test(f.name) && f.file.size <= 16384) {
         const base = f.name.slice(0, -4).toUpperCase();
         const text = await f.file.text();
@@ -1613,10 +1733,11 @@ const HW = (() => {
       out.push(entry);
     }
     if (!loaded && !configProblem) state = HW.defaults();
-    card = { handle: handle || null, label, files: out, names: out.map((f) => f.name), build, imageSha };
+    card = { handle: handle || null, label, files: out, names: out.map((f) => f.name), build, imageSha, imageFile };
     onCard = clone(lists);
     settle();
-    baseline = loaded ? HW.generate(state) : '';
+    baseline = HW.generate(state);
+    card.noConfig = !loaded; // nothing to compare with yet: not "unsaved", but worth saving
     started = true;
     remember();
     render();
@@ -1674,7 +1795,7 @@ const HW = (() => {
   });
   const pending = () => {
     const items = [];
-    if (HW.generate(state) !== baseline) items.push({ name: 'config.txt', text: HW.generate(state) });
+    if (HW.generate(state) !== baseline || card.noConfig) items.push({ name: 'config.txt', text: HW.generate(state) });
     const now = playing();
     for (const key of Object.keys(Object.assign({}, now, onCard)).sort()) {
       const want = now[key] || [], have = onCard[key] || [];
@@ -1710,7 +1831,7 @@ const HW = (() => {
           const writer = await handle.createWritable();
           await writer.write(item.text); await writer.close();
           if (!card.names.some((n) => n.toUpperCase() === item.name.toUpperCase())) { card.names.push(item.name); card.files.push({ name: item.name, wav: null }); }
-          if (item.key) onCard[item.key] = playing()[item.key].slice(); else baseline = item.text;
+          if (item.key) onCard[item.key] = playing()[item.key].slice(); else { baseline = item.text; card.noConfig = false; }
         }
       }
       for (const k of Object.keys(lists)) if (!(playing()[k] || []).length && k !== 'PLAYLIST' && k !== source) delete lists[k];
@@ -1780,11 +1901,38 @@ const HW = (() => {
     catch (e) { fwProblem = 'Writing the firmware failed: ' + e.message + '. Do not use this card to update until it has been written successfully.'; }
     render();
   });
+  $('fwQuietGo').addEventListener('click', async () => {
+    if (!(card && card.handle)) { window.open(HW.RELEASES_URL, '_blank', 'noopener'); return; }
+    const status = $('fwQuietStatus');
+    status.className = 'status'; status.textContent = 'Getting it from GitHub\u2026';
+    try { await fetchLatest(); await installFirmware(); status.textContent = ''; }
+    catch (e) { status.className = 'status bad'; status.textContent = 'That did not work: ' + e.message + '.'; }
+    render();
+  });
   $('fwBannerGo').addEventListener('click', async () => {
     if (!(card && card.handle)) { window.open(HW.RELEASES_URL, '_blank', 'noopener'); return; }
     const status = $('fwBannerStatus');
     status.className = 'status'; status.textContent = 'Getting it from GitHub…';
     $('fwBannerGo').disabled = true;
+    try { await fetchLatest(); await installFirmware(); status.textContent = ''; }
+    catch (e) { status.className = 'status bad'; status.textContent = 'That did not work: ' + e.message + '.'; }
+    render();
+  });
+
+  // ---------- first use ----------
+  $('frBackup').addEventListener('click', () => {
+    const url = URL.createObjectURL(card.imageFile);
+    const a = el('a'); a.href = url; a.download = 'image-before-hamburger-wavy.hex'; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    wayBack = true; render();
+  });
+  $('frAgree').addEventListener('change', () => { wayBack = $('frAgree').checked; render(); });
+  $('frSkip').addEventListener('click', () => { skipFirst = true; render(); });
+  $('frInstall').addEventListener('click', async () => {
+    if (!(card && card.handle)) { window.open(HW.RELEASES_URL, '_blank', 'noopener'); return; }
+    const status = $('frStatus');
+    status.className = 'status'; status.textContent = 'Getting it from GitHub\u2026';
+    $('frInstall').disabled = true;
     try { await fetchLatest(); await installFirmware(); status.textContent = ''; }
     catch (e) { status.className = 'status bad'; status.textContent = 'That did not work: ' + e.message + '.'; }
     render();
