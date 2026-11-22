@@ -6,6 +6,10 @@ This is an unofficial sampler firmware for the Tiptop Audio ONE module, built fr
 
 This repository contains the application, build tools, tests and documentation. No vendor firmware, boot/debug stub, extracted pitch tables or sample library is supplied. The module's existing updater is required. See [provenance](docs/provenance.md) for what was learned through reverse engineering and what is included.
 
+## Download
+
+Ready-made firmware is on the [releases page](https://github.com/misterwavey/hamburger-wavy/releases): a zip with `image.hex` for the extended build, the legacy build, the config editor and install notes, with SHA-256 checksums. Each release is tied to a tag of this source. The [config editor](docs/config-editor.html) can also fetch the current image, verify its checksum and write it to the card for you (Chrome or Edge). See [Install](#install) before updating a module.
+
 ## Build
 
 You need Python 3.11 or newer, LLVM Clang with the MIPS backend, and LLD with ELF/MIPS support. No Python packages, proprietary SDK, XC32 compiler, vendor HEX, libc or runtime library is required. `make` is convenient but optional.
@@ -14,7 +18,7 @@ You need Python 3.11 or newer, LLVM Clang with the MIPS backend, and LLD with EL
 make
 ```
 
-The default target retains legacy build 21 (eight modes). For current build 53 with Flip, CV Flip, Tape, Chop, Colour, Filter, phaser, flanger and tremolo/ring modulation, use:
+The default target retains legacy build 21 (eight modes). For current build 54 with Flip, CV Flip, Tape, Chop, Colour, Filter, phaser, flanger and tremolo/ring modulation, use:
 
 ```sh
 make extended          # build/extended/image.hex
@@ -41,7 +45,7 @@ make BUILD_FLAGS='--cc /path/to/clang --ld /path/to/ld.lld'
 make test
 ```
 
-Tests validate the HEX/ELF address contract, generated pitch mathematics, a rebuild in an isolated source tree, and the host C suite under AddressSanitizer/UndefinedBehaviorSanitizer when a suitable host compiler is available. These tests do not emulate the complete device or certify recovery from an interrupted update.
+Tests validate the HEX/ELF address contract, the config editor against the firmware's config parser (when Node.js is available), generated pitch mathematics, a rebuild in an isolated source tree, and the host C suite under AddressSanitizer/UndefinedBehaviorSanitizer when a suitable host compiler is available. These tests do not emulate the complete device or certify recovery from an interrupted update.
 
 Optional original 440 Hz test WAVs can be generated with `python3 tools/generate_test_tones.py`. No audio files are included in the repository.
 
@@ -55,7 +59,7 @@ For the extended firmware, `make extended-profile` builds the matching diagnosti
 
 This is experimental replacement firmware. Preserve your existing firmware and card files separately. The application does not include the resident updater or a full recovery image. See [hardware and update limits](docs/provenance.md#hardware-and-update-limits).
 
-Prepare a FAT16/FAT32 sample card with supported mono PCM16/24 WAVs. Copy the built image to its root as `image.hex`, verify it, then eject. Example for current extended build 53 on a macOS volume named TTA ONE (run `make extended` first):
+Prepare a FAT16/FAT32 sample card with supported mono PCM16/24 WAVs. Copy the built image to its root as `image.hex`, verify it, then eject. Example for current extended build 54 on a macOS volume named TTA ONE (run `make extended` first):
 
 ```sh
 cp build/extended/image.hex "/Volumes/TTA ONE/image.hex"
@@ -78,9 +82,10 @@ See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD
 
 - **Playback modes 9–12:** [Flip](docs/flip.md) reverses direction on each gate; [CV Flip](docs/cv-flip.md) takes direction from bipolar CV; [Tape](docs/tape.md) gives signed speed with a hold at zero; [Chop](docs/chop.md) jumps to a CV-selected position on each gate.
 - **Effects**, set by lines in `config.txt`: [drive and crush](docs/colour.md); a resonant [filter](docs/filter.md) with low-pass, high-pass and band-pass outputs and an automatic wah sweep; a [phaser](docs/phaser.md) or [flanger](docs/flanger.md); and [tremolo and ring modulation](docs/mod.md). The pitch knob/CV can be assigned to an effect amount, the filter cutoff or the modulation speed.
+- Several playlist files on one card, with a `Playlist name` line in `config.txt` choosing the one in use, and playlist entries that use files' full names (up to 63 characters).
 - A FILE encoder reader that tolerates worn or chattering contacts, and one automatic retry of a failed card read.
 
-The [user guide](docs/user-guide.md#effects) lists every effect line, the rate scales and how many effects can run at each playback rate.
+The [user guide](docs/user-guide.md#effects) lists every effect line, the rate scales and how many effects can run at each playback rate. The [config editor](docs/config-editor.html), a single offline web page, builds `config.txt` and playlists from menus and sliders, explains what each choice will do, and can check the files on the card.
 
 ## Status
 

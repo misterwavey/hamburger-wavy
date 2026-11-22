@@ -305,6 +305,9 @@ typedef struct {
   uint32_t valid;
   uint8_t checksum;
   char name[14];
+#ifdef ONE_LONG_NAMES
+  uint8_t next, sum, match; /* a longer name being compared piece by piece */
+#endif
 } LongName;
 static int name_equal(const char *a, const char *b) {
   while (*a && upper((uint8_t)*a) == upper((uint8_t)*b)) {
@@ -336,14 +339,54 @@ static void long_name(LongName *l, const uint8_t *p) {
   l->checksum = p[13];
   l->valid = l->name[0] != 0;
 }
+#ifdef ONE_LONG_NAMES
+/* Compare one VFAT name entry with the wanted name, without storing it, so
+ * names longer than 13 characters can be found. Entries arrive last piece
+ * first; each holds 13 UTF-16 units, the name ending with 0 then 0xffff. */
+static void long_match(LongName *l, const uint8_t *p, const char *wanted) {
+  static const uint8_t offsets[13] = {1,  3,  5,  7,  9,  14, 16,
+                                      18, 20, 22, 24, 28, 30};
+  uint32_t piece = p[0] & 0x3fu, length = 0;
+  while (wanted[length])
+    length++;
+  if (p[12] || u16(p + 26) || !piece || piece > 20u) {
+    l->match = 0;
+    return;
+  }
+  uint32_t base = (piece - 1u) * 13u;
+  if (p[0] & 0x40u) {
+    l->sum = p[13];
+    l->match = length > base && length <= base + 13u;
+  } else if (!l->match || piece != l->next || p[13] != l->sum) {
+    l->match = 0;
+    return;
+  }
+  l->next = (uint8_t)(piece - 1u);
+  for (uint32_t i = 0; i < 13u && l->match; i++) {
+    uint32_t c = u16(p + offsets[i]), at = base + i;
+    if (at < length)
+      l->match = c < 128u && upper((uint8_t)c) == upper((uint8_t)wanted[at]);
+    else
+      l->match = c == (at == length ? 0u : 0xffffu);
+  }
+}
+#endif
 static int add_entry(Fat *f, const uint8_t *p, Entry *out, uint32_t *count,
                      uint32_t max, const char *wanted, LongName *l) {
   if (p[11] == 15 && p[0] != 0xe5 && p[0]) {
     long_name(l, p);
+#ifdef ONE_LONG_NAMES
+    if (wanted)
+      long_match(l, p, wanted);
+#endif
     return 0;
   }
   uint32_t use_long = l->valid;
   l->valid = 0;
+#ifdef ONE_LONG_NAMES
+  uint32_t long_hit = l->match && !l->next;
+  l->match = 0;
+#endif
   if (!p[0])
     return 1;
   if (p[0] == 0xe5 || p[0] == '.' || (p[11] & 0x1e) || p[11] == 15)
@@ -381,6 +424,15 @@ static int add_entry(Fat *f, const uint8_t *p, Entry *out, uint32_t *count,
     memcpy(e->name, l->name, sizeof(e->name));
     matched = 1;
   }
+#ifdef ONE_LONG_NAMES
+  /* Found by a longer name: the entry keeps its short alias. */
+  if (wanted && !matched && long_hit) {
+    uint8_t sum = 0;
+    for (uint32_t i = 0; i < 11; i++)
+      sum = (uint8_t)(((sum & 1u) << 7) + (sum >> 1) + p[i]);
+    matched = sum == l->sum;
+  }
+#endif
   if (!matched)
     return 0;
   (*count)++;

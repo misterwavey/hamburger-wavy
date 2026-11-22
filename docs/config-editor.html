@@ -1,0 +1,1641 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hamburger Wavy config editor</title>
+<style>
+  :root {
+    --paper: #17150f;
+    --panel: #1f1c15;
+    --ink: #e4dcc6;
+    --faint: #9c9480;
+    --rule: #4a4435;
+    --accent: #d2553b;
+    --ok: #9db37a;
+    --mono: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body {
+    margin: 0; padding: 1.5rem 1rem 4rem; color: var(--ink);
+    font: 15px/1.5 var(--mono); position: relative; min-height: 100vh;
+  }
+  /* Grain over everything: fixed, non-interactive. */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    opacity: .13; mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  /* A few scuffs. */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .5;
+    background:
+      radial-gradient(ellipse 40% 8% at 12% 18%, rgba(0,0,0,.35), transparent 70%),
+      radial-gradient(ellipse 30% 5% at 85% 62%, rgba(0,0,0,.3), transparent 70%),
+      radial-gradient(ellipse 60% 30% at 50% 110%, rgba(0,0,0,.5), transparent 70%);
+  }
+  main { max-width: 1080px; margin: 0 auto; }
+  header { margin-bottom: 1.6rem; }
+  h1 {
+    font-size: 1.7rem; letter-spacing: .14em; text-transform: uppercase; margin: 0;
+    filter: url(#rough); transform: rotate(-.5deg); transform-origin: left;
+    text-shadow: 1.5px 0 0 rgba(210,85,59,.55), -1px 0 0 rgba(120,170,160,.3);
+  }
+  header p { color: var(--faint); margin: .5rem 0 0; max-width: 62ch; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.6rem; align-items: start; }
+  @media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+  section {
+    background: var(--panel); padding: .9rem 1rem 1rem; margin-bottom: 1.1rem;
+    border: 1px solid var(--rule); border-radius: 2px 5px 3px 6px;
+    box-shadow: 2px 3px 0 rgba(0,0,0,.35);
+  }
+  aside section { transform: rotate(.15deg); }
+  h2 {
+    font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; color: var(--accent);
+    margin: 0 0 .7rem; filter: url(#worn);
+  }
+  label, .label { display: block; color: var(--faint); font-size: .8rem; letter-spacing: .06em; }
+  .row { display: grid; grid-template-columns: 7.2rem minmax(0, 1fr) 9.5rem; gap: .6rem; align-items: center; margin: .35rem 0; }
+  .row .label { color: var(--ink); font-size: .9rem; letter-spacing: 0; }
+  .row output { color: var(--faint); font-size: .8rem; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row.off .label, .row.off output { opacity: .45; }
+  @media (max-width: 480px) { .row { grid-template-columns: 5.5rem minmax(0, 1fr) 6.5rem; } }
+  select, input[type=text], textarea, button {
+    font: inherit; color: var(--ink); background: #14120d; border: 1px solid var(--rule);
+    border-radius: 2px 4px 2px 3px; padding: .35rem .5rem;
+  }
+  select, input[type=text] { width: 100%; }
+  select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .pick { display: grid; grid-template-columns: 7.2rem minmax(0, 1fr); gap: .6rem; align-items: center; margin: .4rem 0; }
+  .pick .label { color: var(--ink); font-size: .9rem; }
+  .seg { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .seg label {
+    color: var(--ink); font-size: .85rem; letter-spacing: 0; cursor: pointer;
+    border: 1px solid var(--rule); padding: .2rem .55rem; border-radius: 2px 5px 2px 4px; background: #14120d;
+  }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg input:checked + span { color: var(--accent); }
+  .seg label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 1.4rem; background: transparent; }
+  .hint { color: var(--faint); font-size: .78rem; margin: .5rem 0 0; }
+  pre#out {
+    margin: 0 0 .7rem; padding: .8rem .9rem; background: #100e0a; color: var(--ink);
+    border: 1px dashed var(--rule); min-height: 9rem; white-space: pre-wrap; word-break: break-word;
+    font: 15px/1.55 var(--mono); text-shadow: .6px 0 0 rgba(228,220,198,.35);
+  }
+  .buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+  button { cursor: pointer; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; padding: .45rem .8rem; }
+  button.primary { border-color: var(--accent); color: var(--accent); }
+  button:hover { background: #221e16; }
+  button:active { transform: translate(1px, 1px); }
+  ul.notes { list-style: none; margin: 0; padding: 0; }
+  ul.notes li { padding: .3rem 0 .3rem 1.3rem; position: relative; border-bottom: 1px dotted var(--rule); font-size: .88rem; }
+  ul.notes li:last-child { border-bottom: 0; }
+  ul.notes li::before { content: "·"; position: absolute; left: .35rem; color: var(--faint); }
+  ul.notes li.warn::before { content: "!"; color: var(--accent); font-weight: bold; }
+  ul.notes li.warn { color: #f0d9cf; }
+  table.stages { width: 100%; border-collapse: collapse; font-size: .88rem; margin-bottom: .4rem; }
+  table.stages td { padding: .22rem .3rem; border-bottom: 1px dotted var(--rule); vertical-align: top; }
+  table.stages td:first-child { width: 4.6rem; letter-spacing: .1em; text-transform: uppercase; font-size: .72rem; padding-top: .4rem; }
+  .runs td:first-child { color: var(--ok); }
+  .skips td:first-child { color: var(--accent); }
+  .skips td:last-child { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(210,85,59,.6); }
+  .idle td { color: var(--faint); opacity: .6; }
+  textarea { width: 100%; min-height: 7rem; resize: vertical; }
+  input[type=file] { font: inherit; font-size: .78rem; color: var(--faint); max-width: 100%; }
+  input[type=file]::file-selector-button {
+    font: inherit; color: var(--ink); background: #14120d; border: 1px solid var(--rule);
+    border-radius: 2px 4px 2px 3px; padding: .45rem .8rem; margin-right: .6rem; cursor: pointer;
+    text-transform: uppercase; letter-spacing: .12em;
+  }
+  .status { font-size: .82rem; margin: .5rem 0 0; color: var(--faint); min-height: 1.2em; }
+  .status.bad { color: var(--accent); }
+  footer { color: var(--faint); font-size: .78rem; margin-top: 1.5rem; max-width: 70ch; }
+  a { color: var(--ink); }
+  svg.defs { position: absolute; width: 0; height: 0; }
+  .guide { transform: none; }
+  article { max-width: 78ch; }
+  article h1 { font-size: 1.25rem; letter-spacing: .08em; margin: .6rem 0 1rem; filter: url(#worn); }
+  article h2 { font-size: .95rem; margin: 1.8rem 0 .6rem; filter: none; letter-spacing: .14em; }
+  article h3 { font-size: .9rem; margin: 1.4rem 0 .5rem; color: var(--ink); letter-spacing: .06em; }
+  article p, article li { font-size: .92rem; }
+  article ul, article ol { padding-left: 1.3rem; }
+  article li { margin: .25rem 0; }
+  article code { background: #100e0a; padding: .05rem .3rem; border-radius: 2px; font-size: .9em; }
+  article pre { background: #100e0a; border: 1px dashed var(--rule); padding: .6rem .8rem; overflow: auto; }
+  article pre code { background: none; padding: 0; }
+  article .tablewrap { overflow-x: auto; margin: .8rem 0; }
+  article table { border-collapse: collapse; font-size: .85rem; }
+  article th, article td { border-bottom: 1px dotted var(--rule); padding: .3rem .6rem .3rem 0; text-align: left; vertical-align: top; }
+  article th { color: var(--faint); font-weight: normal; letter-spacing: .06em; border-bottom-style: solid; }
+  article a { color: var(--accent); text-underline-offset: 2px; }
+  .cardbar { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; margin-bottom: 1.2rem; }
+  .cardbar .status { margin: 0; flex: 1 1 16rem; }
+  .tabs { display: flex; gap: .3rem; margin-bottom: -1px; position: relative; z-index: 1; flex-wrap: wrap; }
+  .tabs button {
+    border-radius: 3px 6px 0 0; border-bottom-color: transparent; background: transparent; color: var(--faint);
+    padding: .5rem 1rem; font-size: .82rem;
+  }
+  .tabs button[aria-selected=true] { background: var(--panel); color: var(--accent); border-color: var(--rule); border-bottom-color: var(--panel); }
+  .count { color: var(--faint); font-size: .72rem; letter-spacing: 0; }
+  .tabs button[aria-selected=true] .count { color: var(--ink); }
+  details {
+    margin-bottom: .7rem; border: 1px dotted var(--rule); border-radius: 2px 5px 3px 6px; padding: .45rem .8rem;
+  }
+  details > summary { cursor: pointer; color: var(--faint); font-size: .82rem; letter-spacing: .06em; }
+  details[open] > summary { margin-bottom: .6rem; color: var(--ink); }
+  details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  section details { border: 0; padding: 0; margin: .7rem 0 0; }
+  aside { position: sticky; top: 1rem; }
+  @media (max-width: 820px) { aside { position: static; } }
+  .side .buttons { margin: .8rem 0 .2rem; }
+  .side pre#out { min-height: 0; }
+  ol.entries { list-style: none; margin: .4rem 0; padding: 0; counter-reset: n; }
+  ol.entries li {
+    display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; gap: .4rem; align-items: center;
+    padding: .18rem 0; border-bottom: 1px dotted var(--rule); font-size: .88rem; counter-increment: n;
+  }
+  ol.entries li::before { content: counter(n); color: var(--faint); font-size: .75rem; text-align: right; padding-right: .3rem; }
+  ol.entries .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ol.entries .why { display: block; font-size: .74rem; color: var(--accent); white-space: normal; }
+  ol.entries li.stops .name { color: #f0d9cf; }
+  ol.entries li.unreached .name { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(210,85,59,.6); }
+  ol.entries .acts { display: flex; gap: .2rem; }
+  ul.checks { list-style: none; margin: .2rem 0 .7rem; padding: 0; border: 1px dashed var(--rule); }
+  ul.checks li { border-bottom: 1px dotted var(--rule); }
+  ul.checks li:last-child { border-bottom: 0; }
+  ul.checks label {
+    display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) auto; gap: .5rem; align-items: center;
+    padding: .28rem .5rem; color: var(--ink); font-size: .88rem; letter-spacing: 0; cursor: pointer;
+  }
+  ul.checks label:hover { background: #221e16; }
+  ul.checks input { accent-color: var(--accent); width: 1rem; height: 1rem; margin: 0; }
+  ul.checks .info { color: var(--faint); font-size: .76rem; white-space: nowrap; }
+  ul.checks li.no label { cursor: not-allowed; color: var(--faint); }
+  ul.checks li.no .info { color: var(--accent); white-space: normal; text-align: right; }
+  ul.checks .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.mini { padding: .1rem .42rem; font-size: .8rem; letter-spacing: 0; min-width: 1.7rem; }
+  .line { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .45rem 0; }
+  .line select, .line input[type=text] { width: auto; flex: 1 1 9rem; min-width: 0; }
+  table.files { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: .5rem; }
+  table.files td { padding: .16rem .3rem; border-bottom: 1px dotted var(--rule); }
+  table.files td:nth-child(2) { color: var(--faint); white-space: nowrap; }
+  table.files tr.bad td:nth-child(2) { color: var(--accent); white-space: normal; }
+  table.files button { float: right; }
+  .scroll { max-height: 15rem; overflow: auto; }
+  dialog {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--accent); border-radius: 2px 6px 3px 5px;
+    font: inherit; max-width: 34rem; width: calc(100% - 2rem); padding: 1rem 1.1rem;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.7); }
+  dialog pre { background: #100e0a; border: 1px dashed var(--rule); padding: .5rem .6rem; max-height: 9rem; overflow: auto; margin: .3rem 0 .8rem; font: 13px/1.45 var(--mono); }
+  dialog h3 { margin: .2rem 0; font-size: .85rem; letter-spacing: .08em; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<svg class="defs" aria-hidden="true">
+  <filter id="rough" x="-5%" y="-20%" width="110%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".035 .5" numOctaves="2" seed="3" result="t"/>
+    <feDisplacementMap in="SourceGraphic" in2="t" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="worn" x="-5%" y="-20%" width="110%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".05 .7" numOctaves="1" seed="11" result="t"/>
+    <feDisplacementMap in="SourceGraphic" in2="t" scale="1.1" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<main>
+  <header>
+    <h1>Hamburger Wavy</h1>
+    <p>Settings and playlists for the sample card. Runs in this page; nothing is uploaded.</p>
+  </header>
+
+  <div class="cardbar">
+    <button class="primary" id="openCard" type="button">Open card</button>
+    <input type="file" id="pickFolder" webkitdirectory multiple aria-label="Choose the card folder">
+    <p class="status" id="cardStatus" role="status">No card opened. You can still build a config and download it.</p>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="What to edit">
+    <button type="button" role="tab" id="t-setup" aria-controls="p-setup" aria-selected="true">Playback</button>
+    <button type="button" role="tab" id="t-effects" aria-controls="p-effects" aria-selected="false" tabindex="-1">Effects <span class="count" id="effectCount"></span></button>
+    <button type="button" role="tab" id="t-lists" aria-controls="p-lists" aria-selected="false" tabindex="-1">Playlists <span class="count" id="listCount"></span></button>
+    <button type="button" role="tab" id="t-guide" aria-controls="p-guide" aria-selected="false" tabindex="-1">User guide</button>
+  </div>
+
+  <div role="tabpanel" id="p-guide" aria-labelledby="t-guide" hidden>
+    <section class="guide">
+      <div class="line">
+        <label for="guidePick">Page</label>
+        <select id="guidePick"></select>
+      </div>
+      <article id="guideBody"></article>
+    </section>
+  </div>
+
+  <div class="cols" id="editor">
+    <div>
+      <div role="tabpanel" id="p-setup" aria-labelledby="t-setup">
+        <section>
+          <h2>Playback</h2>
+          <div class="pick"><span class="label" id="l-play">Mode</span><select id="play" aria-labelledby="l-play"></select></div>
+          <div class="pick"><span class="label" id="l-cv">Knob / CV</span><select id="cv" aria-labelledby="l-cv"></select></div>
+          <div class="pick"><span class="label" id="l-playlist">Playlist</span><select id="playlist" aria-labelledby="l-playlist"></select></div>
+          <div class="pick" id="delayRow"><span class="label" id="l-delay">CV settle</span>
+            <div class="seg" role="radiogroup" aria-labelledby="l-delay" id="delay"></div></div>
+        </section>
+        <details>
+          <summary>Files on the card <span class="count" id="fileCount"></span></summary>
+          <div class="scroll" id="cardFiles" hidden><table class="files" id="fileTable"></table></div>
+          <p class="hint" id="noCardHint">Open the card to list its files.</p>
+        </details>
+        <details id="firmwareBox">
+          <summary>Firmware</summary>
+          <p class="hint" id="fwCard">Open the card to see which firmware it was last used with.</p>
+          <div class="buttons">
+            <button id="fwCheck" type="button">Check for the latest</button>
+            <button class="primary" id="fwInstall" type="button" hidden>Put it on the card</button>
+          </div>
+          <p class="status" id="fwStatus" role="status"></p>
+          <p class="hint">Checking contacts GitHub; nothing about you or your card is sent. Or use a firmware file you already have:
+            <input type="file" id="fwFile" accept=".hex" aria-label="Choose an image.hex file"></p>
+        </details>
+        <details>
+          <summary>Start from an existing config</summary>
+          <label for="paste">Paste a config.txt, or choose the file.</label>
+          <textarea id="paste" spellcheck="false"></textarea>
+          <div class="buttons" style="margin-top:.5rem">
+            <button id="load" type="button">Load text</button>
+            <input type="file" id="file" accept=".txt,text/plain" aria-label="Choose a config.txt file">
+          </div>
+          <p class="status" id="loadStatus" role="status"></p>
+        </details>
+        <details>
+          <summary>Note on the first line</summary>
+          <div class="pick"><span class="label" id="l-comment">Note</span><input type="text" id="comment" maxlength="61" aria-labelledby="l-comment" spellcheck="false"></div>
+        </details>
+      </div>
+
+      <div role="tabpanel" id="p-effects" aria-labelledby="t-effects" hidden>
+        <section>
+          <h2>What will run</h2>
+          <div class="pick" id="forFileRow" hidden><span class="label" id="l-forFile">For file</span><select id="forFile" aria-labelledby="l-forFile"></select></div>
+          <div class="pick"><span class="label" id="l-sr">File rate</span>
+            <div class="seg" role="radiogroup" aria-labelledby="l-sr" id="sampleRate"></div></div>
+          <div class="row"><span class="label" id="l-pitch">Pitch</span><input type="range" id="pitch" min="-24" max="7" step="1" aria-labelledby="l-pitch"><output for="pitch"></output></div>
+          <table class="stages" id="stages"></table>
+          <p class="hint" id="rateLine"></p>
+        </section>
+        <section>
+          <h2>Filter</h2>
+          <div class="pick"><span class="label" id="l-shape">Shape</span>
+            <div class="seg" role="radiogroup" aria-labelledby="l-shape" id="shape"></div></div>
+          <div class="row"><span class="label" id="l-cutoff">Cutoff</span><input type="range" id="cutoff" min="0" max="9" step="1" aria-labelledby="l-cutoff"><output for="cutoff"></output></div>
+          <div class="row"><span class="label" id="l-resonance">Resonance</span><input type="range" id="resonance" min="0" max="9" step="1" aria-labelledby="l-resonance"><output for="resonance"></output></div>
+          <div class="row"><span class="label" id="l-wah">Wah</span><input type="range" id="wah" min="0" max="9" step="1" aria-labelledby="l-wah"><output for="wah"></output></div>
+        </section>
+        <section>
+          <h2>Phaser or flanger</h2>
+          <div class="pick"><span class="label" id="l-sweep">Effect</span>
+            <div class="seg" role="radiogroup" aria-labelledby="l-sweep" id="sweep"></div></div>
+          <div class="row"><span class="label" id="l-sweepAmt">Intensity</span><input type="range" id="sweepAmt" min="1" max="9" step="1" aria-labelledby="l-sweepAmt"><output for="sweepAmt"></output></div>
+        </section>
+        <section>
+          <h2>Tremolo or ring mod</h2>
+          <div class="pick"><span class="label" id="l-mod">Effect</span>
+            <div class="seg" role="radiogroup" aria-labelledby="l-mod" id="mod"></div></div>
+          <div class="row"><span class="label" id="l-modAmt">Depth</span><input type="range" id="modAmt" min="1" max="9" step="1" aria-labelledby="l-modAmt"><output for="modAmt"></output></div>
+        </section>
+        <section>
+          <h2>Drive and crush</h2>
+          <div class="row"><span class="label" id="l-drive">Drive</span><input type="range" id="drive" min="0" max="9" step="1" aria-labelledby="l-drive"><output for="drive"></output></div>
+          <div class="row"><span class="label" id="l-crush">Crush</span><input type="range" id="crush" min="0" max="9" step="1" aria-labelledby="l-crush"><output for="crush"></output></div>
+        </section>
+        <section id="rateSection">
+          <h2>Rate</h2>
+          <div class="row"><span class="label" id="l-rate">Rate</span><input type="range" id="rate" min="0" max="9" step="1" aria-labelledby="l-rate"><output for="rate"></output></div>
+          <p class="hint" id="rateHint"></p>
+        </section>
+      </div>
+
+      <div role="tabpanel" id="p-lists" aria-labelledby="t-lists" hidden>
+        <section>
+          <h2>Playlists</h2>
+          <div class="line">
+            <label for="listPick">Editing</label>
+            <select id="listPick"></select>
+            <button id="revertList" type="button" title="Put this playlist back to how it was when the card was opened">Revert</button>
+          </div>
+          <div id="checkBox" hidden>
+            <div class="line">
+              <span class="label">Tick the files to include</span>
+              <button class="mini" id="checkAll" type="button">All</button>
+              <button class="mini" id="checkNone" type="button">None</button>
+            </div>
+            <ul class="checks scroll" id="checks"></ul>
+          </div>
+          <div class="line" id="manualAdd">
+            <input type="text" id="addName" placeholder="name.wav" maxlength="63" spellcheck="false" aria-label="File name to add">
+            <button id="addEntry" type="button">Add</button>
+          </div>
+          <p class="label" id="orderLabel">Play order</p>
+          <ol class="entries" id="entries"></ol>
+          <p class="hint" id="listHint"></p>
+          <p class="status" id="listStatus" role="status"></p>
+        </section>
+        <details>
+          <summary>Add or remove a playlist</summary>
+          <div class="line">
+            <input type="text" id="newList" placeholder="new playlist name" maxlength="8" spellcheck="false" aria-label="New playlist name">
+            <button id="createList" type="button">New playlist</button>
+          </div>
+          <div class="line">
+            <button id="removeList" type="button">Remove the one being edited</button>
+            <button id="listDownload" type="button">Download it</button>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <aside>
+      <section class="side">
+        <h2 id="sideTitle">Ready</h2>
+        <ul class="notes" id="notes"></ul>
+        <details id="moreNotes"><summary><span id="moreCount"></span></summary><ul class="notes" id="infoNotes"></ul></details>
+        <div class="buttons">
+          <button class="primary" id="saveCard" type="button" hidden>Write to card</button>
+          <button class="primary" id="download" type="button">Download config.txt</button>
+        </div>
+        <p class="status" id="copied" role="status"></p>
+        <details>
+          <summary>config.txt</summary>
+          <pre id="out" aria-live="polite"></pre>
+          <div class="buttons">
+            <button id="copy" type="button">Copy</button>
+            <button id="revertConfig" type="button" title="Put the settings back to the config.txt loaded from the card" hidden>Revert</button>
+            <button id="reset" type="button" title="Clear every setting to its default">Reset</button>
+          </div>
+        </details>
+      </section>
+    </aside>
+  </div>
+  <footer>
+    For the extended firmware, build 54. Unofficial; not affiliated with or supported by Tiptop Audio. Frequencies are calculated from the firmware's maps, not measured.
+    See the <a href="#" id="footGuide">user guide</a>.
+  </footer>
+</main>
+<dialog id="confirm" aria-labelledby="confirmTitle">
+  <h2 id="confirmTitle">Write to card</h2>
+  <p class="hint">These files in the card's root will be written. Nothing else is touched.</p>
+  <div id="confirmBody"></div>
+  <div class="buttons">
+    <button class="primary" id="confirmSave" type="button">Write</button>
+    <button id="confirmCancel" type="button">Cancel</button>
+  </div>
+</dialog>
+
+<script type="application/json" id="docs">
+{
+"docs": {
+"chop": "# Chop: CV-selected playback position\n\nChop is mode 12 in the extended build. It loops the selected sample forward at native speed. Each GATE rising edge samples the knob/CV input and jumps to that position with the existing short fade-out/re-prime/fade-in transition. CV changes between gates do not seek. PLAY starts from the current CV-selected position, or stops an already running sample. A gate can also start playback while stopped, including after a PLAY stop; stop the gate source if you want it to remain stopped. FILE browsing stops and selects another sample.\n\n## Controls\n\nThe full knob/CV ADC span maps over the complete file: fully counterclockwise is approximately the beginning and fully clockwise approximately the end on the measured module. Positive external CV moves the selected position later; negative CV moves it earlier. The knob and CV add in the same analogue circuit, so the knob supplies a position offset. This is not a calibrated voltage-to-position scale; extreme settings can clip. Chop does not use the zero calibration from CV Flip/Tape.\n\nPatch stepped or sequenced CV to the CV input and a clock to GATE. Each pulse jumps to the sampled position and plays onwards until the next pulse. Alternatively, use a slow LFO for CV and manual gates to scan slices. Shorter gate intervals make shorter audible segments. The sample wraps at its end; selecting the very last frame therefore wraps almost immediately to the beginning. There is no separate slice-length or loop-window control.\n\nStart with gates around 1 Hz. Direction-change fades and SD refill still add latency and gaps. Rapid requests during a transition/refill coalesce to the latest target; this is not an audio-rate granular engine or a promise of one audible jump for every gate. The sampled target is preserved if CV moves after the gate edge.\n\n## Configuration\n\n```text\n# Hamburger Wavy\nChop\nQuantize\nShort\n```\n\nFree/Quantize/Select File settings and their delay are overridden: playback remains native speed and CV sets position. Line 3 is still required. Select mode 12 with the existing held-PLAY/FILE menu, or use this config on the card. No calibration is needed.\n\n## Trying it\n\nUse a long, recognisable recording. Try different knob positions with PLAY starts, then start playback and send slow gates at a steady CV: each gate should repeat from the same position. Change CV after a gate but before the next one: the jump destination only changes on the next edge. A clock patched to GATE restarts playback after a PLAY stop, so unpatch it when you want the sample to stay stopped.\n",
+"colour": "# Colour: drive and crush\n\nColour is the first effect stage in the extended build (`make extended` / `make extended-profile`), ahead of the [Filter](filter.md), [Phaser](phaser.md) and [tremolo/ring modulation](mod.md). Legacy build 21 does not include it.\n\n## What it does\n\n- **Drive** applies 1× to about 16× gain into a smooth clipper (`y = 2x − x|x|`), followed by a level correction that falls quickly towards about −10 dB as drive rises. Mid-level material keeps roughly its loudness; quiet material still gets louder and full-scale material quieter, each by up to about 8 dB at maximum drive (calculated for sine input, not measured).\n- **Crush** rounds samples to between 16 and 4 bits and holds each value for 1 to 32 frames. Low settings do little to 16-bit files.\n\nDrive runs first, then crush, then the existing envelopes and Flip fades. Silence stays silent, so fades still end at zero. Because pitch is set by the playback clock, the crush hold period and its aliasing move with pitch.\n\n## config.txt\n\nAdd either or both lines after the CV mode line (and after the optional delay line, if present). Each takes a single digit, 0 (off) to 9 (maximum):\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nDrive 4\nCrush 6\n```\n\nA line-4 entry that is neither a delay nor a valid colour line still invalidates the file, as before. Later unrecognised lines are still ignored, so a mistyped `Drive 12` on a later line silently leaves drive off.\n\n## Colour CV mode\n\nPut `Colour` (or `Color`) on the CV mode line. Playback then stays at the file's native pitch and the pitch knob/CV sets the amount: clockwise or positive CV gives more. The knob sweeps from clean to the configured `Drive`/`Crush` amounts; with neither line present both sweep to 9.\n\n```text\n# Hamburger Wavy configuration\nLoop\nColour\n```\n\n- The mode is reachable from config.txt only. The held-PLAY pitch menu still offers Free/Quantize/Select File; choosing one of those leaves Colour CV until the card is next mounted.\n- In CV Flip, Tape and Chop the CV input already controls transport, so the configured amounts are used unscaled.\n- The amount is read once per 1024-frame block as it is fetched, so changes arrive in steps, one to two blocks later (roughly 20–45 ms at 48 kHz).\n\n## Limits\n\n- **Output rate.** Colour is skipped above 96 kHz output, and gives way to other stages at high rates: see [Limits](user-guide.md#limits) in the user guide. Crossing a limit while playing switches the effect off or on at a block boundary, with an audible level change if drive is high.\n- **Start latency.** The 2048-frame primed buffer is processed before playback starts. Expect a few milliseconds extra per start or Flip resume when colour is active.\n- Parameters do not ramp within a block.\n",
+"cv-flip": "# CV Flip\n\nCV Flip is playback mode 10 in the extended application. It loops at the WAV's native speed; CV chooses direction from the current playhead, using the existing 512-frame fades. Positive CV selects forward, negative selects reverse. Around zero, it keeps its last direction. A short PLAY click starts/stops; FILE selects another sample and stops playback. GATE is ignored in this mode. Ordinary Flip remains mode 9 with gate-controlled direction and the existing pitch controls.\n\n## Set up\n\nUse `make extended-profile` for `build/extended/profile/image.hex`, or `make extended` for the normal image. Install with the usual updater procedure. Configuration:\n\n```text\n# Hamburger Wavy\nCV Flip\nQuantize\nShort\n```\n\nThe CV and delay settings remain valid config fields, but CV Flip overrides their pitch/file-selection behaviour: speed stays native and CV controls only direction. On the panel, hold PLAY for 400 ms before turning FILE to select mode 10 (ten red flashes). Release to apply.\n\n## Calibrate and play\n\n1. Set the pitch knob near centre and patch measured 0 V from your bipolar source.\n2. Hold PLAY for at least half a second, without moving either control, then release. This stops playback and captures the zero reference. The usual mode-menu light feedback is retained.\n3. Tap PLAY to start forward.\n4. Apply +0.5 V: it should continue forward. Apply −0.5 V: it should fade into reverse from near the current position. Return to +0.5 V to turn forward again.\n5. Try a slow bipolar LFO. Its polarity should change direction; its amplitude does not change playback speed.\n\nA new reverse start begins at the last sample frame. Returning to zero holds the last direction rather than stopping. Changes during a fade coalesce to the most recently requested direction; rapid modulation need not produce one audible turn per crossing. Existing fade scheduling/refill gaps remain.\n\nCalibration is held only in RAM, survives file selection, and resets on power-up to an approximate built-in reference. Recalibrate each session. Use patched 0 V when calibrating; unplugged and patched-zero readings differed slightly on the tested hardware. Moving the knob afterwards shifts the switching threshold, which can deliberately bias an LFO's forward/reverse duty cycle. Recalibrate to restore the chosen zero.\n\nThe switching thresholds are five raw ADC counts either side of the captured zero (approximately ±0.05 V on the measured module). Values inside that band retain direction. An extreme knob position can clip the combined input and prevent one polarity from crossing the threshold; centre is the recommended starting point. The UI recognises large knob/CV movement during a hold as CV-mode editing, so keep 0 V steady throughout calibration.\n",
+"filter": "# Filter and wah\n\nThe filter is the second effect stage in the extended build (`make extended` / `make extended-profile`), after [Colour](colour.md) and before the [Phaser](phaser.md) and [tremolo/ring modulation](mod.md). Legacy build 21 does not include it.\n\n## What it does\n\nA two-pole (12 dB/octave) state-variable filter with adjustable resonance and a choice of three outputs.\n\n- **Low-pass** removes treble above the cutoff. It can soften crush aliasing and drive harmonics from the colour stage.\n- **High-pass** removes everything below the cutoff: digit 1 takes off only the lowest bass, 9 leaves a thin top end.\n- **Band-pass** keeps a region around the cutoff. Without resonance it is broad and slightly quieter than the input; resonance narrows and raises it.\n- **Cutoff** spans about 6.3 octaves, from roughly 1/500 to 1/6.3 of the playback rate: about 95 Hz to 7.6 kHz at 48 kHz output. Because pitch is set by the playback clock, the cutoff tracks pitch like a tape machine: pitching a sample down an octave lowers the cutoff an octave.\n- **Resonance** runs from none (maximally flat) to a strong peak of roughly +16 dB at the cutoff. It does not self-oscillate. The input is trimmed by up to 6 dB as resonance rises; loud material can still clip at the peak.\n- The brightest low-pass setting is not fully open: there is no bypass at the top of the range.\n\n## config.txt\n\nAdd lines after the CV mode line (and the optional delay line). Each takes a single digit:\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nFilter 5\nResonance 6\n```\n\n| Line | Meaning |\n| --- | --- |\n| `Filter n` | Low-pass cutoff. 0 (or no line) is off; 1 is darkest and 9 brightest. `Lowpass n` is the same. |\n| `Highpass n` | High-pass cutoff, 1 lowest to 9 highest. |\n| `Bandpass n` | Band-pass centre, 1 lowest to 9 highest. |\n| `Resonance n` | 0 to 9, for whichever shape is active. No effect without a filter. |\n| `Wah n` | Depth of an automatic cutoff sweep; see below. |\n\nOnly one shape applies: the last `Filter`, `Highpass` or `Bandpass` line in the file. As with the other effect lines, a mistyped line is silently ignored.\n\nExamples: [filter.txt](../examples/config/filter.txt), [highpass.txt](../examples/config/highpass.txt), [filter-cv.txt](../examples/config/filter-cv.txt) and [bandpass-cv.txt](../examples/config/bandpass-cv.txt).\n\n## Filter CV mode\n\nPut `Filter` on the CV mode line. Playback stays at the file's native pitch and the pitch knob/CV sets the cutoff of whichever shape the config names: clockwise or positive CV is higher. The digit on the cutoff line is then ignored, though the line still chooses the shape (`Highpass 0` works).\n\n```text\n# Hamburger Wavy configuration\nLoop\nFilter\nBandpass 5\nResonance 6\n```\n\n- This mode is reachable from config.txt only; choosing a mode in the held-PLAY pitch menu leaves it until the card is next mounted.\n- In CV Flip, Tape and Chop the CV input controls transport, so the configured cutoff digit is used.\n- The cutoff is read once per 1024-frame block and ramps across that block, so sweeps are smooth but arrive one to two blocks late (roughly 20–45 ms at 48 kHz).\n\n## Wah\n\n`Wah n` makes a slow sine move the cutoff up and down around its set value. It adds no processing stage, so it costs nothing beyond the filter and still runs wherever the filter does.\n\n```text\n# Hamburger Wavy: slow wah\nLoop\nQuantize\nShort\nBandpass 5\nResonance 6\nWah 6\nRate 4\n```\n\n- **Depth.** `Wah 0` (or no line) is off; 9 swings the cutoff about 2.5 octaves each way. The swing stops at the ends of the cutoff range, so a centre near either end gives a lopsided sweep.\n- **Centre and shape** come from the `Filter`, `Highpass` or `Bandpass` line. With no such line the wah uses a low-pass centred mid-range.\n- **Speed** comes from `Rate n`: 0.125, 0.2, 0.31, 0.5, 0.79, 1.3, 2, 3.2, 5 and 8 Hz for digits 0 to 9. This scale is shared with the phaser and flanger and is separate from the tremolo's; if `Tremolo` or `Ring` lines are also present, each follows the same `Rate` value on its own scale.\n- **Rate CV mode** (`Rate` on the CV line) puts the sweep speed on the knob/CV, clockwise faster.\n- **Filter CV mode** puts the centre on the knob/CV while the sweep runs at the fixed `Rate`.\n- The sweep restarts from the centre, rising, each time playback starts and after each Flip/Tape/Chop transition.\n- The cutoff moves in straight lines between block ends (about 21 ms at 48 kHz), so the fastest sweeps are slightly angular.\n\nExamples: [wah.txt](../examples/config/wah.txt) and [wah-cv.txt](../examples/config/wah-cv.txt).\n\n## Limits\n\n- The filter is skipped above 96 kHz output, and between about 64 and 96 kHz it is the only stage that runs: see [Limits](user-guide.md#limits) in the user guide. This includes 88.2/96 kHz files at native pitch.\n- Crossing a limit while playing switches the filter off or on at a block boundary. On a steady tone through a resonant band-pass that is a clear click.\n- At the darkest settings integer truncation leaves a DC error below −90 dBFS.\n",
+"flanger": "# Flanger\n\nThe flanger is an effect stage in the extended build (`make extended` / `make extended-profile`). It takes the [Phaser](phaser.md)'s place in the chain, after [Colour](colour.md) and the [Filter](filter.md) and before [tremolo/ring modulation](mod.md): a config can have one or the other. Legacy build 21 does not include it.\n\n## What it does\n\nThe signal is mixed with a copy of itself delayed by a very short, slowly changing time. That cuts a comb of evenly spaced notches into the spectrum, which sweep up and down as the delay changes: the classic jet sound. Some of the delayed signal is fed back, which sharpens the peaks between the notches.\n\n- The delay sweeps between 32 and 384 frames: about 0.7 to 8 ms at 48 kHz output, half that at 96 kHz. Like the other effects it follows the playback pitch.\n- The sweep restarts from its middle whenever playback starts and after each Flip/Tape/Chop transition, with an empty delay line.\n- The delayed copy is kept at 16-bit resolution; the dry signal is untouched.\n- Silence stays silent. The input is trimmed by up to 4.4 dB as intensity rises, because the peaks reach about +1.6 dB at full intensity; very loud material can still clip there.\n\n## config.txt\n\n```text\n# Hamburger Wavy: flanger\nLoop\nQuantize\nShort\nFlanger 7\nRate 2\n```\n\n- `Flanger n`: intensity, 0 (off) to 9. Higher values deepen the notches and raise the feedback together; at 9 the notches are complete.\n- `Rate n`: sweep speed on the slow scale shared with `Wah` and `Phaser`: 0.125, 0.2, 0.31, 0.5, 0.79, 1.3, 2, 3.2, 5 and 8 Hz for 0 to 9. Slow settings suit a flanger best.\n- If both `Flanger` and `Phaser` lines are present, the flanger is used.\n- **Rate CV mode** (`Rate` on the CV line) puts the sweep speed on the knob/CV, clockwise faster.\n\nExamples: [flanger.txt](../examples/config/flanger.txt) and [flanger-cv.txt](../examples/config/flanger-cv.txt).\n\n## Limits\n\nThe flanger counts as the same stage as the phaser in the [limits](user-guide.md#limits): it runs with everything up to 48 kHz output, stays on when stages are dropped up to about 64 kHz, and above that runs only if no filter is set. Crossing a limit while playing switches it at a block boundary, audibly.\n",
+"flip": "# Flip: interrupt playback direction\n\nFlip is mode 9 in the extended build (`make extended` or `make extended-profile`); the legacy build-21 targets do not include it. It loops a file and reverses direction from the current playback position when GATE rises. It does not restart the file at each gate.\n\n## Controls\n\n| Control | Action in Flip |\n| --- | --- |\n| PLAY tap | Start forwards from the beginning; tap again to stop. A later start begins forwards again. |\n| GATE rising edge | Reverse the running sample from the DMA playhead position captured at that edge. |\n| GATE falling edge | No direction change. Holding GATE high produces one flip. |\n| FILE | Browse as usual; browsing stops playback and selects/primes the next file. |\n| Pitch knob / CV | Retain the selected Free/Quantize speed mapping. |\n| Held PLAY + FILE | Existing mode menu; Flip is red count 9. |\n\nGATE alone does not start playback in Flip. Start with PLAY, then use an external trigger, clock or manual gate to interrupt direction. Rising edges during the mode menu or a PLAY gesture are suppressed consistently with existing control handling. In Select File CV mode, PLAY starts still select the file from CV at nominal rate; GATE edges flip direction instead of selecting/retriggering a file.\n\nTo boot directly into Flip, config.txt can contain:\n\n```text\n# Hamburger Wavy configuration\nFlip\nQuantize\nShort\n```\n\nExisting mode counts 1–8 and LED colours retain their meaning. Playback stays red; blue is not used as a direction indicator. Power cycling reloads config.txt.\n\n## Transition behaviour\n\nA gate records the frame actually being heard, not the read-ahead position. The running audio then fades to zero over 512 output frames, the buffer is refilled from the captured position in the new direction, and playback restarts with a fade-in. Other modes keep their 256-frame envelopes.\n\nThis is not a seamless crossfade or sample-accurate scratching. There is a short gap for the refill and a wait for a safe buffer boundary; fade time scales with playback rate, and card access adds latency. Edges arriving during a transition update the requested direction and can coalesce, so very fast gates may produce interrupted or silent output instead of one audible reversal per edge. Begin with slow manual pulses or a 1 Hz clock, then increase the rate to find what is useful on your sample and card.\n\nPLAY, browsing and menu changes cancel pending flips. Errors use the usual recovery and blue signals. A flip does not write file-recall state; ordinary manual starts keep the existing recall behaviour.\n\n## Streaming\n\nSelecting a file in a Flip-family mode scans its FAT chain once, with audio stopped, and keeps a small index so reverse reads can seek. Contiguous files are addressed directly; large fragmented files can take longer to select and to seek. Reverse blocks are read in forward byte order and decoded backwards, for 16-bit and 24-bit PCM alike.\n\nA test sweep for hearing direction changes can be generated with `python3 tools/generate_flip_tone.py`. For polarity-controlled direction, see [CV Flip](cv-flip.md).\n",
+"mod": "# Tremolo and ring modulation\n\nTremolo and ring modulation are the last effect stage in the extended build (`make extended` / `make extended-profile`), after [Colour](colour.md), the [Filter](filter.md) and the [Phaser](phaser.md). Legacy build 21 does not include them.\n\n## What it does\n\nOne sine oscillator multiplies the signal.\n\n- **Tremolo** swings the level between full and `1 - depth`: at depth 9 it dips to silence once per cycle. Rates run from 1 to 16 Hz.\n- **Ring modulation** crossfades from the dry signal to the signal multiplied by the sine: at depth 9 only the product remains, giving sum and difference tones. Rates run from 16 Hz to about 4.1 kHz.\n\nThe gain never exceeds one, so neither can clip, and silence stays silent. The stage runs last, after drive, crush, the filter and the phaser, and before the existing envelopes and Flip fades. The oscillator restarts at its peak whenever playback starts, so tremolo begins at full level. Its sine is a corrected parabola, within about 0.3% of an ideal sine.\n\nBecause pitch is set by the playback clock, the oscillator runs in the sample domain: the rates below hold at the file's native pitch and move with it when the file is pitched up or down.\n\n## config.txt\n\nAdd lines after the CV mode line (and after the optional delay line, if present). Each takes a single digit:\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nTremolo 7\nRate 5\n```\n\n- `Tremolo n`: depth, 0 (off) to 9.\n- `Ring n`: depth, 0 (off) to 9. If both lines are present, Ring is used and Tremolo is ignored.\n- `Rate n`: 0 to 9, on the scale of whichever is active. Without a `Rate` line the rate is 0.\n\n| `Rate` | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |\n|---|---|---|---|---|---|---|---|---|---|---|\n| Tremolo (Hz) | 1 | 1.4 | 1.9 | 2.7 | 3.5 | 4.8 | 6.7 | 8.8 | 12 | 16 |\n| Ring (Hz) | 16 | 30 | 56 | 107 | 197 | 363 | 682 | 1236 | 2216 | 4096 |\n\nThese are calculated from the firmware's rate map. Examples: [tremolo.txt](../examples/config/tremolo.txt), [ring.txt](../examples/config/ring.txt) and [rate-cv.txt](../examples/config/rate-cv.txt).\n\nAs with the other effect lines, a mistyped line after line 4 is silently ignored, and any line longer than 63 characters invalidates the whole file.\n\n## Rate CV mode\n\nPut `Rate` on the CV mode line. Playback then stays at the file's native pitch and the pitch knob/CV sweeps the rate across the whole range: clockwise or positive CV is faster. With a `Ring n` line it sweeps ring modulation; otherwise tremolo, at the `Tremolo n` depth. If the file has no `Tremolo`, `Ring`, `Wah`, `Phaser` or `Flanger` line, the mode gives full-depth tremolo. The reading is taken once per 1024-frame block (about 21 ms at 48 kHz) and smoothed: very small changes are ignored and larger ones settle in roughly a tenth of a second, so a chosen rate stays put.\n\nIn CV Flip, Tape and Chop the CV input belongs to the transport, so the rate stays at the fixed `Rate n` value.\n\nWith `Wah`, `Phaser` or `Flanger` lines present, the same knob/CV also sets their sweep speed, on their own slower scale.\n\n## Limits\n\nThe stage is skipped above 96 kHz output and gives way to the filter and phaser at high rates: see [Limits](user-guide.md#limits) in the user guide.\n",
+"phaser": "# Phaser\n\nThe phaser is an effect stage in the extended build (`make extended` / `make extended-profile`). It runs after [Colour](colour.md) and the [Filter](filter.md) and before [tremolo/ring modulation](mod.md). A [Flanger](flanger.md) can be used in its place. Legacy build 21 does not include it.\n\n## What it does\n\nFour all-pass stages shift the phase of the signal, and the result is mixed with the dry signal so that two notches appear in the spectrum, with a peak between them. A slow sine moves the notches up and down by about two octaves each way. Some of the output is fed back to the input, which sharpens the peak.\n\n- At 48 kHz output the centre of the sweep is about 750 Hz, moving between roughly 190 Hz and 2.9 kHz (the all-pass turnover; the notches sit at about 0.4 and 2.4 times that). Like the filter, these positions follow the playback pitch.\n- The sweep restarts from its centre, rising, whenever playback starts and after each Flip/Tape/Chop transition.\n- Silence stays silent. The input is trimmed by up to 4.4 dB as intensity rises, because the peak between the notches reaches about +1.6 dB at full intensity; very loud material can still clip there.\n\n## config.txt\n\n```text\n# Hamburger Wavy: phaser\nLoop\nQuantize\nShort\nPhaser 7\nRate 3\n```\n\n- `Phaser n`: intensity, 0 (off) to 9. Higher values deepen the notches and raise the feedback together; at 9 the notches are complete.\n- `Rate n`: sweep speed on the same slow scale as `Wah`: 0.125, 0.2, 0.31, 0.5, 0.79, 1.3, 2, 3.2, 5 and 8 Hz for 0 to 9. If `Wah`, `Tremolo` or `Ring` lines are also present they follow the same `Rate` value on their own scales, and a wah and the phaser move together.\n- **Rate CV mode** (`Rate` on the CV line) puts the sweep speed on the knob/CV, clockwise faster. With a `Phaser` line and no `Tremolo`/`Ring` line, that mode adds no tremolo.\n\nExamples: [phaser.txt](../examples/config/phaser.txt) and [phaser-cv.txt](../examples/config/phaser-cv.txt).\n\n## Limits\n\nWith four stages the rule for how many run depends on the output rate (about 96,000,000 divided by the pitch divider):\n\n| Output rate | Stages that run |\n| --- | --- |\n| Up to 48 kHz | All four |\n| 48 kHz to about 64 kHz | Three: colour gives way first, then tremolo/ring |\n| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser, otherwise tremolo/ring, otherwise colour |\n| Above 96 kHz | None |\n\nA 44.1 or 48 kHz file at native pitch or below gets everything. Crossing a limit while playing switches a stage at a block boundary, audibly.\n",
+"profiling": "# Profiling diagnostics\n\nThis optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark.\n\n## Build and install\n\nFrom the repository:\n\n```sh\nmake profile\n```\n\nThe diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 21; the diagnostic manifest has `profiling: true`.\n\nFor the extended firmware use `make extended-profile`, which writes `build/extended/profile/image.hex` and reports the extended build number; substitute that path below.\n\nInstall the diagnostic using the usual SD update procedure:\n\n```sh\ncp build/profile/image.hex \"/Volumes/TTA ONE/image.hex\"\nsync\ncmp build/profile/image.hex \"/Volumes/TTA ONE/image.hex\"\ndiskutil eject \"/Volumes/TTA ONE\"\n```\n\nStartup remains one second blue. `ONEBUILD.TXT` should show build 21. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.\n\n## Collect a report\n\nPlay or loop a sample for at least a minute. Stop external triggers before collecting. For sustained looping, turn FILE once to stop playback; this also works with a single-entry playlist. For a non-looping sound, simply let it finish.\n\nWait at least one second with playback stopped, PLAY released, no pending trigger and no mode menu open. The firmware attempts to write a report after 250 ms of that idle condition. Allocation, SD writing and readback can take longer, depending on the card. A new trigger arriving during a report write is handled afterward, so diagnostic mode can briefly delay that next trigger. No report writes occur while audio is playing.\n\nPower down, return the card to the computer and preserve the report with a descriptive name:\n\n```sh\ncp \"/Volumes/TTA ONE/ONEPROF.TXT\" ./profile-96k24-fast.txt\npython3 tools/analyze_profile.py profile-96k24-fast.txt \\\n  --manifest build/profile/manifest.json \\\n  --baseline build/manifest.json\n```\n\nThe manifests are optional local build information; use the ones for the exact image you tested. Add `--json` for machine-readable results. Individual compiler stack-frame sizes are emitted as `build/profile/*.su` and `build/*.su`; the analyser lists the largest when a manifest is supplied.\n\nThe firmware accumulates statistics over the current boot, across triggers, files and mode changes, and overwrites the report after each subsequent stop. Remounting a card does not intentionally start a new session. Power-cycle between test cases if you want separate results. Save each report before the next case.\n\n## Suggested test order\n\nStart with a quick smoke test: one Q480 playback, let it finish, wait, and check the report. Then run:\n\n| Case | Material and activity |\n| --- | --- |\n| Baseline | 48 kHz/16-bit Q480, Loop, original pitch; one minute. |\n| Higher rate | 96 kHz/16-bit Q960, then a 96 kHz/24-bit ordinary sample. |\n| Tight deadline | Same 96 kHz/24-bit sample at highest quantized pitch; several minutes. |\n| Envelopes | Fade, repeated quick retriggers, then Gate release, using the same sample. |\n| Seeking | Random Loop, repeated triggers on a longer sample. |\n| Mixed workload | File changes, multiple sample rates, then varying CV; preserve this as a separate stress case. |\n\nRepeat the useful cases at 44.1/88.2 kHz and on other cards if available. Native pitch depends on the input mapping; a tuner and the generated 440 Hz files help locate it. The clock rates in the report are approximate, not tuning calibration. A report captures the settings at worst-work and tightest-margin observations, not a trace of every file or event.\n\n## What is measured\n\n- `sd`: end-to-end streaming sector read attempts, including command/token waits, transfer, CRC and background polling. Failed attempts can be included. This is not isolated card response latency.\n- `prefetch`: raw file read plus decoding into the staging half, including FAT lookups. Some prefetched data may be discarded on stop/retrigger.\n- `decode`: PCM conversion calls during streaming.\n- `envelope`: combined envelope and tail rendering for a published half.\n- `copy`: buffer copy and publication barrier.\n- `refill_work`: the corresponding prefetch work plus publication work for completed refills. It excludes the intentional waiting between prefetch and publication, and includes the nested SD/decoder/envelope/copy operations. Do not add the category totals together.\n- `colour`, `filter`, `phaser`, `flanger`, `mod` (extended build): time in each effect stage per processed block.\n\nEach metric has sample count, total, minimum and maximum; the host tool calculates means. The SD histogram uses inclusive upper bounds of 250 us, 500 us, 1/2/5/10/50 ms, then an open-ended final bucket. This supports coarse latency-distribution inspection rather than exact percentiles.\n\nThe report also records maximum background-service gap, total observed playback interval, stream error counters, and the smallest divider-weighted buffer margin before/after publication. The margin includes unsafe observations: zero can indicate a missed deadline. Its frame count belongs to the settings recorded alongside it; comparing only frame counts across different pitches is misleading. Minimum margin in microseconds is estimated from nominal clock anchors. Polling can miss events between observations; these are measured samples, not exhaustive timing guarantees.\n\nThe timer is the CPU Count register, using the existing firmware's nominal 24 ticks/us conversion at a 48 MHz CPU clock. Unsigned short intervals and split 64-bit accumulated totals handle timer wrap. This timebase has not been calibrated against external equipment. A back-to-back timer-read minimum is included, but does not capture all instrumentation overhead. No overhead is subtracted from measurements.\n\nMeasured refill-work share includes blocking SD waits and excludes other work and discarded prefills. It is **not CPU utilisation**: the application continuously polls even when there is spare processing time. Use worst work, buffer margin, service gaps and error counts together when assessing whether an added feature is plausible. The profiling build itself perturbs timing.\n\n## Stack and memory\n\nBefore the first C function runs, the diagnostic fills unused RAM between the linker-defined static-data end and the initial stack top with a pattern. The report scans for the lowest modified word. This gives an observed stack watermark, including startup/mount work and earlier report activity. It is a lower bound on stack use: a reserved but unwritten frame can retain the pattern. The current report write can deepen the stack after its snapshot; a later report can observe that use. Compiler `.su` frame sizes are supplementary, not a full call-chain bound.\n\nThe untouched gap is not a guaranteed safe allocation budget. Longer or different workloads may use more stack, and the diagnostic has extra frames. This build keeps the same 8 KiB minimum linker stack reservation and the same application-address limit. Compare normal/profiling manifests for code and static-RAM overhead; do not mistake the diagnostic's small code-space remainder for the normal firmware's headroom.\n\nThese measurements do not establish whether the resident updater accepts a larger flash layout. That remains a separate investigation.\n\n## Report storage and failure handling\n\n`ONEPROF.TXT` is a reserved 1024-byte text file. First creation can allocate FAT clusters and update a root directory entry and applicable FAT32 FSInfo hints, using the same restricted allocator as the recall file. Updates write two data sectors and verify them by readback. An existing unrelated, read-only or differently sized file is refused. No general-purpose file-writing API is added.\n\nThe fixed-position CRC32 footer covers the report body, including padding. The analyser rejects truncated, torn or edited reports rather than presenting potentially inconsistent counters. A failed report is attempted once per stop; a later playback/stop attempts a new report. Previously observed write failures are included in later successful reports. A genuinely unreadable card still needs normal card recovery. Interrupted metadata allocation has the existing FAT limitation: it can leak a cluster and is not transactional.\n\n## Return to normal firmware\n\n```sh\nmake\ncp build/image.hex \"/Volumes/TTA ONE/image.hex\"\nsync\ncmp build/image.hex \"/Volumes/TTA ONE/image.hex\"\ndiskutil eject \"/Volumes/TTA ONE\"\n```\n\nInstall normally. Normal firmware leaves an existing profile report untouched; it may be stale. Delete it on the computer when no longer needed.\n\n## Extended build additions\n\nThe extended profiling image adds a few lines to the report, which the analyser prints when present: FILE encoder step counts and the last filtered pin changes, the number of sector reads that were retried, detail of the last failed read, and the last six Chop gates with the knob/CV reading taken at each.\n",
+"provenance": "# Provenance and hardware limits\n\nThis is a source-built, reverse-engineered application, not a historical clean-room implementation. The private development project examined a manufacturer's update and device documentation. That development repository and its history are not part of this distribution.\n\n## Included implementation\n\nApplication startup, peripheral access, SD SPI, FAT, WAV conversion, buffering, controls, configuration, persistence and playback policy are supplied as source. The encoder's seven-state full-step table and masked-state traversal derive from Ben Buxton's GPLv3 Rotary implementation. `firmware/app.c` carries the copyright, adaptation date and upstream reference; NOTICE describes the modification. The entire project is distributed under GPL-3.0-only, with the complete licence in LICENSE.\n\nThe previously transcribed pitch tables were removed. `tools/generate_pitch.py` calculates the distributed application's tables from equal temperament and nominal hardware clock anchors. It does not read an extracted table or vendor binary. Shared values at octave/clock ratios are a consequence of the mathematics and hardware settings.\n\nThe reset routine follows the PIC32's hardware-defined SYSKEY/software-reset mechanism. Interrupt/exception stubs are source-assembled jumps into this application's fault handling. There is no boot-flash debug handler in the supplied source, linker output or update records.\n\n## Compatibility information\n\nRegister addresses, pin/PPS assignments, clock anchors, configuration words, file formats, supported behavior and application/update addresses were learned from hardware documentation and reverse engineering. The layout JSON contains only record headers/addresses and control records, not application instruction bytes. Hardware configuration words are emitted from source. These compatibility facts are retained and are not represented as newly invented hardware behavior.\n\nThe build is freestanding: it links the supplied object files directly, with no startup library, libc or proprietary SDK runtime. Undefined symbols and statically encoded function jumps outside the supplied payload are rejected. Such checks do not prove the absence of every possible indirect dependency or provide comprehensive third-party rights clearance.\n\n## Excluded material\n\nNo vendor update, original device dump, disassembly, original boot/debug stub, extracted pitch table, vendor sample library, historical hybrid firmware or private Git history is included. Generated objects, HEX/ELF files, test audio and build logs are ignored by Git. The source can generate the application without any of these inputs.\n\n## Hardware and update limits\n\nThe module must already have its resident updater. It is neither supplied nor reconstructed here. Its complete binary has not been obtained, and its erase/protection policy remains unknown. Update files omit the reset vector and boot-debug records and are not full-device recovery images. Source-level safeguards and successful updates do not guarantee recovery from corrupt firmware or power interruption.\n\nThe exported build-15 image matches its development counterpart byte-for-byte with the local toolchain: Homebrew Clang 23.1.5, Rust-bundled LLD 13.0.0 in GNU mode, and Python 3.15.2 on macOS. Different compiler/linker versions may produce different machine code. Qualitative user trials cover earlier playback/retrigger, quantization, random sequencing, mode feedback and Fade read-ahead. Build 14 click-overlap protection and build 15 build-record writing have software tests but no reported hardware confirmation yet. Fine tuning, every sample-rate/card combination, and precise latency remain unmeasured.\n\n## References\n\n- [Ben Buxton Rotary source](https://github.com/buxtronix/arduino/blob/master/libraries/Rotary/Rotary.cpp): copyright 2011 Ben Buxton, GNU GPL Version 3; attribution checked 2026-11-16.\n- [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html): full terms included locally in LICENSE.\n- [ONE manual](https://www.tiptopaudio.com/manuals/Tiptop_Audio_one.pdf): hardware behavior, configuration and published SD update workflow.\n- [PIC32MX1XX/2XX family data sheet](https://ww1.microchip.com/downloads/en/DeviceDoc/PIC32MX1XX2XX-28-36-44-PIN-DS60001168K.pdf): registers, memory layout, pins and reset behavior.\n- [Microchip reference-clock documentation](https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/32bit-mcu/PIC32/mx-arch-cpu-overview/oscillator/refclk/): fractional clock divider.\n- [SD simplified physical-layer specification](https://www.sdcard.org/cms/wp-content/themes/sdcard-org/dl.php?f=Part1_Physical_Layer_Simplified_Specification_Ver5.10.pdf): SPI protocol and CRC.\n- [Microsoft FAT specification](https://www.microsoft.com/en-us/download/details.aspx?id=53426) and [RIFF description](https://learn.microsoft.com/en-us/windows/win32/xaudio2/resource-interchange-file-format--riff-): filesystem/container formats.\n\nReferences are links, not bundled vendor documents or a grant of rights over those documents. Hardware/product names identify compatibility; the project is unofficial.\n",
+"tape": "# Tape: signed playback speed\n\nTape is mode 11 in the extended firmware. PLAY starts/stops a looping sample. Positive CV plays forward; negative CV plays backward. Distance from the calibrated zero sets speed. Near zero it fades to silence, holds the position captured when rest was requested, and resumes from there when CV moves away. GATE is ignored; FILE stops and selects another sample.\n\n## Calibrate and use\n\nSet the knob near centre and patch steady 0 V. Hold PLAY for at least half a second without moving either control, then release. Tap PLAY to arm playback. At zero, the button is red but there is no sound; moving CV away starts the sample. PLAY stops both audible playback and an armed zero hold.\n\nUse +0.5 V and −0.5 V first. On the measured module these produce approximately half native speed in opposite directions. About ±1 V gives native speed, with a maximum of 1.5× at approximately ±1.5 V. These are approximate relationships inferred from the measured ADC response, not calibrated 1 V/octave tracking. The speed law is linear in voltage magnitude. The existing Free/Quantize/Select File settings do not affect Tape.\n\nEntering rest requires magnitude below five raw counts (approximately 0.05 V); leaving rest requires eight counts (approximately 0.08 V). Between these thresholds, the previous rest/moving state is retained. ADC resolution can make very slow sweeps sound stepped. The knob offsets zero: moving it after calibration gives manual tape-stop/reversal gestures. Recalibrate to restore the chosen reference. Calibration is RAM-only and should be repeated each power session.\n\nTransitions retain the 512-frame fades and stopped refill gap from Flip. They are scheduled in output frames, so slowing playback also lengthens control response and fades. Near rest this can be hundreds of milliseconds. This is not continuous overlapping crossfade or seamless scrubbing. The position held is the playhead captured on requesting rest, not the later point at which the fade finishes.\n\n## Configuration\n\n```text\n# Hamburger Wavy\nTape\nQuantize\nShort\n```\n\nThe third line remains required, although pitch/file CV modes are overridden. The usual held-PLAY/FILE menu selects mode 11. Keep CV steady during calibration to avoid entering CV-mode editing.\n\n## Trying it\n\nUse a long rising sweep or a recognisable recording. Calibrate, tap PLAY at zero, move positive to hear forward playback, slowly return to zero and pause, then move negative to resume backwards. Change magnitude on one side to check speed without restarting. Try both knob and external CV gestures.\n",
+"user-guide": "# Using Hamburger Wavy\n\n## Card and audio files\n\nUse FAT16 or FAT32, with 512-byte sectors, either directly on the card or in an MBR partition. Audio must be mono PCM WAV, 16 or 24 bit, with a header sample rate of 8–96 kHz. Native clock families are 44.1/48/88.2/96 kHz; other accepted header rates use the 48 kHz family. Stereo, floating-point/compressed audio, exFAT, FAT12 and subdirectory browsing are unsupported.\n\nUp to 256 files or playlist entries are supported. Any `.wav` in the card's root can be browsed, whatever its name. In a playlist, extended build 54 accepts names up to 63 plain-ASCII characters; see [Playlists](#playlists).\n\n## Playback modes\n\nExtended build 54 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser or flanger, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.\n\n| Red count | Mode | Behavior |\n| --- | --- | --- |\n| 1 | Trigger | Each PLAY tap or gate trigger plays from the beginning once. |\n| 2 | Gate | Plays while external gate is held, fading on release. PLAY taps toggle manual playback. |\n| 3 | Fade | Retriggers fade out the current sound, then restart with a fade-in. |\n| 4 | Loop | Repeats the selected file; triggers restart it. Browsing stops it. |\n| 5 | Sequence | Advances one file before playing on each trigger. |\n| 6 | Combo | Advances one file on each trigger, then loops it. |\n| 7 | Random Sequence | Chooses a random file per trigger; repeats are allowed. |\n| 8 | Random Loop | Loops a file; subsequent triggers jump to random frame positions within it. |\n| 9 | Flip | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |\n| 10 | CV Flip | PLAY starts/stops; positive CV selects forward and negative selects reverse at native speed. Near zero, keeps its last direction. GATE is ignored. Calibrate first; see below. |\n| 11 | Tape | Signed CV controls direction and speed; near zero fades to silence and holds position. PLAY starts/stops; GATE ignored. Calibrate as for CV Flip. See [Tape](tape.md). |\n| 12 | Chop | Each gate jumps to the CV-selected position with a short fade, then plays forward at native speed. PLAY starts/stops. See [Chop](chop.md). |\n\nFade/Gate ramps are short 256-sample linear envelopes: about 5.3 ms at 48 kHz before pitch changes. They mainly suppress clicks, rather than providing long musical fades. Buffering adds release/retrigger latency. Random seeking and file changes require SD access and can take longer than cached Trigger playback. Overlapping voices are not implemented.\n\nFlip, CV Flip, Tape and Chop use 512-frame transition fades. These reduce direction-change clicks; they are not overlapping crossfades, and buffering/refill adds response delay.\n\n## CV Flip and Tape calibration\n\nSelect mode 10 (`CV Flip`) or 11 (`Tape`), or put that name on line 2 of `config.txt`. Examples: [cv-flip.txt](../examples/config/cv-flip.txt) and [tape.txt](../examples/config/tape.txt).\n\n1. Centre the pitch knob and patch a steady 0 V from your bipolar CV source.\n2. Hold PLAY for at least half a second without turning either control, then release. Playback stops and the current input becomes the zero reference.\n3. Tap PLAY to start. Positive CV plays forward and negative plays reverse. CV Flip retains the last direction near zero; Tape fades to silence and holds position there.\n\nA reverse start begins at the end of the sample. Calibration survives file selection but resets on power-up, so repeat it each session. Keep the knob at its calibrated position, or move it deliberately to bias the switching threshold. Keep CV steady during calibration: large movement while PLAY is held can enter CV-mode editing instead.\n\nCV Flip always uses native sample speed and overrides Free/Quantize/Select File behaviour. The third config line is still required, but does not change that behaviour. FILE browsing stops playback; GATE is ignored. See [CV Flip](cv-flip.md) for details. [Tape](tape.md) adds signed variable speed and a zero hold. [Chop](chop.md) samples CV position on each gate. These are separate playback modes, not CV-mode options.\n\n## CV modes\n\nThese apply to playback modes 1–9. CV Flip, Tape and Chop override them with their dedicated controls.\n\n| Blue count | Mode | Behavior |\n| --- | --- | --- |\n| 1 | Free | Continuous playback pitch/speed control. |\n| 2 | Quantize | Chromatic semitone steps using mathematically generated tables. |\n| 3 | Select File | Samples pitch/CV at each trigger to select an offset above FILE's base selection; plays at nominal native rate. |\n\nSelect File spans up to 32 offsets, wraps the file list, and takes precedence over automatic Sequence/random selection. CV alone does not retrigger or loop playback in Trigger mode. An LFO at GATE can retrigger on each rising edge.\n\nQuantize provides 49 notes from +7 through −41 semitones. Software input is `value = ADC >> 2`, clamped to 0–255; the note is `7 - floor((value*48 + 127)/255)`. Increasing ADC lowers pitch; the physical voltage/control relationship is not calibrated. Original pitch occupies ADC 140–159, away from the control's centre. Free mode uses a separate continuous mapping.\n\nThe divider for note `n` is `round(native_divider * 2**(-n/12))`, with half values rounded upward. Nominal anchors are 2176, 2000, 1088 and 1000 for 44.1, 48, 88.2 and 96 kHz. The hardware divider is encoded in steps of 1/512. Maximum rounding error relative to those anchors is about 1.09 cents. Oscillator error, approximate anchors and voltage calibration are additional; calibrated 1 V/octave tracking is not claimed. Runtime floating point is unnecessary.\n\n## Panel editing\n\nHold PLAY for at least 400 ms before moving a control to edit modes. Earlier FILE movement remains ordinary browsing and releasing PLAY remains a playback click.\n\nTurn FILE for playback mode. After the last detent, keep PLAY held and pause 350 ms: the complete red count starts from one. Pulses are 200 ms on/off, with at least a one-second gap between groups. Release PLAY to apply. Once FILE has moved during an editing hold, CV/LFO movement cannot change CV mode or take over the display; any provisional CV edit in that hold is discarded.\n\nTo edit CV mode, release and hold PLAY again, then move pitch without turning FILE. Low ADC selects Free, centre selects Quantize, high selects Select File, with intervening dead bands. Blue counts identify the selection. Power cycling or remounting reloads the card configuration.\n\n## config.txt\n\nPlain text in the card root, for example:\n\n```text\n# Hamburger Wavy configuration\nTrigger\nQuantize\nShort\n```\n\nLine 1 starts with `#`; line 2 is a playback mode; line 3 is a CV mode. Optional line 4 is Select File's settling delay: Short=0 ms, Medium=2 ms, Long=10 ms. In the extended build, effect lines follow (see [Effects](#effects)) and `Colour`, `Filter` or `Rate` are also accepted as the CV mode. Other further lines are ignored. `Random` is an alias for Random Sequence; `Looping` aliases Loop and `Quantized` aliases Quantize. Earlier card spellings remain compatibility aliases in the parser.\n\nCase differences, surrounding setting whitespace, CRLF/LF and a UTF-8 BOM are accepted. Missing or malformed settings use Trigger/Quantize/Short. An actual read error invokes card recovery. Config files must fit within 4096 bytes.\n\n## Effects\n\nExtended build 54 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nBandpass 5\nResonance 6\nWah 6\nRate 4\n```\n\n| Line | What it does | Details |\n| --- | --- | --- |\n| `Drive n` | Gain into a smooth clipper, 1× to about 16× | [Colour](colour.md) |\n| `Crush n` | Fewer bits (16 down to 4) and a sample hold of 1 to 32 frames | [Colour](colour.md) |\n| `Filter n` | Low-pass cutoff, 1 darkest to 9 brightest (`Lowpass n` is the same) | [Filter](filter.md) |\n| `Highpass n` | High-pass cutoff, 1 removes only the lowest bass, 9 leaves a thin top | [Filter](filter.md) |\n| `Bandpass n` | Band-pass centre, low to high | [Filter](filter.md) |\n| `Resonance n` | Emphasis at the cutoff for any of the three filter shapes | [Filter](filter.md) |\n| `Wah n` | A slow sine sweeps the filter cutoff, up to about 2.5 octaves each way | [Filter](filter.md) |\n| `Phaser n` | Swept notches with feedback; intensity | [Phaser](phaser.md) |\n| `Flanger n` | Swept short delay with feedback, the jet sound; intensity. Replaces the phaser if both are present | [Flanger](flanger.md) |\n| `Tremolo n` | Level dips at the `Rate`; depth, 9 reaches silence | [Tremolo and ring modulation](mod.md) |\n| `Ring n` | Multiplies the sound by a sine at the `Rate`; depth. Replaces tremolo if both are present | [Tremolo and ring modulation](mod.md) |\n| `Rate n` | Speed for wah, phaser, flanger, tremolo and ring, each on its own scale | below |\n\nOnly one of `Filter`, `Highpass` and `Bandpass` applies: the last one in the file. The signal passes through drive and crush, then the filter, the phaser or flanger, and tremolo or ring modulation, before the existing fades.\n\n`Rate n` scales (calculated, at the file's native pitch):\n\n| `Rate` | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |\n|---|---|---|---|---|---|---|---|---|---|---|\n| Wah, phaser, flanger (Hz) | 0.125 | 0.2 | 0.31 | 0.5 | 0.79 | 1.3 | 2 | 3.2 | 5 | 8 |\n| Tremolo (Hz) | 1 | 1.4 | 1.9 | 2.7 | 3.5 | 4.8 | 6.7 | 8.8 | 12 | 16 |\n| Ring (Hz) | 16 | 30 | 56 | 107 | 197 | 363 | 682 | 1236 | 2216 | 4096 |\n\n### Effect CV modes\n\nPut one of these on the CV mode line (line 3) to control an effect from the pitch knob/CV. Playback then stays at the file's native pitch, and clockwise or positive CV gives more. They can only be chosen in `config.txt`; picking a CV mode in the held-PLAY menu leaves them until the card is next mounted.\n\n| CV mode | Knob/CV controls |\n| --- | --- |\n| `Colour` | Amount of drive and crush, from clean up to the configured digits (both to 9 if neither line is present) |\n| `Filter` | Cutoff of whichever filter shape is named; with `Wah`, the centre of the sweep |\n| `Rate` | Speed of the wah, phaser, flanger, tremolo or ring modulation. With none of those lines present it gives full-depth tremolo |\n\nIn CV Flip, Tape and Chop the CV input controls the transport, so the effects use their fixed config values.\n\n### Limits\n\nHow many effect stages run depends on the output rate, which rises as a file is pitched up. Drive and crush count as one stage; the filter (with or without wah), the phaser or flanger, and tremolo/ring are one each.\n\n| Output rate | Stages that run |\n| --- | --- |\n| Up to 48 kHz | All four |\n| 48 kHz to about 64 kHz | Three: drive/crush gives way first, then tremolo/ring |\n| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser or flanger, otherwise tremolo/ring, otherwise drive/crush |\n| Above 96 kHz | None |\n\nA 44.1 or 48 kHz file at native pitch or below gets everything; an 88.2 or 96 kHz file at native pitch gets one stage. Crossing a limit while playing switches a stage on or off with an audible step, most obvious on steady tones.\n\nFilter cutoff, phaser and flanger positions and all rates are tied to the playback clock, so they move with pitch: pitching a file down an octave lowers the cutoff an octave and halves the rates.\n\nExample files for each effect are in [examples/config](../examples/config).\n\nThe [config editor](config-editor.html) is a single web page that writes `config.txt` and playlists for you. Download it and open it in a browser; it works offline and uploads nothing. It shows each setting in real units, which effects will run for a given file rate and pitch, and what the knob will control, and it can load an existing `config.txt` to edit. Opening the card's folder in it lets it check every WAV against what the firmware accepts, build playlists from the files that are there, and flag a playlist entry that would cut the list short. In Chrome and Edge it can save `config.txt` and the playlists straight to the card, after showing what it will write; in other browsers it reads the card and you download the results. Under Firmware on its Playback tab it shows which build the card was last used with, and can fetch the current firmware, check it against its published checksum and write it to the card as `image.hex`; that step contacts GitHub, and is the only time the page uses the network.\n\n## Playlists\n\nAn optional root file `playlist.txt` lists one WAV filename per line and replaces directory order. Duplicate entries are allowed and weight random selection. From extended build 54 a name can be the file's full name as the computer shows it, up to 63 plain-ASCII characters including `.wav`, with spaces and punctuation allowed; upper and lower case do not matter. Earlier builds, and legacy build 21, accept at most 13 characters with only letters, digits and `~` before `.wav`; longer-named files are then listed by their short alias, such as `MYLONG~1.wav`. The list ends at the first blank, malformed or missing name, so a typing mistake shortens it; a list with no usable entry does not play. Card read errors abort mounting. For a single-tone test, a playlist may simply contain:\n\n```text\nQ480.wav\n```\n\nGenerate that original test tone with `python3 tools/generate_test_tones.py` and copy it from `build/test-tones/` to the card. Delete `playlist.txt` to restore directory browsing.\n\n### Several playlists\n\nFrom extended build 54 a card can hold several playlist files, with `config.txt` choosing the one in use:\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nPlaylist drums\n```\n\n`Playlist drums` (or `Playlist drums.txt`) uses `drums.txt` from the card's root. The name is one to eight letters, digits or `~`. The line goes with the effect lines, after the CV mode and the optional delay line. If the named file is not on the card the firmware uses `playlist.txt`, and if that is absent too, directory order. A named file that exists but has no usable entry does not play. Earlier builds ignore the line and use `playlist.txt`. Switching playlists means editing that one line; the panel cannot change it.\n\n## Persistent files and lights\n\nWAV, config and playlist files remain read-only. Two reserved root files can be created/updated, with audio stopped:\n\n- `ONESTATE.BIN`: 1024 bytes, two alternating CRC-protected records remembering the last manually played file. External gate triggers do not save it. Old `STATUS.BIN` recall is imported read-only.\n- `ONEBUILD.TXT`: 512-byte space-padded plain text identifying the running build. An already-correct record is not rewritten. It identifies the last firmware that successfully wrote the card, not an image merely copied from a computer. Older firmware without this feature can leave the record stale.\n\nFirst creation also updates allocated FAT entries, a root directory entry and applicable FAT32 FSInfo hints. Existing unrelated/read-only same-name files are refused. Build logging is best effort; a failed write does not deliberately block playback. Interrupted metadata creation can leak a cluster; this is not transactional FAT storage.\n\nStartup: one second blue, then no build count. Red indicates playback. Solid blue indicates a playback error, including a missed refill deadline; flashing blue can indicate card recovery or stationary DMA. These signals do not uniquely diagnose the underlying fault. PLAY retries after a playback error reopen/re-prime the selected file.\n\nThe optional diagnostic build adds `ONEPROF.TXT` reporting after playback stops. Normal builds do not create or update it. See [profiling](profiling.md) for collection instructions and the additional reserved write scope.\n"
+},
+"examples": {
+"bandpass-cv.txt": "# Hamburger Wavy: knob/CV sweeps a resonant band-pass\nLoop\nFilter\nBandpass 5\nResonance 6\n",
+"chop.txt": "# Hamburger Wavy\nChop\nQuantize\nShort\n",
+"colour-cv.txt": "# Hamburger Wavy: knob/CV sweeps colour\nLoop\nColour\n",
+"colour.txt": "# Hamburger Wavy colour example: fixed drive and crush\nLoop\nQuantize\nShort\nDrive 4\nCrush 6\n",
+"combo.txt": "# Hamburger Wavy configuration\nCombo\nFree\nShort\n",
+"cv-flip.txt": "# Hamburger Wavy\nCV Flip\nQuantize\nShort\n",
+"fade.txt": "# Hamburger Wavy configuration\nFade\nFree\nShort\n",
+"file-select.txt": "# Hamburger Wavy configuration\nTrigger\nSelect File\nMedium\n",
+"filter-cv.txt": "# Hamburger Wavy: knob/CV sweeps filter cutoff\nLoop\nFilter\nResonance 6\nDrive 6\n",
+"filter.txt": "# Hamburger Wavy: fixed low-pass filter\nLoop\nQuantize\nShort\nFilter 5\nResonance 6\n",
+"flanger-cv.txt": "# Hamburger Wavy: knob/CV sets the flanger speed\nLoop\nRate\nFlanger 7\n",
+"flanger.txt": "# Hamburger Wavy: flanger\nLoop\nQuantize\nShort\nFlanger 7\nRate 2\n",
+"flip.txt": "# Hamburger Wavy configuration\nFlip\nQuantize\nShort\n",
+"gate.txt": "# Hamburger Wavy configuration\nGate\nFree\nShort\n",
+"highpass.txt": "# Hamburger Wavy: fixed high-pass filter\nLoop\nQuantize\nShort\nHighpass 5\nResonance 3\n",
+"loop-quantized.txt": "# Hamburger Wavy sustained quantized-pitch test\nLoop\nQuantize\nShort\n",
+"loop.txt": "# Hamburger Wavy configuration\nLooping\nFree\nShort\n",
+"named-playlist.txt": "# Hamburger Wavy: use drums.txt as the playlist\nSequence\nQuantize\nShort\nPlaylist drums\n",
+"phaser-cv.txt": "# Hamburger Wavy: knob/CV sets the phaser speed\nLoop\nRate\nPhaser 7\n",
+"phaser.txt": "# Hamburger Wavy: phaser\nLoop\nQuantize\nShort\nPhaser 7\nRate 3\n",
+"quantized.txt": "# Hamburger Wavy configuration\nTrigger\nQuantize\nShort\n",
+"random-loop.txt": "# Hamburger Wavy configuration\nRandom Loop\nFree\nShort\n",
+"random-sequence.txt": "# Hamburger Wavy configuration\nRandom\nFree\nShort\n",
+"rate-cv.txt": "# Hamburger Wavy: knob/CV sweeps ring mod rate\nLoop\nRate\nRing 9\n",
+"ring.txt": "# Hamburger Wavy: fixed ring modulation\nLoop\nQuantize\nShort\nRing 9\nRate 5\n",
+"sequence.txt": "# Hamburger Wavy configuration\nSequence\nFree\nShort\n",
+"tape.txt": "# Hamburger Wavy\nTape\nQuantize\nShort\n",
+"tremolo.txt": "# Hamburger Wavy: fixed tremolo\nLoop\nQuantize\nShort\nTremolo 7\nRate 5\n",
+"trigger.txt": "# Hamburger Wavy configuration\nTrigger\nFree\nShort\n",
+"wah-cv.txt": "# Hamburger Wavy: knob/CV sets the wah speed\nLoop\nRate\nBandpass 5\nResonance 6\nWah 6\n",
+"wah.txt": "# Hamburger Wavy: slow wah on a resonant band-pass\nLoop\nQuantize\nShort\nBandpass 5\nResonance 6\nWah 6\nRate 4\n"
+}
+}
+</script><!--docs-end-->
+<script>
+/*LOGIC-BEGIN*/
+// Pure config logic, shared by the page and by the release test, which checks
+// its output against the firmware's own parser. No DOM access in this block.
+const HW = (() => {
+  const PLAY = [
+    ['Trigger', 'Each PLAY tap or gate plays from the beginning once'],
+    ['Gate', 'Plays while the gate is held, fading on release'],
+    ['Fade', 'Like Trigger, with short fades'],
+    ['Loop', 'Loops the file'],
+    ['Sequence', 'Each trigger plays the next file'],
+    ['Combo', 'Sequence with looping'],
+    ['Random Sequence', 'Each trigger plays a random file'],
+    ['Random Loop', 'Loops, jumping to a random position on each trigger'],
+    ['Flip', 'Loops; each gate reverses direction'],
+    ['CV Flip', 'Loops; CV polarity sets direction'],
+    ['Tape', 'CV sets direction and speed, holding at zero'],
+    ['Chop', 'Each gate jumps to the CV-selected position'],
+  ];
+  const PLAY_ALIASES = {
+    'TRIGGER': 0, 'GATE': 1, 'FADE': 2, 'LOOP': 3, 'LOOPING': 3, 'SEQUENCE': 4, 'COMBO': 5,
+    'RANDOM SEQUENCE': 6, 'RANDOM': 6, 'TG SEQUENCE': 6, 'TG LOOP': 7, 'RANDOM LOOP': 7,
+    'FLIP': 8, 'CV FLIP': 9, 'TAPE': 10, 'CHOP': 11,
+  };
+  const CV = [
+    ['Free', 'Pitch, continuous'],
+    ['Quantize', 'Pitch, in semitones'],
+    ['Select File', 'Chooses the file at each trigger'],
+    ['Colour', 'Amount of drive and crush'],
+    ['Filter', 'Filter cutoff'],
+    ['Rate', 'Speed of wah, sweep and modulation'],
+  ];
+  const CV_ALIASES = {
+    'FREE': 0, 'QUANTIZE': 1, 'QUANTIZED': 1, 'SELECT FILE': 2, 'COLOUR': 3, 'COLOR': 3,
+    'FILTER': 4, 'RATE': 5,
+  };
+  const DELAY = [['Short', 0], ['Medium', 2], ['Long', 10]];
+  const SHAPES = [['low', 'Filter', 'Low-pass'], ['high', 'Highpass', 'High-pass'], ['band', 'Bandpass', 'Band-pass']];
+  const TRANSPORT_CV = [9, 10, 11]; // CV Flip, Tape, Chop own the CV input
+
+  const defaults = () => ({
+    comment: 'Hamburger Wavy configuration', play: 3, cv: 1, delay: 0,
+    drive: 0, crush: 0, shape: 'low', cutoff: 0, resonance: 0, wah: 0,
+    sweep: 'none', sweepAmt: 7, mod: 'none', modAmt: 7, rate: 4, playlist: '',
+    sampleRate: 48000, pitch: 0,
+  });
+
+  const amount = (digit) => Math.floor(digit * 255 / 9); // as the firmware scales a digit
+  const clampDigit = (n) => Math.max(0, Math.min(9, Math.round(Number(n) || 0)));
+  const RESERVED = ['CONFIG', 'ONEBUILD', 'ONEPROF', 'PLAYLIST'];
+  // A name usable on a Playlist line: the firmware adds .TXT itself.
+  const validListName = (name) => /^[A-Za-z0-9~]{1,8}$/.test(name || '') && !RESERVED.includes(name.toUpperCase());
+
+  function cleanComment(text) {
+    let out = '';
+    for (const ch of String(text || '')) {
+      const code = ch.charCodeAt(0);
+      out += ch.length === 1 && code >= 32 && code < 127 ? ch : '?';
+    }
+    return out.replace(/\s+$/, '').slice(0, 61);
+  }
+
+  // What the firmware would end up with for this editor state.
+  function settings(state) {
+    const s = {
+      play: state.play, cv: state.cv, delay: DELAY[state.delay][1],
+      drive: amount(state.drive), crush: amount(state.crush),
+      filter: amount(state.cutoff), resonance: amount(state.resonance),
+      shape: 0, tremolo: 0, ring: 0, rate: 0, wah: amount(state.wah), phaser: 0, flanger: 0,
+      playlist: validListName(state.playlist) ? state.playlist.toUpperCase() + '.TXT' : '',
+    };
+    const lines = effectLines(state).map((l) => l.split(' ')[0]);
+    if (lines.includes('Highpass')) s.shape = 1;
+    if (lines.includes('Bandpass')) s.shape = 2;
+    if (!lines.some((k) => k === 'Filter' || k === 'Highpass' || k === 'Bandpass')) s.filter = 0;
+    if (!lines.includes('Resonance')) s.resonance = 0;
+    if (state.sweep === 'phaser') s.phaser = amount(state.sweepAmt);
+    if (state.sweep === 'flanger') s.flanger = amount(state.sweepAmt);
+    if (state.mod === 'tremolo') s.tremolo = amount(state.modAmt);
+    if (state.mod === 'ring') s.ring = amount(state.modAmt);
+    if (lines.includes('Rate')) s.rate = amount(state.rate);
+    return s;
+  }
+
+  function usesRate(state) {
+    return state.wah > 0 || state.sweep !== 'none' || state.mod !== 'none' || state.cv === 5;
+  }
+
+  function effectLines(state) {
+    const out = [];
+    if (state.drive) out.push('Drive ' + state.drive);
+    if (state.crush) out.push('Crush ' + state.crush);
+    const shape = SHAPES.find((x) => x[0] === state.shape) || SHAPES[0];
+    // With Filter on the knob, or a wah, the line still chooses the shape.
+    const shapeNeeded = shape[0] !== 'low' && (state.cv === 4 || state.wah > 0);
+    if (state.cutoff || shapeNeeded) out.push(shape[1] + ' ' + state.cutoff);
+    if (state.resonance) out.push('Resonance ' + state.resonance);
+    if (state.wah) out.push('Wah ' + state.wah);
+    if (state.sweep === 'phaser') out.push('Phaser ' + state.sweepAmt);
+    if (state.sweep === 'flanger') out.push('Flanger ' + state.sweepAmt);
+    if (state.mod === 'tremolo') out.push('Tremolo ' + state.modAmt);
+    if (state.mod === 'ring') out.push('Ring ' + state.modAmt);
+    if (state.rate && usesRate(state)) out.push('Rate ' + state.rate);
+    if (validListName(state.playlist)) out.push('Playlist ' + state.playlist.toLowerCase() + '.txt');
+    return out;
+  }
+
+  function generate(state) {
+    const lines = ['# ' + cleanComment(state.comment), PLAY[state.play][0], CV[state.cv][0], DELAY[state.delay][0]]
+      .concat(effectLines(state));
+    lines[0] = lines[0].replace(/\s+$/, '');
+    return lines.join('\n') + '\n';
+  }
+
+  // Mirror of firmware/settings.c. Returns {ok, error, settings, notes}.
+  function parse(text) {
+    const fail = (error) => ({ ok: false, error, settings: null, notes: [] });
+    if (new TextEncoder().encode(text).length > 4096) return fail('The file is larger than 4096 bytes.');
+    let body = text.replace(/^﻿/, '');
+    if (body.indexOf('\0') >= 0) return fail('The file contains a NUL character.');
+    let raw = body.split('\n');
+    if (raw.length && raw[raw.length - 1] === '') raw.pop();
+    raw = raw.map((l) => l.replace(/\r/g, ''));
+    const tooLong = (l) => new TextEncoder().encode(l).length > 63;
+    const tidy = (l) => l.replace(/[ \t]+$/, '');
+    const name = (l) => l.replace(/^[ \t]+/, '').toUpperCase();
+    const notes = [];
+    if (!raw.length) return fail('The file is empty.');
+    const bom = text.charCodeAt(0) === 0xFEFF ? 3 : 0; // counted by the firmware's line buffer
+    if (new TextEncoder().encode(raw[0]).length + bom > 63) return fail('Line 1 is longer than 63 characters.');
+    if (tidy(raw[0])[0] !== '#') return fail('Line 1 must start with #.');
+    if (raw.length < 2) return fail('Line 2 (the playback mode) is missing.');
+    if (tooLong(raw[1])) return fail('Line 2 is longer than 63 characters.');
+    const play = PLAY_ALIASES[name(tidy(raw[1]))];
+    if (play === undefined) return fail('Line 2 is not a playback mode: "' + tidy(raw[1]) + '".');
+    if (raw.length < 3) return fail('Line 3 (the knob/CV mode) is missing.');
+    if (tooLong(raw[2])) return fail('Line 3 is longer than 63 characters.');
+    const cv = CV_ALIASES[name(tidy(raw[2]))];
+    if (cv === undefined) return fail('Line 3 is not a knob/CV mode: "' + tidy(raw[2]) + '".');
+    const s = { play, cv, delay: 0, drive: 0, crush: 0, filter: 0, resonance: 0, shape: 0,
+                tremolo: 0, ring: 0, rate: 0, wah: 0, phaser: 0, flanger: 0, playlist: '' };
+    const seen = {};
+    const effect = (line) => {
+      const list = /^[ \t]*PLAYLIST[ \t]+([A-Za-z0-9~]{1,8})(?:[ \t]*\.TXT)?$/i.exec(line);
+      if (list) { s.playlist = list[1].toUpperCase() + '.TXT'; seen.PLAYLIST = (seen.PLAYLIST || 0) + 1; return true; }
+      const m = /^[ \t]*([A-Za-z]+)[ \t]+([0-9])$/.exec(line);
+      if (!m) return false;
+      const key = m[1].toUpperCase(), value = amount(Number(m[2]));
+      const cutoff = { FILTER: 0, LOWPASS: 0, HIGHPASS: 1, BANDPASS: 2 };
+      if (key in cutoff) { s.filter = value; s.shape = cutoff[key]; seen.CUTOFF = (seen.CUTOFF || 0) + 1; return true; }
+      const field = { DRIVE: 'drive', CRUSH: 'crush', RESONANCE: 'resonance', TREMOLO: 'tremolo',
+                      RING: 'ring', RATE: 'rate', WAH: 'wah', PHASER: 'phaser', FLANGER: 'flanger' }[key];
+      if (!field) return false;
+      s[field] = value; seen[key] = (seen[key] || 0) + 1;
+      return true;
+    };
+    if (raw.length >= 4) {
+      if (tooLong(raw[3])) return fail('Line 4 is longer than 63 characters.');
+      const four = tidy(raw[3]);
+      if (four && four[0] !== '#') {
+        if (!effect(four)) {
+          const d = { SHORT: 0, MEDIUM: 2, LONG: 10 }[name(four)];
+          if (d === undefined) return fail('Line 4 is neither Short/Medium/Long nor an effect line: "' + four + '".');
+          s.delay = d;
+        }
+      }
+      for (let i = 4; i < raw.length && i < 16; i++) {
+        if (tooLong(raw[i])) return fail('Line ' + (i + 1) + ' is longer than 63 characters.');
+        const l = tidy(raw[i]);
+        if (!effect(l) && l && l[0] !== '#') notes.push('Line ' + (i + 1) + ' is ignored by the firmware: "' + l + '".');
+      }
+      for (let i = 16; i < raw.length; i++)
+        if (tidy(raw[i])) notes.push('Line ' + (i + 1) + ' is past the last line the firmware reads.');
+    }
+    if (seen.PLAYLIST > 1) notes.push('More than one Playlist line: only the last one applies.');
+    if (seen.CUTOFF > 1) notes.push('More than one cutoff line: only the last one applies.');
+    if (s.ring && s.tremolo) notes.push('Ring and Tremolo are both set: Ring is used.');
+    if (s.flanger && s.phaser) notes.push('Flanger and Phaser are both set: Flanger is used.');
+    return { ok: true, error: null, settings: s, notes };
+  }
+
+  const digitOf = (value) => Math.max(0, Math.min(9, Math.round(value * 9 / 255)));
+
+  // Editor state for parsed settings (what the firmware would actually do).
+  function stateFrom(s, comment) {
+    const st = defaults();
+    st.comment = cleanComment(comment);
+    st.play = s.play; st.cv = s.cv;
+    st.delay = Math.max(0, DELAY.findIndex((d) => d[1] === s.delay));
+    st.drive = digitOf(s.drive); st.crush = digitOf(s.crush);
+    st.shape = ['low', 'high', 'band'][s.shape] || 'low';
+    st.cutoff = digitOf(s.filter); st.resonance = digitOf(s.resonance); st.wah = digitOf(s.wah);
+    if (s.flanger) { st.sweep = 'flanger'; st.sweepAmt = digitOf(s.flanger); }
+    else if (s.phaser) { st.sweep = 'phaser'; st.sweepAmt = digitOf(s.phaser); }
+    if (s.ring) { st.mod = 'ring'; st.modAmt = digitOf(s.ring); }
+    else if (s.tremolo) { st.mod = 'tremolo'; st.modAmt = digitOf(s.tremolo); }
+    st.rate = digitOf(s.rate);
+    st.playlist = s.playlist ? s.playlist.replace(/\.TXT$/, '').toLowerCase() : '';
+    return st;
+  }
+
+  // ---- Playlists: mirror of playlist_load in firmware/settings.c ----
+  const MAX_FILES = 256;
+  const BUILD = 54; // the firmware build this page matches
+  const buildOf = (text) => { const m = /build\s+(\d+)/i.exec(text || ''); return m ? Number(m[1]) : null; };
+  const entryProblem = (name) => {
+    if (new TextEncoder().encode(name).length > 63) return 'longer than 63 characters';
+    if (name.length < 5 || !/\.wav$/i.test(name)) return 'not a .wav name';
+    if (!/^[\x20-\x7e]+$/.test(name)) return 'only plain ASCII characters can be matched';
+    return '';
+  };
+  // cardNames: array of file names on the card, or null if unknown.
+  // Returns the entries the firmware would use, and why it stopped.
+  function playlistParse(text, cardNames) {
+    const used = [];
+    let stopped = '';
+    if (new TextEncoder().encode(text).length > 16384)
+      return { used, stopped: 'The file is larger than 16384 bytes: the card will not mount.', fatal: true };
+    const have = cardNames ? cardNames.map((n) => n.toUpperCase()) : null;
+    let raw = text.split('\n');
+    if (raw.length && raw[raw.length - 1] === '') raw.pop();
+    for (let i = 0; i < raw.length && used.length < MAX_FILES; i++) {
+      const whole = raw[i].replace(/\r/g, '');
+      if (whole.indexOf('\0') >= 0 || new TextEncoder().encode(whole).length > 63) {
+        stopped = 'Line ' + (i + 1) + ' is too long.'; break;
+      }
+      const name = whole.replace(/[ \t]+$/, '');
+      const problem = entryProblem(name);
+      if (problem) { stopped = 'Line ' + (i + 1) + ' ("' + name + '"): ' + (name ? problem : 'a blank line ends the list') + '.'; break; }
+      if (have && !have.includes(name.toUpperCase())) { stopped = 'Line ' + (i + 1) + ': ' + name + ' is not on the card.'; break; }
+      used.push(name);
+    }
+    return { used, stopped, fatal: false };
+  }
+  const playlistGenerate = (entries) => entries.map((n) => n + '\n').join('');
+  // Per-entry status for the editor's list.
+  function playlistCheck(entries, cardNames) {
+    const have = cardNames ? cardNames.map((n) => n.toUpperCase()) : null;
+    let cut = false;
+    return entries.map((name, i) => {
+      let problem = entryProblem(name);
+      if (!problem && have && !have.includes(name.toUpperCase())) problem = 'not on the card';
+      if (!problem && i >= MAX_FILES) problem = 'past the 256-file limit';
+      const status = cut ? 'unreached' : problem ? 'stops' : 'ok';
+      if (problem) cut = true;
+      return { name, status, problem };
+    });
+  }
+  // Mirror of wave_open in firmware/wave.c, on the first bytes of a file.
+  function wavInspect(bytes, fileSize) {
+    const u16 = (o) => bytes[o] | bytes[o + 1] << 8;
+    const u32 = (o) => (bytes[o] | bytes[o + 1] << 8 | bytes[o + 2] << 16 | bytes[o + 3] << 24) >>> 0;
+    const bad = (reason) => ({ ok: false, reason });
+    if (bytes.length < 12 || u32(0) !== 0x46464952 || u32(8) !== 0x45564157) return bad('not a WAV file');
+    const riff = u32(4);
+    if (riff < 4 || riff > fileSize - 8) return bad('damaged header');
+    const end = riff + 8;
+    let pos = 12, fmt = null, data = null;
+    for (let chunks = 0; chunks < 1024 && pos <= end && end - pos >= 8; chunks++) {
+      if (pos + 8 > bytes.length) return { ok: null, reason: 'header too far into the file to check here' };
+      const id = u32(pos), n = u32(pos + 4), body = pos + 8;
+      if (n > end - body) return bad('damaged header');
+      if (id === 0x20746d66) {
+        if (fmt || n < 16) return bad('damaged format chunk');
+        if (body + Math.min(n, 40) > bytes.length) return { ok: null, reason: 'header too far into the file to check here' };
+        const tag = u16(body), channels = u16(body + 2), rate = u32(body + 4), align = u16(body + 12), bits = u16(body + 14);
+        if (tag === 0xfffe) {
+          const guid = [1, 0, 0, 0, 0, 0, 16, 0, 128, 0, 0, 170, 0, 56, 155, 113];
+          if (n < 40 || u16(body + 16) < 22 || u16(body + 18) !== bits || guid.some((g, i) => bytes[body + 24 + i] !== g))
+            return bad('not plain PCM');
+        } else if (tag !== 1) return bad('not plain PCM (compressed or float)');
+        if (channels !== 1) return bad(channels + ' channels; mono only');
+        if (bits !== 16 && bits !== 24) return bad(bits + '-bit; 16 or 24 only');
+        if (rate < 8000 || rate > 96000) return bad(rate + ' Hz; 8000 to 96000 only');
+        if (align !== bits / 8 || u32(body + 8) !== rate * align) return bad('inconsistent format chunk');
+        fmt = { rate, bits };
+      } else if (id === 0x61746164 && !data) data = { bytes: n };
+      if (fmt && data) {
+        if (data.bytes % (fmt.bits / 8)) return bad('odd data length');
+        return { ok: true, rate: fmt.rate, bits: fmt.bits, seconds: data.bytes / (fmt.bits / 8) / fmt.rate };
+      }
+      if ((n & 1) && n === end - body) return bad('damaged header');
+      pos = body + n + (n & 1);
+    }
+    return bad('no audio data found');
+  }
+
+  // ---- Firmware images ----
+  // Where the page looks for the current firmware. A branch, because release
+  // attachments cannot be fetched from a web page.
+  const FIRMWARE_BASE = 'https://raw.githubusercontent.com/misterwavey/hamburger-wavy/firmware/';
+  const RELEASES_URL = 'https://github.com/misterwavey/hamburger-wavy/releases';
+  // SHA-256 of a Uint8Array, as lower-case hex. Own code so it also works
+  // where the browser's crypto is unavailable to pages opened from disk.
+  function sha256(bytes) {
+    const K = [], H = [];
+    const frac = (x) => ((x - Math.floor(x)) * 4294967296) | 0;
+    for (let n = 2, found = 0; found < 64; n++) {
+      let prime = true;
+      for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+      if (!prime) continue;
+      if (found < 8) H.push(frac(Math.sqrt(n)));
+      K.push(frac(Math.cbrt(n))); found++;
+    }
+    const length = bytes.length, total = ((length + 9 + 63) >> 6) << 6;
+    const data = new Uint8Array(total);
+    data.set(bytes); data[length] = 0x80;
+    const view = new DataView(data.buffer);
+    view.setUint32(total - 8, Math.floor(length / 536870912)); view.setUint32(total - 4, (length * 8) >>> 0);
+    const w = new Int32Array(64), rot = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let at = 0; at < total; at += 64) {
+      for (let i = 0; i < 16; i++) w[i] = view.getInt32(at + i * 4);
+      for (let i = 16; i < 64; i++) {
+        const a = w[i - 15], b = w[i - 2];
+        w[i] = (w[i - 16] + (rot(a, 7) ^ rot(a, 18) ^ (a >>> 3)) + w[i - 7] + (rot(b, 17) ^ rot(b, 19) ^ (b >>> 10))) | 0;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (h + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+        const t2 = ((rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    return H.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+  // Is this an Intel HEX firmware image? Every record's own checksum is verified.
+  function hexCheck(bytes) {
+    if (bytes.length < 1000 || bytes.length > 2000000) return { ok: false, reason: 'not the size of a firmware image' };
+    let text = '';
+    for (let i = 0; i < bytes.length; i++) {
+      if (bytes[i] > 126) return { ok: false, reason: 'not an Intel HEX file' };
+      text += String.fromCharCode(bytes[i]);
+    }
+    const lines = text.split(/\r?\n/).filter((l) => l.length);
+    let ended = false, data = 0;
+    for (const line of lines) {
+      if (ended) return { ok: false, reason: 'data after the end record' };
+      if (!/^:([0-9A-Fa-f]{2}){5,}$/.test(line)) return { ok: false, reason: 'not an Intel HEX file' };
+      const b = [];
+      for (let i = 1; i < line.length; i += 2) b.push(parseInt(line.substr(i, 2), 16));
+      if (b[0] !== b.length - 5) return { ok: false, reason: 'a record has the wrong length' };
+      if (b.reduce((x, y) => (x + y) & 255, 0) !== 0) return { ok: false, reason: 'a record fails its checksum' };
+      if (b[3] === 0) data += b[0];
+      if (b[3] === 1) ended = true;
+    }
+    if (!ended) return { ok: false, reason: 'the file is cut short (no end record)' };
+    if (data < 1000) return { ok: false, reason: 'too little data for a firmware image' };
+    return { ok: true, bytes: data };
+  }
+  // The published description of the current firmware: { build, file, sha256, ... }.
+  function firmwareInfo(json) {
+    const ok = json && Number.isInteger(json.build) && json.build > 0 && typeof json.file === 'string' &&
+      /^[A-Za-z0-9._\/-]+$/.test(json.file) && !json.file.includes('..') && json.file[0] !== '/' &&
+      typeof json.sha256 === 'string' && /^[0-9a-f]{64}$/.test(json.sha256);
+    return ok ? { build: json.build, file: json.file, sha256: json.sha256, date: typeof json.date === 'string' ? json.date : '' } : null;
+  }
+
+  // ---- A small Markdown renderer for the built-in guide ----
+  // Covers what the project's documents use: headings, paragraphs, lists,
+  // tables, fenced code, inline code, bold and links. Everything is escaped.
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const slug = (t) => t.toLowerCase().replace(/`/g, '').replace(/[^a-z0-9 _-]/g, '').trim().replace(/ /g, '-');
+  // names: which documents and examples exist, to turn their links into in-page ones.
+  function mdLink(label, href, names) {
+    const doc = /^([a-z0-9-]+)\.md(?:#(.*))?$/i.exec(href);
+    if (doc && names.docs.includes(doc[1]))
+      return '<a href="#" data-doc="' + esc(doc[1]) + '"' + (doc[2] ? ' data-anchor="' + esc(doc[2]) + '"' : '') + '>' + label + '</a>';
+    if (href[0] === '#') return '<a href="#" data-anchor="' + esc(href.slice(1)) + '">' + label + '</a>';
+    const example = /^\.\.\/examples\/config\/([A-Za-z0-9._-]+\.txt)$/.exec(href);
+    if (example && names.examples.includes(example[1]))
+      return '<a href="#" data-example="' + esc(example[1]) + '" title="Load this example into the editor">' + label + '</a>';
+    if (/^https?:\/\//.test(href)) return '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+    if (href === 'config-editor.html') return '<a href="#" data-tab="setup">' + label + '</a>';
+    return label; // a path that only exists in the repository
+  }
+  function mdInline(text, names) {
+    return text.split(/(`[^`]*`)/).map((part) => {
+      if (part.length > 1 && part[0] === '`' && part[part.length - 1] === '`') return '<code>' + esc(part.slice(1, -1)) + '</code>';
+      let out = '', rest = part, m;
+      const link = /\[([^\]]*)\]\(([^)\s]*)\)/;
+      while ((m = link.exec(rest))) {
+        out += esc(rest.slice(0, m.index)) + mdLink(mdInline(m[1], names), m[2], names);
+        rest = rest.slice(m.index + m[0].length);
+      }
+      return (out + esc(rest)).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }).join('');
+  }
+  function mdRender(text, names) {
+    names = names || { docs: [], examples: [] };
+    const lines = text.replace(/\r/g, '').split('\n');
+    const out = [];
+    const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+    let i = 0, title = '';
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) { i++; continue; }
+      if (/^```/.test(line)) {
+        const body = [];
+        for (i++; i < lines.length && !/^```/.test(lines[i]); i++) body.push(lines[i]);
+        i++;
+        out.push('<pre><code>' + esc(body.join('\n')) + '</code></pre>');
+        continue;
+      }
+      const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+      if (heading) {
+        const level = heading[1].length;
+        if (level === 1 && !title) title = heading[2].replace(/`/g, '');
+        out.push('<h' + level + ' id="' + esc(slug(heading[2])) + '">' + mdInline(heading[2], names) + '</h' + level + '>');
+        i++; continue;
+      }
+      if (line.trim()[0] === '|' && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1]) && lines[i + 1].includes('-')) {
+        const align = cells(lines[i + 1]).map((c) => /:$/.test(c) ? (/^:/.test(c) ? 'center' : 'right') : '');
+        const row = (line2, tag) => '<tr>' + cells(line2).map((c, k) =>
+          '<' + tag + (align[k] ? ' style="text-align:' + align[k] + '"' : '') + '>' + mdInline(c, names) + '</' + tag + '>').join('') + '</tr>';
+        let table = '<div class="tablewrap"><table><thead>' + row(line, 'th') + '</thead><tbody>';
+        for (i += 2; i < lines.length && lines[i].trim()[0] === '|'; i++) table += row(lines[i], 'td');
+        out.push(table + '</tbody></table></div>');
+        continue;
+      }
+      const item = /^(\s*)([-*]|\d+\.)\s+(.*)$/;
+      if (item.test(line)) {
+        const ordered = /^\s*\d+\./.test(line);
+        const items = [];
+        for (; i < lines.length; i++) {
+          const m = item.exec(lines[i]);
+          if (m && /^\d+\./.test(m[2]) === ordered) items.push(m[3]);
+          else if (lines[i].trim() && /^\s+/.test(lines[i]) && items.length) items[items.length - 1] += ' ' + lines[i].trim();
+          else break;
+        }
+        const tag = ordered ? 'ol' : 'ul';
+        out.push('<' + tag + '>' + items.map((t) => '<li>' + mdInline(t, names) + '</li>').join('') + '</' + tag + '>');
+        continue;
+      }
+      const para = [];
+      for (; i < lines.length && lines[i].trim() && !/^```/.test(lines[i]) && !/^#{1,4}\s/.test(lines[i]) &&
+             lines[i].trim()[0] !== '|' && !item.test(lines[i]); i++) para.push(lines[i].trim());
+      if (para.length) out.push('<p>' + mdInline(para.join(' '), names) + '</p>');
+      else { out.push('<p>' + mdInline(line.trim(), names) + '</p>'); i++; }
+    }
+    return { html: out.join('\n'), title };
+  }
+
+  // Frequencies from the firmware's maps.
+  const slowHz = (digit) => 0.125 * Math.pow(2, 6 * digit / 9);
+  const tremoloHz = (digit) => Math.pow(2, 4 * digit / 9);
+  const ringHz = (digit) => 16 * Math.pow(2, 8 * digit / 9);
+  function cutoffHz(digit, outputRate) {
+    if (!digit) return 0;
+    const f = Math.min(32000, 412 * Math.pow(2, amount(digit) * 1613 / 255 / 256)) / 32768;
+    return outputRate / Math.PI * Math.asin(f / 2);
+  }
+  const hz = (v) => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + ' kHz'
+                  : v >= 10 ? Math.round(v) + ' Hz' : v >= 1 ? v.toFixed(1) + ' Hz' : v.toFixed(2) + ' Hz';
+
+  // Which stages run, and why, at a given file rate and pitch.
+  // context: { lists: {NAME: [entries]}, cardNames: [..] | null, build: number | null } (optional)
+  function analyse(state, context) {
+    const s = settings(state);
+    const ctx = context || { lists: {}, cardNames: null };
+    const transport = TRANSPORT_CV.includes(state.play);
+    const fixedPitch = state.cv >= 3 || transport;
+    const semis = fixedPitch ? 0 : state.pitch;
+    const outputRate = state.sampleRate * Math.pow(2, semis / 12);
+    const budget = outputRate <= 48000.5 ? 4 : outputRate <= 64000.5 ? 3 : outputRate <= 96000.5 ? 1 : 0;
+    const live = (mode) => state.cv === mode && !transport;
+
+    const filterOn = s.filter > 0 || live(4) || s.wah > 0;
+    const sweepOn = s.flanger > 0 || s.phaser > 0;
+    const defaultTremolo = state.cv === 5 && !s.ring && !s.tremolo && !s.wah && !s.phaser && !s.flanger;
+    const modOn = s.ring > 0 || s.tremolo > 0 || defaultTremolo;
+    const defaultColour = state.cv === 3 && !s.drive && !s.crush;
+    const colourOn = s.drive > 0 || s.crush > 0 || defaultColour;
+
+    const shapeName = (SHAPES.find((x) => x[0] === state.shape) || SHAPES[0])[2];
+    const rateText = (fn) => live(5) ? 'speed on the knob' : hz(fn(state.rate));
+    const stages = [
+      { key: 'filter', on: filterOn, text: !filterOn ? 'Filter off' :
+          shapeName + (live(4) ? ', cutoff on the knob' : s.filter ? ' at about ' + hz(cutoffHz(state.cutoff, outputRate)) : ', centred mid-range') +
+          (s.resonance ? ', resonance ' + state.resonance : '') +
+          (s.wah ? ', wah depth ' + state.wah + ' at ' + rateText(slowHz) : '') },
+      { key: 'sweep', on: sweepOn, text: !sweepOn ? 'No phaser or flanger' :
+          (s.flanger ? 'Flanger ' : 'Phaser ') + state.sweepAmt + ' at ' + rateText(slowHz) },
+      { key: 'mod', on: modOn, text: !modOn ? 'No tremolo or ring modulation' :
+          s.ring ? 'Ring modulation ' + state.modAmt + ' at ' + rateText(ringHz)
+                 : 'Tremolo ' + (defaultTremolo ? 'at full depth' : state.modAmt) + ' at ' + rateText(tremoloHz) },
+      { key: 'colour', on: colourOn, text: !colourOn ? 'No drive or crush' :
+          defaultColour ? 'Drive and crush' + (live(3) ? ', amount on the knob up to 9' : ' at 9')
+                        : [s.drive ? 'drive ' + state.drive : '', s.crush ? 'crush ' + state.crush : ''].filter(Boolean).join(', ') +
+                          (live(3) ? ', amount on the knob' : '') },
+    ];
+    let left = budget;
+    for (const stage of stages) {
+      stage.runs = stage.on && left > 0;
+      if (stage.runs) left--;
+    }
+
+    const notes = [];
+    const warn = (text) => notes.push({ warn: true, text });
+    const info = (text) => notes.push({ warn: false, text });
+    const dropped = stages.filter((x) => x.on && !x.runs);
+    if (dropped.length && budget === 0)
+      warn('Above 96 kHz output no effects run at all.');
+    else if (dropped.length)
+      warn('At ' + hz(outputRate) + ' output only ' + (budget === 1 ? 'one effect stage runs' : budget + ' effect stages run') +
+           ', so these are switched off: ' + dropped.map((x) => x.key === 'colour' ? 'drive/crush' : x.key === 'mod' ? 'tremolo/ring' : x.key === 'sweep' ? 'phaser/flanger' : x.key).join(', ') + '.');
+    if (state.sampleRate > 48000 && stages.some((x) => x.on) && !fixedPitch)
+      info('Pitching an 88.2 or 96 kHz file down brings more stages in; each one switching is an audible step.');
+    if (state.cv >= 3 && !transport)
+      info('The knob/CV controls ' + ['', '', '', 'the drive/crush amount', 'the filter cutoff', 'the effect speed'][state.cv] +
+           ', so playback stays at the file\'s own pitch.');
+    if (state.cv >= 3)
+      info('This knob/CV mode can only be set here. Choosing a mode from the panel drops it until the card is next mounted.');
+    if (transport && state.cv >= 3)
+      warn(PLAY[state.play][0] + ' uses the CV input itself, so the knob does not control the effect: the fixed digits apply.');
+    if (transport && state.cv < 3)
+      info(PLAY[state.play][0] + ' uses the CV input itself, so line 3 has no effect on pitch or file selection.');
+    if (state.play === 10)
+      info('Tape runs from a standstill up to 1.5 times normal speed; the stages shown are for normal speed.');
+    if (state.play === 9 || state.play === 10)
+      info('Calibrate after power-up: centre the knob, patch 0 V, hold PLAY for half a second, release.');
+    if (live(4) && state.cutoff)
+      info('With Filter on the knob the cutoff digit is not used' + (state.wah ? '; the knob sets the centre of the wah.' : '.'));
+    if (live(5) && state.rate)
+      info('With Rate on the knob the Rate digit is not used.');
+    if (defaultTremolo)
+      warn('Rate on the knob with no wah, phaser, flanger, tremolo or ring line gives full-depth tremolo.');
+    if (defaultColour)
+      warn('Colour on the knob with no Drive or Crush line sweeps both up to 9.');
+    if (state.resonance && !filterOn)
+      warn('Resonance has no effect without a filter.');
+    if (state.rate && !usesRate(state))
+      info('Nothing uses Rate, so no Rate line is written.');
+    if (state.shape !== 'low' && !state.cutoff && !(state.cv === 4 || state.wah > 0))
+      info('The filter shape only matters once a cutoff, a wah or Filter on the knob is set.');
+    if (state.resonance >= 7 && filterOn)
+      info('High resonance can clip on loud material.');
+    if ((state.sweep !== 'none' && state.sweepAmt >= 8))
+      info('At high intensity the phaser and flanger trim the level by a few dB and can clip at their peaks.');
+    if (state.wah && !s.filter && !live(4))
+      info('Wah with no cutoff sweeps around the middle of the range.');
+    if (state.cv !== 2 && !transport && state.delay)
+      info('The settle time only matters with Select File.');
+    if (state.mod === 'ring')
+      info('Ring modulation and tremolo share a stage; ring replaces tremolo.');
+    // Which files will be in play.
+    const lists = ctx.lists || {};
+    const named = state.playlist ? state.playlist.toUpperCase() : '';
+    const has = (key) => Array.isArray(lists[key]) && lists[key].length > 0;
+    let source = 'card', count = ctx.cardNames ? ctx.cardNames.filter((n) => /\.wav$/i.test(n)).length : null;
+    if (state.playlist && !validListName(state.playlist))
+      warn('"' + state.playlist + '" is not a usable playlist name: one to eight letters, digits or ~.');
+    if (named && has(named)) source = named;
+    else if (has('PLAYLIST')) source = 'PLAYLIST';
+    if (named && !has(named))
+      warn(state.playlist + '.txt has no entries here, so it will not be saved. Without that file the firmware uses ' + (has('PLAYLIST') ? 'playlist.txt.' : 'the card\'s own file order.'));
+    if (source !== 'card') {
+      const result = playlistParse(playlistGenerate(lists[source]), ctx.cardNames);
+      count = result.used.length;
+      if (result.fatal) warn(result.stopped);
+      else if (!count) warn(source.toLowerCase() + '.txt has no usable entry, so nothing will play. ' + result.stopped);
+      else if (result.stopped) warn(source.toLowerCase() + '.txt stops early: only the first ' + count + (count === 1 ? ' file is' : ' files are') + ' used. ' + result.stopped);
+    }
+    if (count !== null && count > 0) {
+      if (count === 1 && [4, 5, 6].includes(state.play)) info('Only one file is in play, so ' + PLAY[state.play][0] + ' has nothing to step through.');
+      if (state.cv === 2 && !transport && count > 32) info('Select File reaches 32 files from the FILE position; ' + count + ' are in play.');
+      if (state.cv === 2 && !transport && count === 1) info('Select File has only one file to choose from.');
+    }
+    if (ctx.build && ctx.build < BUILD)
+      warn('The card was last used with firmware build ' + ctx.build + '. This page writes for build ' + BUILD + ': update the firmware (see Firmware on the Playback tab).');
+    return { settings: s, stages, notes, outputRate, budget, fixedPitch, source, count,
+             live: { colour: live(3), filter: live(4), rate: live(5) } };
+  }
+
+  return { PLAY, CV, DELAY, SHAPES, defaults, amount, clampDigit, cleanComment, settings, effectLines,
+           generate, parse, stateFrom, analyse, slowHz, tremoloHz, ringHz, cutoffHz, hz, usesRate,
+           validListName, entryProblem, BUILD, buildOf, mdRender, mdInline, sha256, hexCheck, firmwareInfo, FIRMWARE_BASE, RELEASES_URL, playlistParse, playlistGenerate, playlistCheck, wavInspect, MAX_FILES, RESERVED };
+})();
+/*LOGIC-END*/
+</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let state = HW.defaults();
+  // lists: NAME (upper case, no extension) -> array of entry names. PLAYLIST is playlist.txt.
+  let lists = { PLAYLIST: [] };
+  let editing = 'PLAYLIST';
+  // What each playlist held when the card was opened (or when it was created
+  // here), and what the card holds now. A list differs from the card when it
+  // is "dirty"; Revert goes back to the opened state.
+  let opened = { PLAYLIST: [] }, onCard = { PLAYLIST: [] };
+  let openedConfig = null;          // editor state loaded from the card's config.txt
+  const same = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+  const dirty = { has: (key) => !same(lists[key], onCard[key]), clear: () => {}, delete: () => {}, add: () => {} };
+  let card = null;                  // { handle|null, files: [{name, wav}], names: [..] }
+
+  const context = () => ({ lists, cardNames: card ? card.names : null, build: card ? card.build : null });
+  const fileOf = (key) => key.toLowerCase() + '.txt';
+
+  const seg = (id, options) => {
+    const box = $(id);
+    box.innerHTML = '';
+    for (const [value, text] of options) {
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = id; input.value = value;
+      const span = document.createElement('span'); span.textContent = text;
+      label.append(input, span); box.append(label);
+      input.addEventListener('change', () => {
+        state[id] = typeof HW.defaults()[id] === 'number' ? Number(value) : value;
+        render();
+      });
+    }
+  };
+  const fill = (id, options) => {
+    const sel = $(id);
+    options.forEach(([text, hint], i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = text + ' — ' + hint; sel.append(o);
+    });
+    sel.addEventListener('change', () => { state[id] = Number(sel.value); render(); });
+  };
+  fill('play', HW.PLAY); fill('cv', HW.CV);
+  seg('delay', HW.DELAY.map((d, i) => [i, d[0]]));
+  seg('shape', HW.SHAPES.map((x) => [x[0], x[2]]));
+  seg('sweep', [['none', 'None'], ['phaser', 'Phaser'], ['flanger', 'Flanger']]);
+  seg('mod', [['none', 'None'], ['tremolo', 'Tremolo'], ['ring', 'Ring mod']]);
+  seg('sampleRate', [[44100, '44.1k'], [48000, '48k'], [88200, '88.2k'], [96000, '96k']]);
+  for (const id of ['drive', 'crush', 'cutoff', 'resonance', 'wah', 'sweepAmt', 'modAmt', 'rate', 'pitch'])
+    $(id).addEventListener('input', () => { state[id] = Number($(id).value); render(); });
+  $('comment').addEventListener('input', () => { state.comment = $('comment').value; render(); });
+  $('playlist').addEventListener('change', () => { state.playlist = $('playlist').value; render(); });
+  $('forFile').addEventListener('change', () => {
+    const f = card && card.files.find((x) => x.name === $('forFile').value);
+    if (f && f.wav && f.wav.ok) { state.sampleRate = f.wav.rate; render(); }
+  });
+
+  const tabs = ['setup', 'effects', 'lists', 'guide'];
+  const showTab = (name) => {
+    for (const t of tabs) {
+      const on = t === name;
+      $('t-' + t).setAttribute('aria-selected', on); $('t-' + t).tabIndex = on ? 0 : -1;
+      $('p-' + t).hidden = !on;
+    }
+    $('editor').hidden = name === 'guide'; // the guide gets the full width
+  };
+  tabs.forEach((t, i) => {
+    $('t-' + t).addEventListener('click', () => showTab(t));
+    $('t-' + t).addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      const next = tabs[(i + step + tabs.length) % tabs.length];
+      showTab(next); $('t-' + next).focus();
+    });
+  });
+  let configProblem = '';
+
+  // ---- The built-in guide ----
+  const bundle = (() => { try { return JSON.parse($('docs').textContent); } catch (e) { return {}; } })();
+  const guides = bundle.docs || {}, examples = bundle.examples || {};
+  const names = { docs: Object.keys(guides), examples: Object.keys(examples) };
+  const order = ['user-guide', 'flip', 'cv-flip', 'tape', 'chop', 'colour', 'filter', 'phaser', 'flanger', 'mod', 'profiling', 'provenance'];
+  const pages = order.filter((k) => guides[k]).concat(names.docs.filter((k) => !order.includes(k)));
+  function showGuide(key, anchor) {
+    if (!guides[key]) key = pages[0];
+    if (!key) { $('guideBody').textContent = 'The guide is not included in this copy of the page.'; return; }
+    $('guidePick').value = key;
+    $('guideBody').innerHTML = HW.mdRender(guides[key], names).html; // escaped by the renderer
+    const target = anchor && $('guideBody').querySelector('[id="' + CSS.escape(anchor) + '"]');
+    if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
+  }
+  for (const key of pages) {
+    const o = document.createElement('option');
+    o.value = key; o.textContent = HW.mdRender(guides[key], names).title || key; $('guidePick').append(o);
+  }
+  $('guidePick').addEventListener('change', () => showGuide($('guidePick').value));
+  $('guideBody').addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a || a.getAttribute('href') !== '#') return;
+    e.preventDefault();
+    if (a.dataset.example) { loadConfig(examples[a.dataset.example]); showTab('setup'); render(); window.scrollTo(0, 0); }
+    else if (a.dataset.tab) { showTab(a.dataset.tab); window.scrollTo(0, 0); }
+    else showGuide(a.dataset.doc || $('guidePick').value, a.dataset.anchor);
+  });
+  $('footGuide').addEventListener('click', (e) => { e.preventDefault(); showTab('guide'); showGuide($('guidePick').value || 'user-guide'); });
+  $('t-guide').addEventListener('click', () => { if (!$('guideBody').firstChild) showGuide('user-guide'); });
+  const setOutput = (id, text) => { document.querySelector('output[for="' + id + '"]').textContent = text; };
+  const dim = (id, off) => { $(id).closest('.row').hidden = off; };
+  const option = (value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; return o; };
+  const button = (text, title, act) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mini'; b.textContent = text; b.title = title; b.setAttribute('aria-label', title);
+    b.addEventListener('click', act); return b;
+  };
+  const named = () => Object.keys(lists).filter((k) => k !== 'PLAYLIST').sort();
+  const touch = () => render();
+
+  function renderLists() {
+    // Config's playlist choice.
+    const pick = $('playlist');
+    pick.innerHTML = '';
+    pick.append(option('', lists.PLAYLIST.length ? 'playlist.txt' : 'playlist.txt, or the card’s own order'));
+    const wanted = state.playlist.toUpperCase();
+    for (const key of named()) pick.append(option(key.toLowerCase(), fileOf(key)));
+    if (state.playlist && !named().includes(wanted)) pick.append(option(state.playlist, state.playlist + '.txt (not listed here)'));
+    pick.value = state.playlist;
+
+    // Which list is being edited.
+    const edit = $('listPick');
+    edit.innerHTML = '';
+    for (const key of ['PLAYLIST', ...named()])
+      edit.append(option(key, fileOf(key) + (key === (wanted || 'PLAYLIST') ? ' — in use' : '') + (dirty.has(key) ? ' *' : '')));
+    if (!lists[editing]) editing = 'PLAYLIST';
+    edit.value = editing;
+    $('removeList').disabled = editing === 'PLAYLIST';
+    $('revertList').disabled = same(lists[editing], opened[editing]);
+
+    const entries = lists[editing];
+    const checked = HW.playlistCheck(entries, card ? card.names : null);
+    const box = $('entries');
+    box.innerHTML = '';
+    checked.forEach((entry, i) => {
+      const li = document.createElement('li');
+      li.className = entry.status;
+      const name = document.createElement('span'); name.className = 'name'; name.textContent = entry.name || '(blank)';
+      if (entry.status === 'stops') {
+        const why = document.createElement('span'); why.className = 'why';
+        why.textContent = 'The list ends here: ' + entry.problem + '.';
+        name.append(why);
+      }
+      const onCard = card && card.files.find((f) => f.name.toUpperCase() === entry.name.toUpperCase());
+      if (entry.status === 'ok' && onCard && onCard.wav && onCard.wav.ok === false) {
+        const why = document.createElement('span'); why.className = 'why';
+        why.textContent = 'On the card, but the firmware cannot play it: ' + onCard.wav.reason + '.';
+        name.append(why);
+      }
+      const acts = document.createElement('span'); acts.className = 'acts';
+      const move = (to) => () => { const [x] = entries.splice(i, 1); entries.splice(to, 0, x); touch(editing); };
+      const up = button('↑', 'Move ' + entry.name + ' up', move(i - 1)); up.disabled = i === 0;
+      const down = button('↓', 'Move ' + entry.name + ' down', move(i + 1)); down.disabled = i === entries.length - 1;
+      acts.append(up, down,
+        button('+', 'Duplicate ' + entry.name, () => { entries.splice(i + 1, 0, entry.name); touch(editing); }),
+        button('×', 'Remove ' + entry.name, () => { entries.splice(i, 1); touch(editing); }));
+      li.append(name, acts); box.append(li);
+    });
+    const usable = checked.filter((e) => e.status === 'ok').length;
+    $('listHint').textContent = !entries.length
+      ? (editing === 'PLAYLIST' ? 'Empty: no playlist.txt is written, and the firmware plays the card’s files in their own order.'
+                                 : 'Empty: this file is not written.')
+      : usable + ' of ' + entries.length + (entries.length === 1 ? ' entry' : ' entries') + ' will be used' +
+        (card ? '.' : '. Open the card to check the names against its files.') + ' Repeating a file makes random modes pick it more often.';
+
+    // With a card open: one tick box per WAV on it.
+    const wavs = card ? card.files.filter((f) => /\.wav$/i.test(f.name)) : [];
+    $('checkBox').hidden = !wavs.length;
+    $('manualAdd').hidden = !!wavs.length;
+    $('orderLabel').hidden = !entries.length;
+    const box2 = $('checks');
+    box2.innerHTML = '';
+    for (const f of wavs) {
+      const reason = HW.entryProblem(f.name) ? 'name cannot go in a playlist: ' + HW.entryProblem(f.name)
+                   : f.wav && f.wav.ok === false ? 'will not play: ' + f.wav.reason : '';
+      const li = document.createElement('li');
+      const label = document.createElement('label');
+      const tick = document.createElement('input');
+      tick.type = 'checkbox';
+      const times = entries.filter((n) => n.toUpperCase() === f.name.toUpperCase()).length;
+      tick.checked = times > 0;
+      tick.disabled = !!reason && !times;
+      if (reason) li.className = 'no';
+      tick.addEventListener('change', () => {
+        if (tick.checked) {
+          if (entries.length >= HW.MAX_FILES) { tick.checked = false; return; }
+          entries.push(f.name);
+        } else {
+          for (let k = entries.length - 1; k >= 0; k--)
+            if (entries[k].toUpperCase() === f.name.toUpperCase()) entries.splice(k, 1);
+        }
+        touch(editing);
+      });
+      const name = document.createElement('span'); name.className = 'fname'; name.textContent = f.name;
+      const info = document.createElement('span'); info.className = 'info';
+      info.textContent = reason || ((f.wav && f.wav.ok ? (f.wav.rate / 1000) + ' kHz · ' + f.wav.bits + '-bit' : '') + (times > 1 ? ' · ×' + times : ''));
+      label.append(tick, name, info); li.append(label); box2.append(li);
+    }
+  }
+
+  function renderCard() {
+    const writable = !!(card && card.handle);
+    $('saveCard').hidden = !writable;
+    // Writing to the card is the main action once it is open for writing.
+    $('download').classList.toggle('primary', !writable);
+    $('cardFiles').hidden = !card; $('noCardHint').hidden = !!card;
+    $('fwCard').textContent = !card ? 'Open the card to see which firmware it was last used with.'
+      : card.build ? 'This card was last used with firmware build ' + card.build + '.' : 'This card has no record of the firmware it was used with.';
+    $('fwInstall').hidden = !(firmware && card && card.handle);
+    $('fileCount').textContent = card ? '(' + card.files.filter((f) => /\.wav$/i.test(f.name)).length + ')' : '';
+    $('download').textContent = card && card.handle ? 'Download' : 'Download config.txt';
+    if (!card) return;
+    const table = $('fileTable');
+    table.innerHTML = '';
+    const wavs = card.files.filter((f) => /\.wav$/i.test(f.name));
+    for (const f of wavs) {
+      const tr = document.createElement('tr');
+      const nameProblem = HW.entryProblem(f.name);
+      const a = document.createElement('td'); a.textContent = f.name;
+      const b = document.createElement('td');
+      if (f.wav && f.wav.ok) {
+        b.textContent = (f.wav.rate / 1000) + ' kHz · ' + f.wav.bits + '-bit · ' +
+          (f.wav.seconds >= 60 ? Math.floor(f.wav.seconds / 60) + 'm ' + Math.round(f.wav.seconds % 60) + 's' : f.wav.seconds.toFixed(1) + ' s');
+      } else if (f.wav && f.wav.ok === false) { tr.className = 'bad'; b.textContent = 'will not play: ' + f.wav.reason; }
+      else b.textContent = f.wav ? f.wav.reason : '';
+      if (nameProblem && !(f.wav && f.wav.ok === false)) b.append((b.textContent ? ' · ' : '') + 'cannot go in a playlist: ' + nameProblem);
+      tr.append(a, b); table.append(tr);
+    }
+    // "What will run" can follow one of the card's files.
+    const rated = wavs.filter((f) => f.wav && f.wav.ok && [44100, 48000, 88200, 96000].includes(f.wav.rate));
+    $('forFileRow').hidden = !rated.length;
+    const pickFile = $('forFile');
+    const chosen = pickFile.value;
+    pickFile.innerHTML = '';
+    pickFile.append(option('', 'choose a file to use its rate'));
+    for (const f of rated) pickFile.append(option(f.name, f.name + ' \u2014 ' + (f.wav.rate / 1000) + ' kHz'));
+    const still = rated.find((f) => f.name === chosen);
+    pickFile.value = still && still.wav.rate === state.sampleRate ? chosen : '';
+    const bad = wavs.filter((f) => f.wav && f.wav.ok === false).length;
+    $('cardStatus').className = 'status';
+    $('cardStatus').textContent = (card.build ? 'Firmware build ' + card.build + '. ' : '') + wavs.length + ' WAV file' + (wavs.length === 1 ? '' : 's') +
+      (bad ? ', ' + bad + ' the firmware will not play' : '') +
+      (card.handle ? '. Use Write to card to save your changes.' : '. This browser can only read the card: download the results and copy them over.');
+  }
+
+  function render() {
+    const a = HW.analyse(state, context());
+    for (const id of ['play', 'cv']) $(id).value = state[id];
+    for (const id of ['delay', 'shape', 'sweep', 'mod', 'sampleRate'])
+      for (const input of document.querySelectorAll('input[name="' + id + '"]'))
+        input.checked = String(input.value) === String(state[id]);
+    for (const id of ['drive', 'crush', 'cutoff', 'resonance', 'wah', 'sweepAmt', 'modAmt', 'rate', 'pitch'])
+      $(id).value = state[id];
+    if (document.activeElement !== $('comment')) $('comment').value = state.comment;
+
+    setOutput('drive', state.drive ? String(state.drive) : 'off');
+    setOutput('crush', state.crush ? String(state.crush) : 'off');
+    setOutput('cutoff', a.live.filter ? 'on the knob' : state.cutoff ? state.cutoff + ' · ' + HW.hz(HW.cutoffHz(state.cutoff, a.outputRate)) : 'off');
+    setOutput('resonance', state.resonance ? String(state.resonance) : 'none');
+    setOutput('wah', state.wah ? state.wah + ' · ±' + (2.5 * state.wah / 9).toFixed(1) + ' oct' : 'off');
+    setOutput('sweepAmt', state.sweep === 'none' ? '—' : String(state.sweepAmt));
+    setOutput('modAmt', state.mod === 'none' ? '—' : String(state.modAmt));
+    setOutput('rate', a.live.rate ? 'on the knob' : String(state.rate));
+    setOutput('pitch', a.fixedPitch ? 'fixed' : (state.pitch > 0 ? '+' : '') + state.pitch + ' st');
+    dim('sweepAmt', state.sweep === 'none'); $('sweepAmt').disabled = state.sweep === 'none';
+    dim('modAmt', state.mod === 'none'); $('modAmt').disabled = state.mod === 'none';
+    dim('pitch', a.fixedPitch); $('pitch').disabled = a.fixedPitch;
+    $('rateSection').hidden = !HW.usesRate(state);
+    $('delayRow').hidden = !(state.cv === 2 && ![9, 10, 11].includes(state.play));
+
+    const d = state.rate;
+    $('rateHint').textContent = a.live.rate
+      ? 'The knob/CV sweeps the speed across each effect’s whole range.'
+      : 'Wah, phaser, flanger ' + HW.hz(HW.slowHz(d)) + ' · tremolo ' + HW.hz(HW.tremoloHz(d)) + ' · ring ' + HW.hz(HW.ringHz(d));
+
+    $('out').textContent = HW.generate(state);
+
+    $('stages').innerHTML = '';
+    for (const stage of a.stages) {
+      const tr = document.createElement('tr');
+      tr.className = !stage.on ? 'idle' : stage.runs ? 'runs' : 'skips';
+      const left = document.createElement('td');
+      left.textContent = !stage.on ? 'off' : stage.runs ? 'runs' : 'skipped';
+      const right = document.createElement('td');
+      right.textContent = stage.text;
+      tr.append(left, right); $('stages').append(tr);
+    }
+    $('rateLine').textContent = 'Output rate ' + HW.hz(a.outputRate) + ': ' +
+      (a.budget === 4 ? 'all four stages may run.' : a.budget === 3 ? 'up to three stages run.' :
+       a.budget === 1 ? 'one stage runs.' : 'no stage runs.') +
+      ' Order of priority: filter, phaser/flanger, tremolo/ring, drive/crush.';
+
+    const warns = a.notes.filter((n) => n.warn).map((n) => n.text);
+    const infos = a.notes.filter((n) => !n.warn).map((n) => n.text);
+    if (configProblem) warns.unshift(configProblem);
+    const fillNotes = (id, items, warn) => {
+      $(id).innerHTML = '';
+      for (const text of items) {
+        const li = document.createElement('li');
+        if (warn) li.className = 'warn';
+        li.textContent = text; $(id).append(li);
+      }
+    };
+    const playing = (a.count === null ? 'Plays ' : 'Plays ' + a.count + (a.count === 1 ? ' file from ' : ' files from ')) +
+      (a.source === 'card' ? 'the card’s own order' : fileOf(a.source)) + '.';
+    $('sideTitle').textContent = warns.length ? (warns.length === 1 ? '1 thing to check' : warns.length + ' things to check') : 'Ready';
+    fillNotes('notes', warns.length ? warns : [HW.PLAY[state.play][0] + ' mode. ' + playing], warns.length > 0);
+    fillNotes('infoNotes', warns.length ? [HW.PLAY[state.play][0] + ' mode. ' + playing, ...infos] : infos, false);
+    const more = $('infoNotes').children.length;
+    $('moreNotes').hidden = !more;
+    $('moreCount').textContent = more === 1 ? '1 note' : more + ' notes';
+    const active = a.stages.filter((x) => x.on).length;
+    $('effectCount').textContent = active ? '(' + active + ')' : '';
+    $('listCount').textContent = a.count === null ? '' : '(' + a.count + ')';
+    $('revertConfig').hidden = !openedConfig;
+    if (openedConfig) $('revertConfig').disabled = HW.generate(state) === HW.generate(openedConfig);
+    renderLists();
+    renderCard();
+  }
+
+  const download = (name, text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  $('download').addEventListener('click', () => download('config.txt', HW.generate(state)));
+  $('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(HW.generate(state)); $('copied').textContent = 'Copied.'; }
+    catch (e) { $('copied').textContent = 'Copy failed; select the text above instead.'; }
+    setTimeout(() => { $('copied').textContent = ''; }, 2500);
+  });
+  $('reset').addEventListener('click', () => {
+    const keep = { sampleRate: state.sampleRate, pitch: state.pitch };
+    state = Object.assign(HW.defaults(), keep); render();
+  });
+
+  // ---- Playlists ----
+  $('listPick').addEventListener('change', () => { editing = $('listPick').value; render(); });
+  $('listDownload').addEventListener('click', () => {
+    if (!lists[editing].length) { $('listStatus').textContent = 'This list is empty, so there is nothing to download.'; return; }
+    download(fileOf(editing), HW.playlistGenerate(lists[editing]));
+  });
+  const addEntry = (name) => {
+    name = name.trim();
+    const problem = HW.entryProblem(name);
+    if (problem) { $('listStatus').className = 'status bad'; $('listStatus').textContent = '"' + name + '" cannot be added: ' + problem + '.'; return; }
+    if (lists[editing].length >= HW.MAX_FILES) { $('listStatus').className = 'status bad'; $('listStatus').textContent = 'A playlist holds at most 256 entries.'; return; }
+    $('listStatus').className = 'status'; $('listStatus').textContent = '';
+    lists[editing].push(name); touch(editing);
+  };
+  $('addEntry').addEventListener('click', () => { addEntry($('addName').value); $('addName').value = ''; });
+  $('addName').addEventListener('keydown', (e) => { if (e.key === 'Enter') addEntry($('addName').value); });
+  $('checkAll').addEventListener('click', () => {
+    const entries = lists[editing];
+    for (const f of card.files) {
+      if (!/\.wav$/i.test(f.name) || HW.entryProblem(f.name) || (f.wav && f.wav.ok === false)) continue;
+      if (entries.length < HW.MAX_FILES && !entries.some((n) => n.toUpperCase() === f.name.toUpperCase())) entries.push(f.name);
+    }
+    touch(editing);
+  });
+  $('checkNone').addEventListener('click', () => { lists[editing].length = 0; touch(editing); });
+  $('revertList').addEventListener('click', () => {
+    lists[editing] = (opened[editing] || []).slice();
+    $('listStatus').className = 'status';
+    $('listStatus').textContent = fileOf(editing) + ' is back to how it was when ' + (card ? 'the card was opened' : 'it was created') +
+      (dirty.has(editing) ? '. The card still holds the newer version until you write this one.' : '.');
+    render();
+  });
+  $('revertConfig').addEventListener('click', () => {
+    if (!openedConfig) return;
+    state = Object.assign(JSON.parse(JSON.stringify(openedConfig)), { sampleRate: state.sampleRate, pitch: state.pitch });
+    render();
+  });
+  $('createList').addEventListener('click', () => {
+    const name = $('newList').value.trim();
+    const status = $('listStatus');
+    if (!HW.validListName(name)) {
+      status.className = 'status bad';
+      status.textContent = HW.RESERVED.includes(name.toUpperCase()) ? 'That name is reserved.' : 'Use one to eight letters, digits or ~.';
+      return;
+    }
+    const key = name.toUpperCase();
+    if (lists[key]) { status.className = 'status bad'; status.textContent = 'There is already a playlist with that name.'; return; }
+    status.className = 'status'; status.textContent = '';
+    lists[key] = []; opened[key] = opened[key] || []; editing = key; $('newList').value = ''; render();
+  });
+  $('removeList').addEventListener('click', () => {
+    if (editing === 'PLAYLIST') return;
+    const key = editing;
+    delete lists[key]; dirty.delete(key);
+    if (state.playlist.toUpperCase() === key) state.playlist = '';
+    $('listStatus').className = 'status';
+    $('listStatus').textContent = fileOf(key) + ' is removed from this page. A copy already on the card is left there.';
+    editing = 'PLAYLIST'; render();
+  });
+
+  // ---- Loading a config ----
+  function loadConfig(text, quiet) {
+    const status = $('loadStatus');
+    const result = HW.parse(text);
+    if (!result.ok) {
+      status.className = 'status bad';
+      status.textContent = 'The firmware would reject this file and use Trigger / Quantize. ' + result.error;
+      if (quiet) configProblem = 'The config.txt on the card would be rejected by the firmware. ' + result.error + ' Writing a new one fixes it.';
+      return false;
+    }
+    const first = text.replace(/^﻿/, '').split('\n')[0].replace(/\r/g, '').replace(/^#\s?/, '');
+    configProblem = '';
+    const keep = { sampleRate: state.sampleRate, pitch: state.pitch };
+    state = Object.assign(HW.stateFrom(result.settings, first), keep);
+    status.className = 'status';
+    status.textContent = (quiet ? 'config.txt loaded from the card.' : 'Loaded.') + (result.notes.length ? ' ' + result.notes.join(' ') : '');
+    return true;
+  }
+  $('load').addEventListener('click', () => { loadConfig($('paste').value); render(); });
+  $('file').addEventListener('change', async () => {
+    const file = $('file').files[0];
+    if (!file) return;
+    const text = await file.text();
+    $('paste').value = text; loadConfig(text); render();
+  });
+
+  // ---- The card ----
+  const looksLikeList = (text) => {
+    const lines = text.split('\n').map((l) => l.replace(/\r/g, '').trim()).filter(Boolean);
+    return lines.length > 0 && lines.every((l) => /\.wav$/i.test(l));
+  };
+  // files: [{name, file: File}] from the card's root.
+  async function readCard(files, handle) {
+    const visible = files.filter((f) => !f.name.startsWith('.'));
+    const out = [];
+    lists = { PLAYLIST: [] }; editing = 'PLAYLIST'; openedConfig = null; configProblem = '';
+    let loadedConfig = false, build = null;
+    for (const f of visible.sort((a, b) => a.name.localeCompare(b.name))) {
+      const entry = { name: f.name, wav: null };
+      if (/\.wav$/i.test(f.name)) {
+        try {
+          const bytes = new Uint8Array(await f.file.slice(0, 65536).arrayBuffer());
+          entry.wav = HW.wavInspect(bytes, f.file.size);
+        } catch (e) { entry.wav = { ok: null, reason: 'could not be read' }; }
+      } else if (/\.txt$/i.test(f.name) && f.file.size <= 16384) {
+        const base = f.name.slice(0, -4).toUpperCase();
+        const text = await f.file.text();
+        if (base === 'ONEBUILD') build = HW.buildOf(text);
+        else if (base === 'CONFIG') { loadedConfig = loadConfig(text, true); $('paste').value = text; }
+        else if (base === 'PLAYLIST' || (HW.validListName(base) && looksLikeList(text))) {
+          const raw = text.split('\n');
+          if (raw[raw.length - 1] === '') raw.pop();
+          lists[base] = raw.map((l) => l.replace(/\r/g, '').replace(/[ \t]+$/, ''));
+        }
+      }
+      out.push(entry);
+    }
+    card = { handle: handle || null, files: out, names: out.map((f) => f.name), build };
+    opened = JSON.parse(JSON.stringify(lists)); onCard = JSON.parse(JSON.stringify(lists));
+    if (loadedConfig) openedConfig = JSON.parse(JSON.stringify(state));
+    if (!loadedConfig && !$('loadStatus').classList.contains('bad')) $('loadStatus').textContent = 'No config.txt on the card yet.';
+    if (Object.keys(lists).some((k) => lists[k].length) && !loadedConfig) showTab('lists');
+    render();
+  }
+  if (window.showDirectoryPicker) {
+    $('pickFolder').hidden = true;
+    $('openCard').addEventListener('click', async () => {
+      let handle;
+      try { handle = await window.showDirectoryPicker({ mode: 'readwrite' }); }
+      catch (e) { return; } // cancelled
+      const files = [];
+      try {
+        for await (const [name, item] of handle.entries())
+          if (item.kind === 'file') files.push({ name, file: await item.getFile() });
+      } catch (e) {
+        $('cardStatus').className = 'status bad'; $('cardStatus').textContent = 'The card could not be read: ' + e.message;
+        return;
+      }
+      await readCard(files, handle);
+    });
+  } else {
+    $('openCard').hidden = true;
+    $('pickFolder').addEventListener('change', async () => {
+      const files = [];
+      for (const file of $('pickFolder').files) {
+        const parts = (file.webkitRelativePath || file.name).split('/');
+        if (parts.length <= 2) files.push({ name: file.name, file });
+      }
+      await readCard(files, null);
+    });
+  }
+
+  // ---- Firmware ----
+  let firmware = null; // { bytes, label } ready to write
+  const fwSay = (text, bad) => { $('fwStatus').className = bad ? 'status bad' : 'status'; $('fwStatus').textContent = text; };
+  const fwOffer = (bytes, label) => {
+    firmware = { bytes, label };
+    $('fwInstall').hidden = !(card && card.handle);
+    $('fwInstall').textContent = 'Put ' + label + ' on the card';
+  };
+  $('fwCheck').addEventListener('click', async () => {
+    fwSay('Checking\u2026');
+    try {
+      const reply = await fetch(HW.FIRMWARE_BASE + 'latest.json', { cache: 'no-store' });
+      if (!reply.ok) throw new Error('no firmware listing was found (' + reply.status + ')');
+      const info = HW.firmwareInfo(await reply.json());
+      if (!info) throw new Error('the firmware listing could not be understood');
+      const image = await fetch(HW.FIRMWARE_BASE + info.file, { cache: 'no-store' });
+      if (!image.ok) throw new Error('the firmware file could not be downloaded (' + image.status + ')');
+      const bytes = new Uint8Array(await image.arrayBuffer());
+      if (HW.sha256(bytes) !== info.sha256) throw new Error('the downloaded file does not match its published checksum');
+      const check = HW.hexCheck(bytes);
+      if (!check.ok) throw new Error('the downloaded file is not a valid image: ' + check.reason);
+      fwOffer(bytes, 'build ' + info.build);
+      const have = card && card.build;
+      fwSay('The latest is build ' + info.build + (info.date ? ' (' + info.date + ')' : '') + '; checksum verified. ' +
+        (have ? (have >= info.build ? 'The card was last used with build ' + have + ', so it is up to date.' : 'The card was last used with build ' + have + '.') : '') +
+        (card && card.handle ? '' : ' Open the card in Chrome or Edge to put it on, or download it from ' + HW.RELEASES_URL + '.'));
+    } catch (e) {
+      firmware = null; $('fwInstall').hidden = true;
+      fwSay('Could not get the firmware: ' + e.message + '. You can download it from ' + HW.RELEASES_URL + ' and choose the file below.', true);
+    }
+  });
+  $('fwFile').addEventListener('change', async () => {
+    const file = $('fwFile').files[0];
+    if (!file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const check = HW.hexCheck(bytes);
+    if (!check.ok) { firmware = null; $('fwInstall').hidden = true; fwSay(file.name + ' was not accepted: ' + check.reason + '.', true); return; }
+    fwOffer(bytes, file.name);
+    fwSay(file.name + ' looks like a valid image (' + check.bytes + ' bytes of data). SHA-256 ' + HW.sha256(bytes).slice(0, 16) + '\u2026' +
+      (card && card.handle ? '' : ' Open the card in Chrome or Edge to put it on.'));
+  });
+  $('fwInstall').addEventListener('click', async () => {
+    if (!firmware || !card || !card.handle) return;
+    if (!window.confirm('Write ' + firmware.label + ' to the card as image.hex, replacing any image.hex already there?\n\n' +
+        'The module installs it the next time it is powered up with PLAY held. Do not interrupt that update.')) return;
+    try {
+      const handle = await card.handle.getFileHandle('image.hex', { create: true });
+      const writer = await handle.createWritable();
+      await writer.write(firmware.bytes); await writer.close();
+      const back = new Uint8Array(await (await handle.getFile()).arrayBuffer());
+      if (HW.sha256(back) !== HW.sha256(firmware.bytes)) throw new Error('the file read back from the card does not match');
+      fwSay('image.hex is on the card and reads back correctly. Eject the card, power the module down, insert the card, ' +
+        'then hold PLAY while powering up and let the rapid flashing finish.');
+    } catch (e) {
+      fwSay('Writing the firmware failed: ' + e.message + '. Do not use this card to update until it has been written successfully.', true);
+    }
+  });
+
+  // ---- Saving to the card ----
+  const pending = () => {
+    const out = [{ name: 'config.txt', text: HW.generate(state) }];
+    for (const key of Object.keys(lists).sort())
+      if (lists[key].length && (dirty.has(key) || !card.names.some((n) => n.toUpperCase() === key + '.TXT')))
+        out.push({ name: fileOf(key), key, text: HW.playlistGenerate(lists[key]) });
+    return out;
+  };
+  const askSave = () => {
+    const body = $('confirmBody');
+    body.innerHTML = '';
+    for (const item of pending()) {
+      const h = document.createElement('h3'); h.textContent = item.name;
+      const pre = document.createElement('pre'); pre.textContent = item.text;
+      body.append(h, pre);
+    }
+    const stale = Object.keys(lists).filter((k) => !lists[k].length && card.names.some((n) => n.toUpperCase() === k + '.TXT'));
+    if (stale.length) {
+      const p = document.createElement('p'); p.className = 'hint';
+      p.textContent = 'Not changed: ' + stale.map(fileOf).join(', ') + ' is empty here but exists on the card. Delete it on the computer if you no longer want it.';
+      body.append(p);
+    }
+    $('confirm').showModal();
+  };
+  $('saveCard').addEventListener('click', askSave);
+  $('confirmCancel').addEventListener('click', () => $('confirm').close());
+  $('confirmSave').addEventListener('click', async () => {
+    const items = pending();
+    $('confirm').close();
+    const status = $('copied');
+    try {
+      for (const item of items) {
+        const handle = await card.handle.getFileHandle(item.name, { create: true });
+        const writer = await handle.createWritable();
+        await writer.write(item.text); await writer.close();
+        if (!card.names.some((n) => n.toUpperCase() === item.name.toUpperCase())) {
+          card.names.push(item.name); card.files.push({ name: item.name, wav: null });
+        }
+      }
+      for (const item of items) if (item.key) onCard[item.key] = lists[item.key].slice();
+      status.className = 'status';
+      status.textContent = 'Saved ' + items.map((i) => i.name).join(', ') + '. Eject the card before removing it.';
+    } catch (e) {
+      status.className = 'status bad';
+      status.textContent = 'Saving failed: ' + e.message + '. Nothing further was written; use Download instead.';
+    }
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

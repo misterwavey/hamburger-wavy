@@ -151,12 +151,17 @@ typedef struct {
   uint32_t wah; /* filter cutoff sweep depth, 0 off .. 255 */
   uint32_t phaser; /* intensity, 0 off .. 255 */
   uint32_t flanger; /* intensity, 0 off .. 255; takes the phaser's place */
+  char playlist[13]; /* "NAME.TXT" from a Playlist line, or empty for PLAYLIST.TXT */
 #endif
 } Settings;
 void settings_default(Settings *);
 int settings_load(Fat *,
                   Settings *); /* 1 loaded, 0 absent, -1 I/O, -2 invalid */
 int playlist_load(Fat *, Entry *, uint32_t); /* -2 absent, -1 I/O, else count */
+#ifdef ONE_COLOUR
+/* The named list if it exists, otherwise PLAYLIST.TXT. */
+int playlist_load_named(Fat *, const char *name, Entry *, uint32_t);
+#endif
 uint32_t pitch_divider(uint32_t, uint32_t, CvMode);
 uint32_t cv_file_offset(uint32_t, uint32_t);
 #ifdef ONE_FLIP

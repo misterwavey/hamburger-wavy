@@ -62,8 +62,52 @@ static int amount(const char *text, const char *key, uint32_t *value) {
   return 1;
 }
 #endif
+#ifdef ONE_COLOUR
+/* "PLAYLIST name" or "PLAYLIST name.txt": one to eight letters, digits or ~.
+ * Stores "NAME.TXT". Anything else is not a playlist line. */
+static int playlist_line(const char *text, Settings *s) {
+  static const char key[] = "PLAYLIST";
+  while (*text == ' ' || *text == '\t')
+    text++;
+  for (uint32_t i = 0; key[i]; i++) {
+    char c = *text++;
+    if (c >= 'a' && c <= 'z')
+      c -= 32;
+    if (c != key[i])
+      return 0;
+  }
+  if (*text != ' ' && *text != '\t')
+    return 0;
+  while (*text == ' ' || *text == '\t')
+    text++;
+  char name[13];
+  uint32_t n = 0;
+  for (;;) {
+    char c = text[n];
+    if (c >= 'a' && c <= 'z')
+      c -= 32;
+    if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '~'))
+      break;
+    if (n == 8)
+      return 0;
+    name[n++] = c;
+  }
+  if (!n || (text[n] && !equal(text + n, ".TXT")))
+    return 0;
+  name[n++] = '.';
+  name[n++] = 'T';
+  name[n++] = 'X';
+  name[n++] = 'T';
+  name[n] = 0;
+  for (uint32_t i = 0; i <= n; i++)
+    s->playlist[i] = name[i];
+  return 1;
+}
+#endif
 static int effect_line(const char *text, Settings *s) {
 #ifdef ONE_COLOUR
+  if (playlist_line(text, s))
+    return 1;
   /* The last cutoff line sets both the cutoff and the filter's output. */
   if (amount(text, "FILTER", &s->filter) || amount(text, "LOWPASS", &s->filter)) {
     s->shape = FILTER_LOW;
@@ -95,6 +139,7 @@ void settings_default(Settings *s) {
 #ifdef ONE_COLOUR
   s->drive = s->crush = s->filter = s->resonance = s->shape = 0;
   s->tremolo = s->ring = s->rate = s->wah = s->phaser = s->flanger = 0;
+  s->playlist[0] = 0;
 #endif
 }
 int settings_load(Fat *fs, Settings *out) {
@@ -189,8 +234,9 @@ int settings_load(Fat *fs, Settings *out) {
       return -2;
   }
 #ifdef ONE_COLOUR
-  /* Later lines: effect amounts are recognised; anything else stays ignored. */
-  for (unsigned extra = 0; extra < 8 && n == 1; extra++) {
+  /* Later lines: effect amounts and a playlist name are recognised; anything
+   * else stays ignored. */
+  for (unsigned extra = 0; extra < 12 && n == 1; extra++) {
     n = line(&f, text, sizeof(text));
     if (n < 0)
       return n;
@@ -201,10 +247,16 @@ int settings_load(Fat *fs, Settings *out) {
   *out = s;
   return 1;
 }
+#ifdef ONE_COLOUR
+#define PLAYLIST_FILE name
+static int playlist_file(Fat *fs, const char *name, Entry *entries, uint32_t max) {
+#else
+#define PLAYLIST_FILE "PLAYLIST.TXT"
 int playlist_load(Fat *fs, Entry *entries, uint32_t max) {
+#endif
   Entry e;
   File f;
-  int found = fat_find(fs, "PLAYLIST.TXT", &e);
+  int found = fat_find(fs, PLAYLIST_FILE, &e);
   if (found < 0)
     return -1;
   if (!found)
@@ -212,7 +264,11 @@ int playlist_load(Fat *fs, Entry *entries, uint32_t max) {
   if (e.size > 16384 || file_open(&f, fs, &e))
     return -1;
   uint32_t count = 0;
+#ifdef ONE_LONG_NAMES
+  char text[64];
+#else
   char text[16];
+#endif
   while (count < max) {
     int n = line(&f, text, sizeof(text));
     if (n == -1)
@@ -222,6 +278,14 @@ int playlist_load(Fat *fs, Entry *entries, uint32_t max) {
     uint32_t len = 0;
     while (text[len])
       len++;
+#ifdef ONE_LONG_NAMES
+    /* Any plain-ASCII name up to 63 characters; the card decides if it exists. */
+    if (len < 5 || text[len - 4] != '.' || !equal(text + len - 3, "WAV"))
+      break;
+    for (uint32_t i = 0; i < len - 4; i++)
+      if (text[i] < 32 || text[i] > 126)
+        return (int)count;
+#else
     if (len < 5 || len > 13 || text[len - 4] != '.' ||
         !equal(text + len - 3, "WAV"))
       break;
@@ -231,6 +295,7 @@ int playlist_load(Fat *fs, Entry *entries, uint32_t max) {
             (c >= '0' && c <= '9') || c == '~'))
         return (int)count;
     }
+#endif
     found = fat_find(fs, text, &e);
     if (found < 0)
       return -1;
@@ -240,3 +305,16 @@ int playlist_load(Fat *fs, Entry *entries, uint32_t max) {
   }
   return (int)count;
 }
+#ifdef ONE_COLOUR
+int playlist_load(Fat *fs, Entry *entries, uint32_t max) {
+  return playlist_file(fs, "PLAYLIST.TXT", entries, max);
+}
+int playlist_load_named(Fat *fs, const char *name, Entry *entries, uint32_t max) {
+  if (name[0]) {
+    int n = playlist_file(fs, name, entries, max);
+    if (n != -2)
+      return n;
+  }
+  return playlist_file(fs, "PLAYLIST.TXT", entries, max);
+}
+#endif

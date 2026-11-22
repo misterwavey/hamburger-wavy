@@ -4,11 +4,11 @@
 
 Use FAT16 or FAT32, with 512-byte sectors, either directly on the card or in an MBR partition. Audio must be mono PCM WAV, 16 or 24 bit, with a header sample rate of 8–96 kHz. Native clock families are 44.1/48/88.2/96 kHz; other accepted header rates use the 48 kHz family. Stereo, floating-point/compressed audio, exFAT, FAT12 and subdirectory browsing are unsupported.
 
-Up to 256 files or playlist entries are supported. Names up to 13 ASCII characters including `.wav` work through checked short/single-entry VFAT names. Longer names may be accessible through their short aliases.
+Up to 256 files or playlist entries are supported. Any `.wav` in the card's root can be browsed, whatever its name. In a playlist, extended build 54 accepts names up to 63 plain-ASCII characters; see [Playlists](#playlists).
 
 ## Playback modes
 
-Extended build 53 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser or flanger, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
+Extended build 54 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser or flanger, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
 
 | Red count | Mode | Behavior |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ Case differences, surrounding setting whitespace, CRLF/LF and a UTF-8 BOM are ac
 
 ## Effects
 
-Extended build 53 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.
+Extended build 54 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.
 
 ```text
 # Hamburger Wavy configuration
@@ -149,15 +149,31 @@ Filter cutoff, phaser and flanger positions and all rates are tied to the playba
 
 Example files for each effect are in [examples/config](../examples/config).
 
-## playlist.txt
+The [config editor](config-editor.html) is a single web page that writes `config.txt` and playlists for you. Download it and open it in a browser; it works offline and uploads nothing. It shows each setting in real units, which effects will run for a given file rate and pitch, and what the knob will control, and it can load an existing `config.txt` to edit. Opening the card's folder in it lets it check every WAV against what the firmware accepts, build playlists from the files that are there, and flag a playlist entry that would cut the list short. In Chrome and Edge it can save `config.txt` and the playlists straight to the card, after showing what it will write; in other browsers it reads the card and you download the results. Under Firmware on its Playback tab it shows which build the card was last used with, and can fetch the current firmware, check it against its published checksum and write it to the card as `image.hex`; that step contacts GitHub, and is the only time the page uses the network.
 
-An optional root file lists one WAV filename per line and replaces directory order. Duplicate entries are allowed and weight random selection. The first missing/invalid name ends the usable prefix; card read errors abort mounting. An empty usable list does not play. For a single-tone test, a playlist may simply contain:
+## Playlists
+
+An optional root file `playlist.txt` lists one WAV filename per line and replaces directory order. Duplicate entries are allowed and weight random selection. From extended build 54 a name can be the file's full name as the computer shows it, up to 63 plain-ASCII characters including `.wav`, with spaces and punctuation allowed; upper and lower case do not matter. Earlier builds, and legacy build 21, accept at most 13 characters with only letters, digits and `~` before `.wav`; longer-named files are then listed by their short alias, such as `MYLONG~1.wav`. The list ends at the first blank, malformed or missing name, so a typing mistake shortens it; a list with no usable entry does not play. Card read errors abort mounting. For a single-tone test, a playlist may simply contain:
 
 ```text
 Q480.wav
 ```
 
 Generate that original test tone with `python3 tools/generate_test_tones.py` and copy it from `build/test-tones/` to the card. Delete `playlist.txt` to restore directory browsing.
+
+### Several playlists
+
+From extended build 54 a card can hold several playlist files, with `config.txt` choosing the one in use:
+
+```text
+# Hamburger Wavy configuration
+Loop
+Quantize
+Short
+Playlist drums
+```
+
+`Playlist drums` (or `Playlist drums.txt`) uses `drums.txt` from the card's root. The name is one to eight letters, digits or `~`. The line goes with the effect lines, after the CV mode and the optional delay line. If the named file is not on the card the firmware uses `playlist.txt`, and if that is absent too, directory order. A named file that exists but has no usable entry does not play. Earlier builds ignore the line and use `playlist.txt`. Switching playlists means editing that one line; the panel cannot change it.
 
 ## Persistent files and lights
 

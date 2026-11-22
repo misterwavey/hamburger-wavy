@@ -1,0 +1,5 @@
+# Hamburger Wavy: use drums.txt as the playlist
+Sequence
+Quantize
+Short
+Playlist drums

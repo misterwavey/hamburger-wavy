@@ -689,7 +689,11 @@ static void mount_card(void) {
     return;
   }
   /* A malformed text file leaves all settings at their safe defaults. */
+#ifdef ONE_COLOUR
+  int n = playlist_load_named(&fs, settings.playlist, entries, ONE_MAX_FILES);
+#else
   int n = playlist_load(&fs, entries, ONE_MAX_FILES);
+#endif
   if (n == -2)
     n = fat_list(&fs, entries, ONE_MAX_FILES);
   if (n <= 0) {

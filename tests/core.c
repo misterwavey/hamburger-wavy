@@ -1040,6 +1040,81 @@ static void test_settings_playlist(void) {
   CHECK(playlist_load(&f, list, 256) == 256);
   CHECK(list[0].cluster == list[255].cluster);
 }
+#ifdef ONE_LONG_NAMES
+/* A file with a VFAT long name of any length: its name entries, last piece
+ * first, then the short entry. Returns the next free directory slot. */
+static uint32_t put_long(uint32_t slot, const char *name, const char *alias,
+                         uint32_t cluster, uint32_t size) {
+  static const uint8_t offsets[13] = {1,  3,  5,  7,  9,  14, 16,
+                                      18, 20, 22, 24, 28, 30};
+  uint32_t length = (uint32_t)strlen(name), pieces = (length + 12u) / 13u;
+  uint8_t checksum = 0;
+  for (uint32_t i = 0; i < 11; i++)
+    checksum = (uint8_t)(((checksum & 1u) << 7) + (checksum >> 1) + (uint8_t)alias[i]);
+  for (uint32_t piece = pieces; piece >= 1; piece--) {
+    uint8_t *p = block(21) + slot++ * 32;
+    memset(p, 0, 32);
+    p[0] = (uint8_t)(piece | (piece == pieces ? 0x40u : 0u));
+    p[11] = 15;
+    p[13] = checksum;
+    for (uint32_t i = 0; i < 13; i++) {
+      uint32_t at = (piece - 1u) * 13u + i;
+      put16(p + offsets[i], at < length ? (uint8_t)name[at] : at == length ? 0 : 0xffff);
+    }
+  }
+  entry(block(21) + slot++ * 32, alias, cluster, size);
+  return slot;
+}
+static void test_longer_names(void) {
+  Fat f;
+  Entry list[8], e;
+  const uint32_t size = 44 + 37 * 2;
+  feature_disk(0, "My Long Sample Name 01.wav\nkick drum.wav\nexactly-26-characters.wav\nB.wav\n", 37, 16);
+  uint32_t slot = put_long(5, "My Long Sample Name 01.wav", "MYLONG~1WAV", 3, size);
+  slot = put_long(slot, "kick drum.wav", "KICKDR~1WAV", 35, size);
+  slot = put_long(slot, "exactly-26-characters.wav", "EXACTL~1WAV", 67, size);
+  CHECK(slot <= 16);
+  CHECK(!fat_mount(&f, disk, 0));
+  /* Found by the whole name in any case, and by the short alias; the entry
+   * carries the alias when the name is longer than 13 characters. */
+  CHECK(fat_find(&f, "my long sample name 01.WAV", &e) == 1 && e.cluster == 3 && !strcmp(e.name, "MYLONG~1.WAV"));
+  CHECK(fat_find(&f, "MYLONG~1.wav", &e) == 1 && e.cluster == 3);
+  CHECK(fat_find(&f, "kick drum.wav", &e) == 1 && e.cluster == 35 && !strcmp(e.name, "kick drum.wav"));
+  CHECK(fat_find(&f, "exactly-26-characters.wav", &e) == 1 && e.cluster == 67);
+  /* Near misses: a prefix, an extension of the name, one wrong character,
+   * and a name whose length lands on a piece boundary. */
+  CHECK(fat_find(&f, "My Long Sample Name 0.wav", &e) == 0);
+  CHECK(fat_find(&f, "My Long Sample Name 011.wav", &e) == 0);
+  CHECK(fat_find(&f, "My Long Sample Mame 01.wav", &e) == 0);
+  CHECK(fat_find(&f, "My Long Sampl", &e) == 0);
+  CHECK(fat_find(&f, "exactly-26-characters.wavx", &e) == 0);
+  CHECK(fat_find(&f, "xactly-26-characters.wav", &e) == 0);
+  CHECK(playlist_load(&f, list, 8) == 4);
+  CHECK(list[0].cluster == 3 && list[1].cluster == 35 && list[2].cluster == 67 && !strcmp(list[3].name, "B.WAV"));
+  /* Directory order still lists every file, long names by their alias. */
+  CHECK(fat_list(&f, list, 8) == 6);
+  /* A name entry out of sequence, or belonging to another short entry, does
+   * not match. */
+  block(21)[5 * 32] = 0x43; /* claims to be piece 3 of 3 */
+  f.cache_lba = 0xffffffffu;
+  CHECK(fat_find(&f, "My Long Sample Name 01.wav", &e) == 0);
+  block(21)[5 * 32] = 0x42;
+  block(21)[5 * 32 + 13] ^= 1; /* checksum of the first piece only */
+  f.cache_lba = 0xffffffffu;
+  CHECK(fat_find(&f, "My Long Sample Name 01.wav", &e) == 0);
+  block(21)[5 * 32 + 13] ^= 1;
+  block(21)[7 * 32 + 1] ^= 1; /* the short entry's name, so its checksum */
+  f.cache_lba = 0xffffffffu;
+  CHECK(fat_find(&f, "My Long Sample Name 01.wav", &e) == 0);
+  /* Playlist lines: up to 63 characters; non-ASCII ends the list. */
+  feature_disk(0, "A.wav\ncaf\xc3\xa9.wav\nB.wav\n", 37, 16);
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(playlist_load(&f, list, 8) == 1);
+  feature_disk(0, "A.wav\n123456789012345678901234567890123456789012345678901234567890.wav\nB.wav\n", 37, 16);
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(playlist_load(&f, list, 8) == 1);
+}
+#endif
 static void test_long_playlist_name(void) {
   Fat f;
   Entry list[8], e;
@@ -3178,6 +3253,69 @@ static void test_flanger(void) {
   phaser_capture("# test\nLoop\nQuantize\nShort\nFlanger 9\nRate 9", 96000, 0, first, 0, 1000);
   CHECK(!memcmp(first, expected, sizeof(first)));
 }
+static void test_named_playlist(void) {
+  Fat f;
+  Settings s;
+  Entry list[8];
+  /* The Playlist line: name with or without .txt, any case, on any effect
+   * line including line 4; the last one wins. */
+  static const char *good[][2] = {
+      {"# c\nLoop\nQuantize\nShort\nPlaylist drums", "DRUMS.TXT"},
+      {"# c\nLoop\nQuantize\nplaylist  Drums.TXT  ", "DRUMS.TXT"},
+      {"# c\nLoop\nQuantize\nShort\nDrive 3\nPLAYLIST a~1\nRate 2", "A~1.TXT"},
+      {"# c\nLoop\nQuantize\nShort\nPlaylist one\nPlaylist TWO.txt", "TWO.TXT"},
+      {"# c\nLoop\nQuantize\nShort\nPlaylist 12345678", "12345678.TXT"},
+      {"# c\nLoop\nQuantize\nShort\nDrive 1\nCrush 1\nFilter 1\nResonance 1\nWah 1\nPhaser 1\n"
+       "Tremolo 1\nRate 1\nPlaylist late", "LATE.TXT"},
+  };
+  for (uint32_t i = 0; i < sizeof(good) / sizeof(*good); i++) {
+    feature_disk(good[i][0], 0, 37, 16);
+    CHECK(!fat_mount(&f, disk, 0));
+    CHECK(settings_load(&f, &s) == 1 && !strcmp(s.playlist, good[i][1]));
+  }
+  static const char *ignored[] = {
+      "# c\nLoop\nQuantize\nShort\nPlaylist", "# c\nLoop\nQuantize\nShort\nPlaylist 123456789",
+      "# c\nLoop\nQuantize\nShort\nPlaylist a.wav", "# c\nLoop\nQuantize\nShort\nPlaylist a b",
+      "# c\nLoop\nQuantize\nShort\nPlaylist a-b", "# c\nLoop\nQuantize\nShort\nPlaylists a",
+      "# c\nLoop\nQuantize\nShort\nPlaylist .txt", "# c\nLoop\nQuantize\nShort"};
+  for (uint32_t i = 0; i < sizeof(ignored) / sizeof(*ignored); i++) {
+    feature_disk(ignored[i], 0, 37, 16);
+    CHECK(!fat_mount(&f, disk, 0));
+    CHECK(settings_load(&f, &s) == 1 && !s.playlist[0]);
+  }
+  /* On line 4 a malformed playlist line is as invalid as any other. */
+  feature_disk("# c\nLoop\nQuantize\nPlaylist a b", 0, 37, 16);
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(settings_load(&f, &s) == -2 && !s.playlist[0]);
+  /* The named list is used when present; otherwise PLAYLIST.TXT; otherwise
+   * the caller falls back to directory order. */
+  feature_disk("# c\nLoop\nQuantize\nShort\nPlaylist drums", "B.wav\nA.wav\n", 5000, 24);
+  put_text(5, "DRUMS   TXT", 102, "C.wav\nA.wav\nC.wav\n");
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(settings_load(&f, &s) == 1);
+  CHECK(playlist_load_named(&f, s.playlist, list, 8) == 3);
+  CHECK(!strcmp(list[0].name, "C.WAV") && !strcmp(list[1].name, "A.WAV") && !strcmp(list[2].name, "C.WAV"));
+  CHECK(playlist_load_named(&f, "OTHER.TXT", list, 8) == 2 && !strcmp(list[0].name, "B.WAV"));
+  CHECK(playlist_load_named(&f, "", list, 8) == 2 && !strcmp(list[0].name, "B.WAV"));
+  CHECK(playlist_load(&f, list, 8) == 2);
+  feature_mount();
+  host_adc = 512;
+  click_play();
+  CHECK(host_active && host_audio[0] == sample_word(3, 0)); /* C.wav first */
+  /* A named list that is present but unusable does not fall back. */
+  feature_disk("# c\nLoop\nQuantize\nShort\nPlaylist drums", "B.wav\n", 5000, 24);
+  put_text(5, "DRUMS   TXT", 102, "missing.wav\n");
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(playlist_load_named(&f, "DRUMS.TXT", list, 8) == 0);
+  /* Neither file: the absent code, as before. */
+  feature_disk("# c\nLoop\nQuantize\nShort\nPlaylist drums", 0, 5000, 24);
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(playlist_load_named(&f, "DRUMS.TXT", list, 8) == -2);
+  feature_mount();
+  host_adc = 512;
+  click_play();
+  CHECK(host_active && host_audio[0] == sample_word(1, 0)); /* directory order */
+}
 #endif
 #ifdef ONE_TOLERANT_ENCODER
 static int32_t encoder_feed(Encoder *e, const uint8_t *states, uint32_t count) {
@@ -3385,7 +3523,54 @@ static void test_polled_decode(void) {
   wave_poll = saved;
 }
 #endif
-int main(void) {
+#if defined(ONE_COLOUR) && defined(ONE_FLIP) && defined(ONE_LONG_NAMES)
+/* With a file argument, parse each config in it with the firmware's own
+ * settings_load and print the result, for checking the web config editor.
+ * Records are "@ <bytes>\n" followed by that many bytes. */
+static int parse_configs(const char *path) {
+  FILE *in = fopen(path, "rb");
+  if (!in) return 2;
+  unsigned length;
+  static char text[4200];
+  char header[32];
+  char kind;
+  while (fgets(header, sizeof(header), in) && sscanf(header, "%c %u", &kind, &length) == 2) {
+    if (length >= sizeof(text) || fread(text, 1, length, in) != length) { fclose(in); return 2; }
+    text[length] = 0;
+    Fat f;
+    Settings s;
+    if (kind == '%') { /* a playlist, on a card holding A.wav, B.wav and C.wav */
+      Entry list[8];
+      feature_disk("# c\nLoop\nQuantize", text, 37, 16);
+      uint32_t slot = put_long(5, "My Long Sample Name 01.wav", "MYLONG~1WAV", 3, 44 + 37 * 2);
+      (void)put_long(slot, "kick drum.wav", "KICKDR~1WAV", 35, 44 + 37 * 2);
+      if (fat_mount(&f, disk, 0)) { fclose(in); return 2; }
+      int count = playlist_load(&f, list, 8);
+      printf("P %d", count);
+      for (int i = 0; i < count; i++) printf(" %u", (unsigned)list[i].cluster);
+      printf("\n");
+      (void)fgetc(in);
+      continue;
+    }
+    feature_disk(text, 0, 37, 16);
+    if (fat_mount(&f, disk, 0)) { fclose(in); return 2; }
+    int rc = settings_load(&f, &s);
+    printf("%s %d %u %u %u %u %u %u %u %u %u %u %u %u %u %u\n", s.playlist[0] ? s.playlist : "-", rc, (unsigned)s.play, (unsigned)s.cv,
+           (unsigned)s.delay_ms, (unsigned)s.drive, (unsigned)s.crush, (unsigned)s.filter,
+           (unsigned)s.resonance, (unsigned)s.shape, (unsigned)s.tremolo, (unsigned)s.ring,
+           (unsigned)s.rate, (unsigned)s.wah, (unsigned)s.phaser, (unsigned)s.flanger);
+    (void)fgetc(in); /* the newline after each record */
+  }
+  fclose(in);
+  return 0;
+}
+#endif
+int main(int argc, char **argv) {
+#if defined(ONE_COLOUR) && defined(ONE_FLIP) && defined(ONE_LONG_NAMES)
+  if (argc == 2) return parse_configs(argv[1]);
+#endif
+  (void)argc;
+  (void)argv;
   test_fat();
   test_wave();
   test_sd();
@@ -3396,6 +3581,9 @@ int main(void) {
   test_application();
   test_settings_playlist();
   test_long_playlist_name();
+#ifdef ONE_LONG_NAMES
+  test_longer_names();
+#endif
   test_policy();
   test_modes();
   test_sd_write();
@@ -3430,6 +3618,7 @@ int main(void) {
   test_wah();
   test_phaser();
   test_flanger();
+  test_named_playlist();
 #endif
 #ifdef ONE_POLL_DECODE
   test_polled_decode();

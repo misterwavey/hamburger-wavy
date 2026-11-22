@@ -534,7 +534,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(manifest['resources']['combined_text_bytes'],layout['.text']['bytes']+layout['.app_extension']['bytes'])
             self.assertEqual(manifest['resources']['combined_text_free'],80964-manifest['resources']['combined_text_bytes'])
             if profiling:
-                report={'build':53}
+                report={'build':54}
                 attach_build_info(report,out/'manifest.json',ROOT/'build/extended/manifest.json')
                 self.assertEqual(report['profiling_overhead_bytes']['combined_text'],
                                  report['profiling_overhead_bytes']['main_text']+report['profiling_overhead_bytes']['extension_text'])
@@ -594,7 +594,7 @@ class ReleaseTests(unittest.TestCase):
                  ('fat','wave','sd','ring','memory','app','advertise','settings','policy','ui','recall')]]
         for profile in (False,True):
             binary=ROOT/('build/flip-profile-test' if profile else 'build/flip-core-test')
-            flags=['-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1']+(['-DONE_PROFILE=1',str(ROOT/'firmware/profile.c')] if profile else [])
+            flags=['-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1','-DONE_LONG_NAMES=1']+(['-DONE_PROFILE=1',str(ROOT/'firmware/profile.c')] if profile else [])
             result=subprocess.run([cc,'-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-fno-builtin',
                 '-fsanitize=address,undefined','-I'+str(ROOT/'build'),*flags,*map(str,sources),'-o',str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -646,6 +646,40 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual((root/'build/cv-diag/image.hex').read_bytes(),(out/'image.hex').read_bytes())
         invalid=subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--cv-diag','--extended'],capture_output=True,text=True)
         self.assertNotEqual(invalid.returncode,0)
+
+    def test_config_editor_agrees_with_firmware_parser(self):
+        # docs/config-editor.html: its generated files and its loader are
+        # checked against settings.c, compiled for the host.
+        node=shutil.which('node')
+        cc=os.environ.get('CC') or shutil.which('clang') or shutil.which('cc')
+        if not node or not cc:self.skipTest('needs node and a host C compiler')
+        result=subprocess.run([node,str(ROOT/'tests/config_editor_cases.js')],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout[-2000:]+result.stderr)
+        cases=json.loads(result.stdout)
+        self.assertGreater(len(cases),3000)
+        sources=[ROOT/'tests/core.c',*[ROOT/'firmware'/f'{name}.c' for name in
+                 ('fat','wave','sd','ring','memory','app','advertise','settings','policy','ui','recall')]]
+        binary=ROOT/'build/config-editor-test'
+        result=subprocess.run([cc,'-std=c11','-O1','-Wall','-Wextra','-Werror','-fno-builtin','-I'+str(ROOT/'build'),
+            '-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1','-DONE_LONG_NAMES=1',
+            *map(str,sources),'-o',str(binary)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        records=ROOT/'build/config-editor-cases.bin'
+        with records.open('wb') as out:
+            for case in cases:
+                data=case['text'].encode('utf-8')
+                out.write(case.get('kind','@').encode()+b' %d\n'%len(data)+data+b'\n')
+        result=subprocess.run([str(binary),str(records)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout[-2000:]+result.stderr)
+        lines=result.stdout.splitlines()
+        self.assertEqual(len(lines),len(cases))
+        for case,line in zip(cases,lines):
+            got=line.split()
+            self.assertEqual([got[0],*[int(v) for v in got[1:2]],*[v if case.get('kind') else int(v) for v in got[2:]]],case['expect'],repr(case['text']))
+
+    def test_config_editor_carries_current_guides(self):
+        result=subprocess.run([sys.executable,str(ROOT/'tools/embed_docs.py'),'--check'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_example_configs_fit_the_parser_line_buffer(self):
         # settings.c rejects a whole config whose line exceeds 63 characters.
