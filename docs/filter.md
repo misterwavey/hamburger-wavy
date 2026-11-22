@@ -71,7 +71,7 @@ Rate 4
 
 - **Depth.** `Wah 0` (or no line) is off; 9 swings the cutoff about 2.5 octaves each way. The swing stops at the ends of the cutoff range, so a centre near either end gives a lopsided sweep.
 - **Centre and shape** come from the `Filter`, `Highpass` or `Bandpass` line. With no such line the wah uses a low-pass centred mid-range.
-- **Speed** comes from `Rate n`: 0.125, 0.2, 0.31, 0.5, 0.79, 1.3, 2, 3.2, 5 and 8 Hz for digits 0 to 9. This scale is shared with the phaser and is separate from the tremolo's; if `Tremolo` or `Ring` lines are also present, each follows the same `Rate` value on its own scale.
+- **Speed** comes from `Rate n`: 0.125, 0.2, 0.31, 0.5, 0.79, 1.3, 2, 3.2, 5 and 8 Hz for digits 0 to 9. This scale is shared with the phaser and flanger and is separate from the tremolo's; if `Tremolo` or `Ring` lines are also present, each follows the same `Rate` value on its own scale.
 - **Rate CV mode** (`Rate` on the CV line) puts the sweep speed on the knob/CV, clockwise faster.
 - **Filter CV mode** puts the centre on the knob/CV while the sweep runs at the fixed `Rate`.
 - The sweep restarts from the centre, rising, each time playback starts and after each Flip/Tape/Chop transition.

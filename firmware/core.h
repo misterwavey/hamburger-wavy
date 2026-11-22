@@ -150,6 +150,7 @@ typedef struct {
   uint32_t tremolo, ring, rate; /* depths 0 off .. 255; rate 0 .. 255 */
   uint32_t wah; /* filter cutoff sweep depth, 0 off .. 255 */
   uint32_t phaser; /* intensity, 0 off .. 255 */
+  uint32_t flanger; /* intensity, 0 off .. 255; takes the phaser's place */
 #endif
 } Settings;
 void settings_default(Settings *);
@@ -224,6 +225,17 @@ typedef struct {
 uint32_t phaser_coefficient(uint32_t cutoff);
 void phaser_apply(Phaser *, uint32_t *, uint32_t frames, uint32_t target,
                   uint32_t intensity);
+/* Flanger: a short swept delay with feedback, mixed with the dry signal.
+ * The delayed signal is kept at 16 bits. */
+#define FLANGER_FRAMES 512u
+typedef struct {
+  int16_t line[FLANGER_FRAMES];
+  uint32_t at;    /* next write position */
+  uint32_t delay; /* running delay in frames, Q16 */
+} Flanger;
+uint32_t flanger_delay(int32_t sine); /* Q16 frames, 32 to 384 */
+void flanger_apply(Flanger *, uint32_t *, uint32_t frames, uint32_t target,
+                   uint32_t intensity);
 #endif
 typedef struct {
   uint32_t half, pending, blocks, underruns, running;

@@ -153,6 +153,13 @@ static Colour colour;
 static Filter filter;
 static Mod mod;
 static Phaser phaser;
+static Flanger flanger;
+static uint32_t flanger_live; /* the delay line holds something */
+static void flanger_clear(void) {
+  for (uint32_t i = 0; i < FLANGER_FRAMES; ++i) flanger.line[i] = 0;
+  flanger.at = 0;
+  flanger_live = 0;
+}
 static int32_t rate_cv; /* smoothed knob/CV reading, ADC counts in Q4 */
 static uint32_t effect_divider;
 static int cv_effect(void) {
@@ -183,6 +190,8 @@ static void effects_reset(void) {
   filter.f = filter_target() << 8;
   for (uint32_t i = 0; i < 5u; ++i) phaser.z[i] = 0;
   phaser.a = phaser_coefficient(PHASER_CENTRE) << 8;
+  if (flanger_live) flanger_clear();
+  flanger.delay = flanger_delay(0);
   mod.phase = MOD_START_PHASE;
   rate_cv = (int32_t)board_adc() << 4;
 }
@@ -202,7 +211,7 @@ static void effects_block(uint32_t *data, uint32_t frames) {
   uint32_t ring = settings.ring, depth = ring ? ring : settings.tremolo;
   uint32_t rate = settings.rate * 1023u / 255u;
   if (settings.cv == CV_RATE) {
-    if (!depth && !settings.wah && !settings.phaser) depth = 255u;
+    if (!depth && !settings.wah && !settings.phaser && !settings.flanger) depth = 255u;
     if (cv_effect_live()) {
       /* Hold still inside two ADC counts; otherwise close a quarter of the
        * distance each block, so a chosen rate does not wander with noise. */
@@ -212,7 +221,7 @@ static void effects_block(uint32_t *data, uint32_t frames) {
     }
   }
   /* The wah position at the end of this block is the filter's next target. */
-  if (settings.wah || settings.phaser) wah_phase += wah_increment(rate, wave.rate) * frames;
+  if (settings.wah || settings.phaser || settings.flanger) wah_phase += wah_increment(rate, wave.rate) * frames;
   uint32_t target = filter_target(), start = filter.f >> 8;
   /* Stages allowed by output rate: all four up to 48 kHz, three up to about
    * 64 kHz, one up to 96 kHz. Filter, phaser, modulation, colour in that
@@ -221,16 +230,20 @@ static void effects_block(uint32_t *data, uint32_t frames) {
                     effect_divider >= EFFECT_BOTH_DIVIDER ? 3u :
                     effect_divider >= EFFECT_MIN_DIVIDER ? 1u : 0u;
   if (target) --budget; /* target is already zero when no stage may run */
-  uint32_t swirl = settings.phaser && budget;
+  /* The flanger takes the phaser's place if both are set. */
+  uint32_t swirl = (settings.phaser || settings.flanger) && budget;
   if (swirl) --budget;
   uint32_t wobble = depth && budget;
   if (wobble) --budget;
   uint32_t tone = (drive || crush) && budget;
   uint32_t sweep = phaser_coefficient(wah_cutoff(PHASER_CENTRE, PHASER_SWING, mod_sine(wah_phase)));
   uint32_t sweep_start = phaser.a >> 8;
+  uint32_t jet = flanger_delay(mod_sine(wah_phase)), jet_start = flanger.delay;
   if (!swirl) {
     for (uint32_t i = 0; i < 5u; ++i) phaser.z[i] = 0;
     phaser.a = sweep << 8;
+    if (flanger_live) flanger_clear();
+    flanger.delay = jet;
   }
   uint32_t increment = wobble ? mod_increment(rate, ring, wave.rate) : 0;
   if (!target) filter.low = filter.band = 0, filter.f = 0;
@@ -261,7 +274,15 @@ static void effects_block(uint32_t *data, uint32_t frames) {
     uint32_t late = board_ticks();
     filter_ticks += late - middle;
 #endif
-    if (swirl) {
+    if (swirl && settings.flanger) {
+      int32_t span = (int32_t)jet - (int32_t)jet_start;
+      flanger_live = 1;
+      flanger_apply(&flanger, data + (done - count) * 2u, count,
+                    /* Q8 steps keep the product inside 32 bits. */
+                    (uint32_t)((int32_t)jet_start +
+                               (span / 256) * (int32_t)done / (int32_t)frames * 256),
+                    settings.flanger);
+    } else if (swirl) {
       int32_t span = (int32_t)sweep - (int32_t)sweep_start;
       phaser_apply(&phaser, data + (done - count) * 2u, count,
                    (uint32_t)((int32_t)sweep_start + span * (int32_t)done / (int32_t)frames),
@@ -281,7 +302,7 @@ static void effects_block(uint32_t *data, uint32_t frames) {
   if (profiled && tone) profile_sample(PROF_COLOUR, tone_ticks);
   if (profiled && target) profile_sample(PROF_FILTER, filter_ticks);
   if (profiled && wobble) profile_sample(PROF_MOD, mod_ticks);
-  if (profiled && swirl) profile_sample(PROF_PHASER, swirl_ticks);
+  if (profiled && swirl) profile_sample(settings.flanger ? PROF_FLANGER : PROF_PHASER, swirl_ticks);
 #endif
 }
 #endif

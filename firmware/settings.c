@@ -81,7 +81,7 @@ static int effect_line(const char *text, Settings *s) {
          amount(text, "RESONANCE", &s->resonance) ||
          amount(text, "TREMOLO", &s->tremolo) || amount(text, "RING", &s->ring) ||
          amount(text, "RATE", &s->rate) || amount(text, "WAH", &s->wah) ||
-         amount(text, "PHASER", &s->phaser);
+         amount(text, "PHASER", &s->phaser) || amount(text, "FLANGER", &s->flanger);
 #else
   (void)text;
   (void)s;
@@ -94,7 +94,7 @@ void settings_default(Settings *s) {
   s->delay_ms = 0;
 #ifdef ONE_COLOUR
   s->drive = s->crush = s->filter = s->resonance = s->shape = 0;
-  s->tremolo = s->ring = s->rate = s->wah = s->phaser = 0;
+  s->tremolo = s->ring = s->rate = s->wah = s->phaser = s->flanger = 0;
 #endif
 }
 int settings_load(Fat *fs, Settings *out) {

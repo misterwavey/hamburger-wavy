@@ -1,0 +1,6 @@
+# Hamburger Wavy: flanger
+Loop
+Quantize
+Short
+Flanger 7
+Rate 2

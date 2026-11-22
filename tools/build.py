@@ -108,7 +108,7 @@ def main():
  flags=['-I'+str(out),'--target=mipsel-none-elf','-march=mips32r2','-mabi=32','-mno-abicalls','-fno-pic','-G0','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-jump-tables','-Os','-fstack-usage','-Wall','-Wextra','-Werror']
  if args.profile:flags+=['-DONE_PROFILE=1']
  if args.cv_diag:flags+=['-DONE_CV_DIAG=1','-DONE_BUILD_NUMBER=29']
- if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1','-DONE_BUILD_NUMBER=52']
+ if args.extended:flags+=['-DONE_EXTENDED_APP=1','-DONE_FLIP=1','-DONE_COLOUR=1','-DONE_POLL_DECODE=1','-DONE_TOLERANT_ENCODER=1','-DONE_SD_RETRY=1','-DONE_BUILD_NUMBER=53']
  if probe:flags+=['-DONE_FLASH_PROBE=1','-DONE_BUILD_NUMBER='+('23' if args.flash_bank else '22')]
  if args.flash_bank:flags+=['-DONE_FLASH_BANK=1']
  linker=ROOT/'firmware/layout.ld'
@@ -209,7 +209,7 @@ def main():
  memory.update(payload);image=out/'image.hex';write_image(spec,memory,image)
  build_number=int(re.search(r'^#define ONE_BUILD_NUMBER (\d+)$',(ROOT/'firmware/build.h').read_text(),re.M)[1])
  if probe:build_number=23 if args.flash_bank else 22
- if args.extended:build_number=52
+ if args.extended:build_number=53
  if args.cv_diag:build_number=29
  report=dict(profiling=args.profile,project='Hamburger Wavy',licence='GPL-3.0-only',build_number=build_number,status='EXPERIMENTAL — COMPLETE APPLICATION, NOT HARDWARE VALIDATED',source_built=True,
              features=dict(config_txt=True,playlist_txt=True,playback_modes=['Trigger','Gate','Fade','Loop','Sequence','Combo','Random Sequence','Random Loop']+(['Flip','CV Flip','Tape','Chop'] if args.extended else []),cv_modes=['Free','Quantize','Select File']+(['Colour (config.txt only)','Filter (config.txt only)','Rate (config.txt only)'] if args.extended else []),cv_select_delays_ms=dict(Short=0,Medium=2,Long=10),front_panel_modes=True,last_manual_file_recall='ONESTATE.BIN: two alternating CRC32 sectors; stock status.bin read-only import',build_identification='ONEBUILD.TXT: best-effort on mount, written only if content changes',generated_chromatic_tables=True,fade_ramp_samples=256),

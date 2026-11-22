@@ -14,7 +14,7 @@ You need Python 3.11 or newer, LLVM Clang with the MIPS backend, and LLD with EL
 make
 ```
 
-The default target retains legacy build 21 (eight modes). For current build 52 with Flip, CV Flip, Tape, Chop, Colour, Filter, phaser and tremolo/ring modulation, use:
+The default target retains legacy build 21 (eight modes). For current build 53 with Flip, CV Flip, Tape, Chop, Colour, Filter, phaser, flanger and tremolo/ring modulation, use:
 
 ```sh
 make extended          # build/extended/image.hex
@@ -55,7 +55,7 @@ For the extended firmware, `make extended-profile` builds the matching diagnosti
 
 This is experimental replacement firmware. Preserve your existing firmware and card files separately. The application does not include the resident updater or a full recovery image. See [hardware and update limits](docs/provenance.md#hardware-and-update-limits).
 
-Prepare a FAT16/FAT32 sample card with supported mono PCM16/24 WAVs. Copy the built image to its root as `image.hex`, verify it, then eject. Example for current extended build 52 on a macOS volume named TTA ONE (run `make extended` first):
+Prepare a FAT16/FAT32 sample card with supported mono PCM16/24 WAVs. Copy the built image to its root as `image.hex`, verify it, then eject. Example for current extended build 53 on a macOS volume named TTA ONE (run `make extended` first):
 
 ```sh
 cp build/extended/image.hex "/Volumes/TTA ONE/image.hex"
@@ -77,13 +77,13 @@ See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD
 ## Features of the extended build
 
 - **Playback modes 9–12:** [Flip](docs/flip.md) reverses direction on each gate; [CV Flip](docs/cv-flip.md) takes direction from bipolar CV; [Tape](docs/tape.md) gives signed speed with a hold at zero; [Chop](docs/chop.md) jumps to a CV-selected position on each gate.
-- **Effects**, set by lines in `config.txt`: [drive and crush](docs/colour.md); a resonant [filter](docs/filter.md) with low-pass, high-pass and band-pass outputs and an automatic wah sweep; a [phaser](docs/phaser.md); and [tremolo and ring modulation](docs/mod.md). The pitch knob/CV can be assigned to an effect amount, the filter cutoff or the modulation speed.
+- **Effects**, set by lines in `config.txt`: [drive and crush](docs/colour.md); a resonant [filter](docs/filter.md) with low-pass, high-pass and band-pass outputs and an automatic wah sweep; a [phaser](docs/phaser.md) or [flanger](docs/flanger.md); and [tremolo and ring modulation](docs/mod.md). The pitch knob/CV can be assigned to an effect amount, the filter cutoff or the modulation speed.
 - A FILE encoder reader that tolerates worn or chattering contacts, and one automatic retry of a failed card read.
 
 The [user guide](docs/user-guide.md#effects) lists every effect line, the rate scales and how many effects can run at each playback rate.
 
 ## Status
 
-This is experimental firmware developed and tested on a single module with a small set of cards and files. The legacy build 21 and the extended build have both run on that hardware across their playback modes and effects, including sustained 96 kHz/24-bit playback, with the diagnostic build recording no streaming errors in those runs. A complete matrix of modes, cards, sample rates and modulation speeds has not been tested, and the phaser in build 52 is newer than the rest. Timing margins are tightest for 88.2/96 kHz files; see the limits in the user guide.
+This is experimental firmware developed and tested on a single module with a small set of cards and files. The legacy build 21 and the extended build have both run on that hardware across their playback modes and effects, including sustained 96 kHz/24-bit playback, with the diagnostic build recording no streaming errors in those runs. A complete matrix of modes, cards, sample rates and modulation speeds has not been tested, and the phaser and flanger are newer than the rest. Timing margins are tightest for 88.2/96 kHz files; see the limits in the user guide.
 
 Hamburger Wavy is independent of Tiptop Audio and is not endorsed by the manufacturer. Hardware/product names identify compatibility. See [provenance](docs/provenance.md) for what is included and how it was derived.

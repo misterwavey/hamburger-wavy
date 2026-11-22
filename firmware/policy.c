@@ -204,6 +204,58 @@ void phaser_apply(Phaser *s, uint32_t *stereo, uint32_t frames, uint32_t target,
   s->z[0] = z0; s->z[1] = z1; s->z[2] = z2; s->z[3] = z3; s->z[4] = z4;
   s->a = target << 8;
 }
+/* Delay for a sweep position: 32 frames at the bottom of the sine to 384 at
+ * the top, 3.5 octaves, with a piecewise-linear exponential. Q16 frames. */
+uint32_t flanger_delay(int32_t sine) {
+  int32_t octaves = 448 + ((448 * sine) >> 15); /* Q8 */
+  if (octaves < 0) octaves = 0;
+  if (octaves > 896) octaves = 896;
+  uint32_t o = (uint32_t)octaves;
+  return ((32u * (256u + (o & 255u))) << (o >> 8)) << 8;
+}
+/* A delay line on the left word, read with linear interpolation at a delay
+ * that ramps linearly to the target across the call; both channels receive
+ * the result. As for the phaser, intensity raises the wet share to one half
+ * and the feedback to 0.5 together, with the wet path scaled by
+ * (1 + feedback) so the notches stay deep, and trims the input by up to
+ * 4.4 dB. Zero state and zero input give zero output, and the line decays to
+ * exact silence; zero intensity leaves samples unchanged. */
+void flanger_apply(Flanger *s, uint32_t *stereo, uint32_t frames, uint32_t target,
+                   uint32_t intensity) {
+  if (!frames) return;
+  if (intensity > 255u) intensity = 255u;
+  if (target > (FLANGER_FRAMES - 2u) << 16) target = (FLANGER_FRAMES - 2u) << 16;
+  if (target < 1u << 16) target = 1u << 16;
+  int32_t mix = (int32_t)(intensity * 128u / 255u);        /* Q8, up to 0.5 */
+  int32_t feedback = mix;                                  /* Q8, up to 0.5 */
+  int32_t wet_gain = (mix * (256 + feedback)) >> 8;        /* Q8, up to 0.75 */
+  int32_t trim = 256 - (int32_t)(intensity * 102u / 255u); /* Q8, down to 0.6 */
+  uint32_t at = s->at & (FLANGER_FRAMES - 1u);
+  int32_t delay = (int32_t)s->delay;
+  if (delay < 1 << 16) delay = (int32_t)target;
+  int32_t step = ((int32_t)target - delay) / (int32_t)frames;
+  for (uint32_t i = 0; i < frames; i++) {
+    delay += step;
+    uint32_t whole = (uint32_t)delay >> 16;
+    int32_t fraction = (int32_t)(((uint32_t)delay >> 1) & 32767u);
+    int32_t near = s->line[(at - whole) & (FLANGER_FRAMES - 1u)];
+    int32_t far = s->line[(at - whole - 1u) & (FLANGER_FRAMES - 1u)];
+    int32_t wet = near + (((far - near) * fraction) >> 15);
+    int32_t dry = (((int32_t)stereo[0] >> 8) * trim) >> 8;
+    int32_t keep = dry + wet * feedback;
+    if (keep > 0x7fffff) keep = 0x7fffff;
+    else if (keep < -0x800000) keep = -0x800000;
+    s->line[at] = (int16_t)(keep / 256); /* towards zero: no residual offset */
+    at = (at + 1u) & (FLANGER_FRAMES - 1u);
+    int32_t out = dry + wet * wet_gain - ((dry * mix) >> 8);
+    if (out > 0x7fffff) out = 0x7fffff;
+    else if (out < -0x800000) out = -0x800000;
+    stereo[0] = stereo[1] = (uint32_t)out << 8;
+    stereo += 2;
+  }
+  s->at = at;
+  s->delay = target;
+}
 /* Multiply the left word by a gain that follows a sine; both channels
  * receive the result. Tremolo swings the gain between 1 and 1 - depth.
  * Ring modulation crossfades from the dry signal to signal times sine, so

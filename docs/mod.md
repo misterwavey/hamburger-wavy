@@ -41,11 +41,11 @@ As with the other effect lines, a mistyped line after line 4 is silently ignored
 
 ## Rate CV mode
 
-Put `Rate` on the CV mode line. Playback then stays at the file's native pitch and the pitch knob/CV sweeps the rate across the whole range: clockwise or positive CV is faster. With a `Ring n` line it sweeps ring modulation; otherwise tremolo, at the `Tremolo n` depth. If the file has no `Tremolo`, `Ring`, `Wah` or `Phaser` line, the mode gives full-depth tremolo. The reading is taken once per 1024-frame block (about 21 ms at 48 kHz) and smoothed: very small changes are ignored and larger ones settle in roughly a tenth of a second, so a chosen rate stays put.
+Put `Rate` on the CV mode line. Playback then stays at the file's native pitch and the pitch knob/CV sweeps the rate across the whole range: clockwise or positive CV is faster. With a `Ring n` line it sweeps ring modulation; otherwise tremolo, at the `Tremolo n` depth. If the file has no `Tremolo`, `Ring`, `Wah`, `Phaser` or `Flanger` line, the mode gives full-depth tremolo. The reading is taken once per 1024-frame block (about 21 ms at 48 kHz) and smoothed: very small changes are ignored and larger ones settle in roughly a tenth of a second, so a chosen rate stays put.
 
 In CV Flip, Tape and Chop the CV input belongs to the transport, so the rate stays at the fixed `Rate n` value.
 
-With `Wah` or `Phaser` lines present, the same knob/CV also sets their sweep speed, on their own slower scale.
+With `Wah`, `Phaser` or `Flanger` lines present, the same knob/CV also sets their sweep speed, on their own slower scale.
 
 ## Limits
 

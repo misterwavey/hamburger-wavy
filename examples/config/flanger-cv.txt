@@ -1,0 +1,4 @@
+# Hamburger Wavy: knob/CV sets the flanger speed
+Loop
+Rate
+Flanger 7

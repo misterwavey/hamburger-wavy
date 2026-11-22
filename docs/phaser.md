@@ -1,6 +1,6 @@
 # Phaser
 
-The phaser is an effect stage in the extended build (`make extended` / `make extended-profile`). It runs after [Colour](colour.md) and the [Filter](filter.md) and before [tremolo/ring modulation](mod.md). Legacy build 21 does not include it.
+The phaser is an effect stage in the extended build (`make extended` / `make extended-profile`). It runs after [Colour](colour.md) and the [Filter](filter.md) and before [tremolo/ring modulation](mod.md). A [Flanger](flanger.md) can be used in its place. Legacy build 21 does not include it.
 
 ## What it does
 

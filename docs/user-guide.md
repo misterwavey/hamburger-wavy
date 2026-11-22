@@ -8,7 +8,7 @@ Up to 256 files or playlist entries are supported. Names up to 13 ASCII characte
 
 ## Playback modes
 
-Extended build 52 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
+Extended build 53 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser or flanger, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.
 
 | Red count | Mode | Behavior |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ Case differences, surrounding setting whitespace, CRLF/LF and a UTF-8 BOM are ac
 
 ## Effects
 
-Extended build 52 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.
+Extended build 53 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.
 
 ```text
 # Hamburger Wavy configuration
@@ -105,17 +105,18 @@ Rate 4
 | `Resonance n` | Emphasis at the cutoff for any of the three filter shapes | [Filter](filter.md) |
 | `Wah n` | A slow sine sweeps the filter cutoff, up to about 2.5 octaves each way | [Filter](filter.md) |
 | `Phaser n` | Swept notches with feedback; intensity | [Phaser](phaser.md) |
+| `Flanger n` | Swept short delay with feedback, the jet sound; intensity. Replaces the phaser if both are present | [Flanger](flanger.md) |
 | `Tremolo n` | Level dips at the `Rate`; depth, 9 reaches silence | [Tremolo and ring modulation](mod.md) |
 | `Ring n` | Multiplies the sound by a sine at the `Rate`; depth. Replaces tremolo if both are present | [Tremolo and ring modulation](mod.md) |
-| `Rate n` | Speed for wah, phaser, tremolo and ring, each on its own scale | below |
+| `Rate n` | Speed for wah, phaser, flanger, tremolo and ring, each on its own scale | below |
 
-Only one of `Filter`, `Highpass` and `Bandpass` applies: the last one in the file. The signal passes through drive and crush, then the filter, the phaser, and tremolo or ring modulation, before the existing fades.
+Only one of `Filter`, `Highpass` and `Bandpass` applies: the last one in the file. The signal passes through drive and crush, then the filter, the phaser or flanger, and tremolo or ring modulation, before the existing fades.
 
 `Rate n` scales (calculated, at the file's native pitch):
 
 | `Rate` | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Wah, phaser (Hz) | 0.125 | 0.2 | 0.31 | 0.5 | 0.79 | 1.3 | 2 | 3.2 | 5 | 8 |
+| Wah, phaser, flanger (Hz) | 0.125 | 0.2 | 0.31 | 0.5 | 0.79 | 1.3 | 2 | 3.2 | 5 | 8 |
 | Tremolo (Hz) | 1 | 1.4 | 1.9 | 2.7 | 3.5 | 4.8 | 6.7 | 8.8 | 12 | 16 |
 | Ring (Hz) | 16 | 30 | 56 | 107 | 197 | 363 | 682 | 1236 | 2216 | 4096 |
 
@@ -127,24 +128,24 @@ Put one of these on the CV mode line (line 3) to control an effect from the pitc
 | --- | --- |
 | `Colour` | Amount of drive and crush, from clean up to the configured digits (both to 9 if neither line is present) |
 | `Filter` | Cutoff of whichever filter shape is named; with `Wah`, the centre of the sweep |
-| `Rate` | Speed of the wah, phaser, tremolo or ring modulation. With none of those lines present it gives full-depth tremolo |
+| `Rate` | Speed of the wah, phaser, flanger, tremolo or ring modulation. With none of those lines present it gives full-depth tremolo |
 
 In CV Flip, Tape and Chop the CV input controls the transport, so the effects use their fixed config values.
 
 ### Limits
 
-How many effect stages run depends on the output rate, which rises as a file is pitched up. Drive and crush count as one stage; the filter (with or without wah), the phaser, and tremolo/ring are one each.
+How many effect stages run depends on the output rate, which rises as a file is pitched up. Drive and crush count as one stage; the filter (with or without wah), the phaser or flanger, and tremolo/ring are one each.
 
 | Output rate | Stages that run |
 | --- | --- |
 | Up to 48 kHz | All four |
 | 48 kHz to about 64 kHz | Three: drive/crush gives way first, then tremolo/ring |
-| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser, otherwise tremolo/ring, otherwise drive/crush |
+| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser or flanger, otherwise tremolo/ring, otherwise drive/crush |
 | Above 96 kHz | None |
 
 A 44.1 or 48 kHz file at native pitch or below gets everything; an 88.2 or 96 kHz file at native pitch gets one stage. Crossing a limit while playing switches a stage on or off with an audible step, most obvious on steady tones.
 
-Filter cutoff, phaser position and all rates are tied to the playback clock, so they move with pitch: pitching a file down an octave lowers the cutoff an octave and halves the rates.
+Filter cutoff, phaser and flanger positions and all rates are tied to the playback clock, so they move with pitch: pitching a file down an octave lowers the cutoff an octave and halves the rates.
 
 Example files for each effect are in [examples/config](../examples/config).
 

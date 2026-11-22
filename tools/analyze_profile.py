@@ -11,7 +11,7 @@ METRICS = ('sd', 'prefetch', 'decode', 'envelope', 'copy', 'refill_work')
 MODES = ('Trigger', 'Gate', 'Fade', 'Loop', 'Sequence', 'Combo',
          'Random Sequence', 'Random Loop', 'Flip', 'CV Flip', 'Tape', 'Chop')
 CV_MODES = ('Free', 'Quantize', 'Select File', 'Colour', 'Filter', 'Rate')
-OPTIONAL_METRICS = ('colour', 'filter', 'mod', 'phaser')  # builds 33, 35 and 47 onwards
+OPTIONAL_METRICS = ('colour', 'filter', 'mod', 'phaser', 'flanger')  # builds 33, 35 and 47 onwards
 SCALARS = ('build', 'ticks_per_us', 'plays', 'timer_pair_min', 'wall_lo',
            'wall_hi', 'service_gap_max', 'min_slack_frames', 'report_failures', 'saturated',
            'sd_retries')

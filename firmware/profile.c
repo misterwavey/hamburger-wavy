@@ -192,7 +192,7 @@ REPORT_SIZE void profile_idle(Fat *fs, uint32_t now, uint32_t allowed) {
   row("sd_hist", p.histogram, 8, &at);
   static const char *const names[PROF_METRICS] = {"sd","prefetch","decode","envelope","copy","refill_work"
 #ifdef ONE_COLOUR
-      ,"colour","filter","mod","phaser"
+      ,"colour","filter","mod","phaser","flanger"
 #endif
   };
   for (uint32_t i = 0; i < PROF_METRICS; ++i) {

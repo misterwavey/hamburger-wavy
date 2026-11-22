@@ -3015,6 +3015,169 @@ static void test_phaser(void) {
   phaser_capture(four, 96000, 0, first, 0, 1000);
   CHECK(!memcmp(first, expected, sizeof(first)));
 }
+static void flanger_block(Flanger *state, uint32_t *data, uint32_t frames, uint32_t target,
+                          uint32_t intensity) {
+  uint32_t start = state->delay;
+  for (uint32_t done = 0; done < frames;) {
+    uint32_t count = frames - done < 64u ? frames - done : 64u;
+    done += count;
+    int32_t span = (int32_t)target - (int32_t)start;
+    flanger_apply(state, data + (done - count) * 2u, count,
+                  (uint32_t)((int32_t)start + (span / 256) * (int32_t)done / (int32_t)frames * 256),
+                  intensity);
+  }
+}
+static Flanger flanger_state;
+/* Peak of a steady sine through the flanger at a fixed delay. */
+static double flanger_gain(uint32_t delay, uint32_t intensity, double turns_per_frame) {
+  static uint32_t tone[2 * 8192];
+  memset(&flanger_state, 0, sizeof(flanger_state));
+  flanger_state.delay = delay << 16;
+  for (uint32_t i = 0; i < 8192; i++)
+    tone[2 * i] = tone[2 * i + 1] =
+        (uint32_t)(int32_t)(2097152.0 * sin(6.283185307179586 * turns_per_frame * i)) << 8;
+  flanger_apply(&flanger_state, tone, 8192, delay << 16, intensity);
+  int32_t peak = 0;
+  for (uint32_t i = 4096; i < 8192; i++) {
+    int32_t v = (int32_t)tone[2 * i] >> 8;
+    CHECK(tone[2 * i + 1] == tone[2 * i]);
+    if (v < 0) v = -v;
+    if (v > peak) peak = v;
+  }
+  return peak / 2097152.0;
+}
+static void test_flanger(void) {
+  static uint32_t data[2 * 4096], expected[2 * (ONE_CACHE_FRAMES + ONE_HALF_FRAMES)];
+  static uint32_t first[2 * ONE_CACHE_FRAMES], second[2 * ONE_CACHE_FRAMES];
+  Flanger *state = &flanger_state;
+  /* Delay map: 32 to 384 frames, rising with the sine, centre in between. */
+  CHECK(flanger_delay(-32768) == 32u << 16 && flanger_delay(32767) >= 383u << 16 &&
+        flanger_delay(32767) <= 384u << 16);
+  CHECK(flanger_delay(0) == 112u << 16);
+  uint32_t previous = 0;
+  for (int32_t sine = -32768; sine <= 32767; sine += 257) {
+    uint32_t delay = flanger_delay(sine);
+    CHECK(delay >= previous && delay < (FLANGER_FRAMES - 2u) << 16);
+    previous = delay;
+  }
+  /* Silence stays silent at every setting. */
+  for (uint32_t intensity = 0; intensity <= 300; intensity += 60) {
+    memset(state, 0, sizeof(*state));
+    memset(data, 0, sizeof(data));
+    flanger_apply(state, data, 4096, 200u << 16, intensity);
+    for (uint32_t i = 0; i < 8192; i++) CHECK(!data[i]);
+    for (uint32_t i = 0; i < FLANGER_FRAMES; i++) CHECK(!state->line[i]);
+    CHECK(state->delay == 200u << 16);
+  }
+  flanger_apply(state, data, 0, 300u << 16, 255);
+  CHECK(state->delay == 200u << 16);
+  /* Out-of-range targets are kept inside the line. */
+  flanger_apply(state, data, 64, 0xffffffffu, 255);
+  CHECK(state->delay == (FLANGER_FRAMES - 2u) << 16);
+  flanger_apply(state, data, 64, 0, 255);
+  CHECK(state->delay == 1u << 16);
+  /* Zero intensity leaves the samples exactly as they were. */
+  uint32_t noise = 9191;
+  memset(state, 0, sizeof(*state));
+  for (uint32_t i = 0; i < 2048; i++)
+    data[2 * i] = data[2 * i + 1] = expected[2 * i] = expected[2 * i + 1] = random_next(&noise) & ~255u;
+  flanger_apply(state, data, 2048, 100u << 16, 0);
+  CHECK(!memcmp(data, expected, 2048 * 8u));
+  /* Comb response at a fixed delay: notches at odd half-cycles of the delay,
+   * peaks at whole cycles; depth follows intensity. */
+  for (uint32_t delay = 40; delay <= 360; delay += 160) {
+    CHECK(flanger_gain(delay, 255, 0.5 / delay) < 0.05);
+    CHECK(flanger_gain(delay, 255, 1.5 / delay) < 0.05);
+    double peak = flanger_gain(delay, 255, 1.0 / delay);
+    CHECK(peak > 1.1 && peak < 1.25);
+    double half = flanger_gain(delay, 128, 0.5 / delay);
+    CHECK(half > 0.3 && half < 0.8);
+  }
+  /* Full-scale noise and a full-scale square at the comb's peak stay bounded,
+   * and the line then decays to exact silence. */
+  memset(state, 0, sizeof(*state));
+  for (uint32_t pass = 0; pass < 6; pass++) {
+    for (uint32_t i = 0; i < 4096; i++)
+      data[2 * i] = data[2 * i + 1] =
+          pass < 3 ? ((random_next(&noise) & 1u) ? 0x7fffff00u : 0x80000000u)
+                   : ((i / 50u) & 1u ? 0x7fffff00u : 0x80000000u);
+    flanger_apply(state, data, 4096, 100u << 16, 255);
+    for (uint32_t i = 0; i < 4096; i++) CHECK(!(data[2 * i] & 255u) && data[2 * i + 1] == data[2 * i]);
+  }
+  for (uint32_t pass = 0; pass < 8; pass++) {
+    memset(data, 0, sizeof(data));
+    flanger_apply(state, data, 4096, 100u << 16, 255);
+  }
+  for (uint32_t i = 0; i < 8192; i++) CHECK(!data[i]);
+  for (uint32_t i = 0; i < FLANGER_FRAMES; i++) CHECK(!state->line[i]);
+  /* A moving delay reads between stored samples without leaving the line. */
+  memset(state, 0, sizeof(*state));
+  state->delay = 32u << 16;
+  for (uint32_t i = 0; i < 4096; i++)
+    data[2 * i] = data[2 * i + 1] = (uint32_t)((int32_t)(i % 97u) * 40000 - 1900000) << 8;
+  flanger_apply(state, data, 4096, 384u << 16, 255);
+  CHECK(state->delay == 384u << 16 && state->at == (4096u & (FLANGER_FRAMES - 1u)));
+  /* config.txt. */
+  Fat f;
+  Settings s;
+  feature_disk("# card\nLoop\nRate\nflanger 6\nRate 2", 0, 37, 16);
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(settings_load(&f, &s) == 1 && s.cv == CV_RATE && s.flanger == 170 && s.rate == 56 && !s.phaser);
+  feature_disk("# card\nLoop\nQuantize", 0, 37, 16);
+  CHECK(!fat_mount(&f, disk, 0));
+  CHECK(settings_load(&f, &s) == 1 && !s.flanger);
+  /* Playback: the sweep starts at its centre and each block ramps to the
+   * sweep's position at that block's end. Twice, so a restart is shown to
+   * begin from a cleared line. */
+  for (uint32_t pass = 0; pass < 2; pass++) {
+    feature_disk("# test\nLoop\nQuantize\nShort\nFlanger 9\nRate 9", 0, 5000, 24);
+    feature_mount();
+    host_adc = 512;
+    click_play();
+    CHECK(host_active && host_led == 2);
+    memset(state, 0, sizeof(*state));
+    state->delay = flanger_delay(0);
+    uint32_t phase = WAH_START_PHASE, step = wah_increment(1023, 48000);
+    for (uint32_t i = 0; i < ONE_CACHE_FRAMES + ONE_HALF_FRAMES; i++)
+      expected[2 * i] = expected[2 * i + 1] = sample_word(1, i);
+    phase += step * ONE_CACHE_FRAMES;
+    CHECK(flanger_delay(mod_sine(phase)) != flanger_delay(0));
+    flanger_block(state, expected, ONE_CACHE_FRAMES, flanger_delay(mod_sine(phase)), 255);
+    phase += step * ONE_HALF_FRAMES;
+    flanger_block(state, expected + ONE_CACHE_FRAMES * 2u, ONE_HALF_FRAMES,
+                  flanger_delay(mod_sine(phase)), 255);
+    CHECK(expected[400] != sample_word(1, 200));
+    CHECK(!memcmp(host_audio, expected, ONE_CACHE_FRAMES * 8u));
+    host_offset = ONE_HALF_FRAMES * 8u;
+    app_tick();
+    CHECK(host_active && !memcmp(host_audio, expected + ONE_CACHE_FRAMES * 2u, ONE_HALF_FRAMES * 8u));
+  }
+  /* The flanger takes the phaser's place when both lines are present. */
+  phaser_capture("# test\nLoop\nQuantize\nShort\nPhaser 9\nFlanger 9\nRate 9", 48000, 512, first, 2000, 100000);
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFlanger 9\nRate 9", 48000, 512, second, 2000, 100000);
+  CHECK(!memcmp(first, second, sizeof(first)));
+  phaser_capture("# test\nLoop\nQuantize\nShort\nPhaser 9\nRate 9", 48000, 512, second, 2000, 100000);
+  CHECK(memcmp(first, second, sizeof(first)));
+  /* Rate CV with a flanger line adds no tremolo. */
+  phaser_capture("# test\nLoop\nRate\nFlanger 9", 48000, 0, second, 0, 100000);
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFlanger 9\nRate 9", 48000, 512, first, 2000, 100000);
+  CHECK(!memcmp(first, second, sizeof(first)));
+  /* It shares the phaser's place in the stage limits: behind the filter in
+   * the one-stage band, ahead of tremolo and colour. */
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFilter 5\nFlanger 9\nTremolo 5\nDrive 9\nRate 9", 96000, 7 * 22,
+                 first, 1000, 1500);
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFilter 5", 96000, 7 * 22, second, 1000, 1500);
+  CHECK(!memcmp(first, second, sizeof(first)));
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFlanger 9\nTremolo 5\nDrive 9\nRate 9", 96000, 7 * 22,
+                 first, 1000, 1500);
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFlanger 9\nRate 9", 96000, 7 * 22, second, 1000, 1500);
+  CHECK(!memcmp(first, second, sizeof(first)));
+  for (uint32_t i = 0; i < ONE_CACHE_FRAMES; i++)
+    expected[2 * i] = expected[2 * i + 1] = sample_word(1, i);
+  CHECK(memcmp(first, expected, sizeof(first)));
+  phaser_capture("# test\nLoop\nQuantize\nShort\nFlanger 9\nRate 9", 96000, 0, first, 0, 1000);
+  CHECK(!memcmp(first, expected, sizeof(first)));
+}
 #endif
 #ifdef ONE_TOLERANT_ENCODER
 static int32_t encoder_feed(Encoder *e, const uint8_t *states, uint32_t count) {
@@ -3266,6 +3429,7 @@ int main(void) {
   test_mod();
   test_wah();
   test_phaser();
+  test_flanger();
 #endif
 #ifdef ONE_POLL_DECODE
   test_polled_decode();

@@ -67,7 +67,7 @@ Repeat the useful cases at 44.1/88.2 kHz and on other cards if available. Native
 - `envelope`: combined envelope and tail rendering for a published half.
 - `copy`: buffer copy and publication barrier.
 - `refill_work`: the corresponding prefetch work plus publication work for completed refills. It excludes the intentional waiting between prefetch and publication, and includes the nested SD/decoder/envelope/copy operations. Do not add the category totals together.
-- `colour`, `filter`, `phaser`, `mod` (extended build): time in each effect stage per processed block.
+- `colour`, `filter`, `phaser`, `flanger`, `mod` (extended build): time in each effect stage per processed block.
 
 Each metric has sample count, total, minimum and maximum; the host tool calculates means. The SD histogram uses inclusive upper bounds of 250 us, 500 us, 1/2/5/10/50 ms, then an open-ended final bucket. This supports coarse latency-distribution inspection rather than exact percentiles.
 
