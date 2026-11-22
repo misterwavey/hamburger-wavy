@@ -6,9 +6,15 @@ This is an unofficial sampler firmware for the Tiptop Audio ONE module, built fr
 
 This repository contains the application, build tools, tests and documentation. No vendor firmware, boot/debug stub, extracted pitch tables or sample library is supplied. The module's existing updater is required. See [provenance](docs/provenance.md) for what was learned through reverse engineering and what is included.
 
+## Config editor
+
+**[Open the config editor](https://misterwavey.github.io/hamburger-wavy/)** in your browser. It builds `config.txt` and playlists from menus and sliders, explains what each choice will do, includes the user guide, and in Chrome or Edge can open your sample card to check its files, save your settings and put the current firmware on it. Nothing is uploaded; the page only contacts GitHub when you ask it to look for firmware.
+
+It is a single file, [docs/config-editor.html](docs/config-editor.html), so you can also save it and use it offline; a copy is in each release zip.
+
 ## Download
 
-Ready-made firmware is on the [releases page](https://github.com/misterwavey/hamburger-wavy/releases): a zip with `image.hex` for the extended build, the legacy build, the config editor and install notes, with SHA-256 checksums. Each release is tied to a tag of this source. The [config editor](docs/config-editor.html) can also fetch the current image, verify its checksum and write it to the card for you (Chrome or Edge). See [Install](#install) before updating a module.
+Ready-made firmware is on the [releases page](https://github.com/misterwavey/hamburger-wavy/releases): a zip with `image.hex` for the extended build, the legacy build, the config editor and install notes, with SHA-256 checksums. Each release is tied to a tag of this source. The [config editor](https://misterwavey.github.io/hamburger-wavy/) can also fetch the current image, verify its checksum and write it to the card for you (Chrome or Edge). See [Install](#install) before updating a module.
 
 ## Build
 
@@ -85,7 +91,7 @@ See [the user guide](docs/user-guide.md) for modes, configuration, playlists, SD
 - Several playlist files on one card, with a `Playlist name` line in `config.txt` choosing the one in use, and playlist entries that use files' full names (up to 63 characters).
 - A FILE encoder reader that tolerates worn or chattering contacts, and one automatic retry of a failed card read.
 
-The [user guide](docs/user-guide.md#effects) lists every effect line, the rate scales and how many effects can run at each playback rate. The [config editor](docs/config-editor.html), a single offline web page, builds `config.txt` and playlists from menus and sliders, explains what each choice will do, and can check the files on the card.
+The [user guide](docs/user-guide.md#effects) lists every effect line, the rate scales and how many effects can run at each playback rate. The [config editor](https://misterwavey.github.io/hamburger-wavy/), a single web page that also works offline, builds `config.txt` and playlists from menus and sliders, explains what each choice will do, and can check the files on the card.
 
 ## Status
 
