@@ -7,217 +7,228 @@
 <title>Hamburger Wavy config editor</title>
 <style>
   :root {
-    --paper: #17150f;
-    --panel: #1f1c15;
-    --ink: #e4dcc6;
-    --faint: #9c9480;
-    --rule: #4a4435;
-    --accent: #d2553b;
-    --ok: #9db37a;
+    --paper: #111410; --panel: #1a1e19; --ink: #e6e2d3; --faint: #98a093; --rule: #3d463d;
+    --accent: #e2412d; --ok: #8fcf8a; --green: #8fcf8a; --amber: #d9a13b; --steel: #8fb3c4;
     --mono: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
   html { background: var(--paper); }
-  body {
-    margin: 0; padding: 1.5rem 1rem 4rem; color: var(--ink);
-    font: 15px/1.5 var(--mono); position: relative; min-height: 100vh;
-  }
-  /* Grain over everything: fixed, non-interactive. */
+  body { margin: 0; padding: 1.5rem 1rem 5rem; color: var(--ink); font: 15px/1.55 var(--mono); position: relative; min-height: 100vh; }
   body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
-    opacity: .13; mix-blend-mode: screen;
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .13; mix-blend-mode: screen;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
-  /* A few scuffs. */
   body::after {
     content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .5;
-    background:
-      radial-gradient(ellipse 40% 8% at 12% 18%, rgba(0,0,0,.35), transparent 70%),
+    background: radial-gradient(ellipse 40% 8% at 12% 18%, rgba(0,0,0,.35), transparent 70%),
       radial-gradient(ellipse 30% 5% at 85% 62%, rgba(0,0,0,.3), transparent 70%),
       radial-gradient(ellipse 60% 30% at 50% 110%, rgba(0,0,0,.5), transparent 70%);
   }
-  main { max-width: 1080px; margin: 0 auto; }
-  header { margin-bottom: 1.6rem; }
+  [hidden] { display: none !important; }
+  svg.defs { position: absolute; width: 0; height: 0; }
+  main { max-width: 44rem; margin: 0 auto; }
+  a { color: var(--ink); text-underline-offset: 2px; }
   h1 {
     font-size: 1.7rem; letter-spacing: .14em; text-transform: uppercase; margin: 0;
     filter: url(#rough); transform: rotate(-.5deg); transform-origin: left;
-    text-shadow: 1.5px 0 0 rgba(210,85,59,.55), -1px 0 0 rgba(120,170,160,.3);
+    text-shadow: 2px 0 0 rgba(226,65,45,.7), -1.5px 0 0 rgba(143,207,138,.45);
   }
-  header p { color: var(--faint); margin: .5rem 0 0; max-width: 62ch; }
-  .cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.6rem; align-items: start; }
-  @media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
-  section {
-    background: var(--panel); padding: .9rem 1rem 1rem; margin-bottom: 1.1rem;
-    border: 1px solid var(--rule); border-radius: 2px 5px 3px 6px;
-    box-shadow: 2px 3px 0 rgba(0,0,0,.35);
-  }
-  aside section { transform: rotate(.15deg); }
-  h2 {
-    font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; color: var(--accent);
-    margin: 0 0 .7rem; filter: url(#worn);
-  }
-  label, .label { display: block; color: var(--faint); font-size: .8rem; letter-spacing: .06em; }
-  .row { display: grid; grid-template-columns: 7.2rem minmax(0, 1fr) 9.5rem; gap: .6rem; align-items: center; margin: .35rem 0; }
-  .row .label { color: var(--ink); font-size: .9rem; letter-spacing: 0; }
-  .row output { color: var(--faint); font-size: .8rem; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row.off .label, .row.off output { opacity: .45; }
-  @media (max-width: 480px) { .row { grid-template-columns: 5.5rem minmax(0, 1fr) 6.5rem; } }
-  select, input[type=text], textarea, button {
+  header { display: flex; gap: 1.5rem; justify-content: space-between; align-items: flex-start; margin-bottom: 1.4rem; }
+  header p { color: var(--faint); margin: .5rem 0 0; max-width: 30rem; }
+  button, select, input[type=text], textarea {
     font: inherit; color: var(--ink); background: #14120d; border: 1px solid var(--rule);
-    border-radius: 2px 4px 2px 3px; padding: .35rem .5rem;
+    border-radius: 2px 4px 2px 3px; padding: .4rem .6rem;
   }
-  select, input[type=text] { width: 100%; }
-  select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible {
-    outline: 2px solid var(--accent); outline-offset: 2px;
-  }
-  .pick { display: grid; grid-template-columns: 7.2rem minmax(0, 1fr); gap: .6rem; align-items: center; margin: .4rem 0; }
-  .pick .label { color: var(--ink); font-size: .9rem; }
-  .seg { display: flex; flex-wrap: wrap; gap: .3rem; }
-  .seg label {
-    color: var(--ink); font-size: .85rem; letter-spacing: 0; cursor: pointer;
-    border: 1px solid var(--rule); padding: .2rem .55rem; border-radius: 2px 5px 2px 4px; background: #14120d;
-  }
-  .seg input { position: absolute; opacity: 0; pointer-events: none; }
-  .seg input:checked + span { color: var(--accent); }
-  .seg label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
-  .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-  input[type=range] { width: 100%; accent-color: var(--accent); height: 1.4rem; background: transparent; }
-  .hint { color: var(--faint); font-size: .78rem; margin: .5rem 0 0; }
-  .hint a { overflow-wrap: anywhere; }
-  pre#out {
-    margin: 0 0 .7rem; padding: .8rem .9rem; background: #100e0a; color: var(--ink);
-    border: 1px dashed var(--rule); min-height: 9rem; white-space: pre-wrap; word-break: break-word;
-    font: 15px/1.55 var(--mono); text-shadow: .6px 0 0 rgba(228,220,198,.35);
-  }
-  .buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
-  button { cursor: pointer; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; padding: .45rem .8rem; }
-  button.primary { border-color: var(--accent); color: var(--accent); }
+  button { cursor: pointer; }
   button:hover { background: #221e16; }
   button:active { transform: translate(1px, 1px); }
-  ul.notes { list-style: none; margin: 0; padding: 0; }
-  ul.notes li { padding: .3rem 0 .3rem 1.3rem; position: relative; border-bottom: 1px dotted var(--rule); font-size: .88rem; }
-  ul.notes li:last-child { border-bottom: 0; }
-  ul.notes li::before { content: "·"; position: absolute; left: .35rem; color: var(--faint); }
-  ul.notes li.warn::before { content: "!"; color: var(--accent); font-weight: bold; }
-  ul.notes li.warn { color: #f0d9cf; }
-  table.stages { width: 100%; border-collapse: collapse; font-size: .88rem; margin-bottom: .4rem; }
-  table.stages td { padding: .22rem .3rem; border-bottom: 1px dotted var(--rule); vertical-align: top; }
-  table.stages td:first-child { width: 4.6rem; letter-spacing: .1em; text-transform: uppercase; font-size: .72rem; padding-top: .4rem; }
-  .runs td:first-child { color: var(--ok); }
-  .skips td:first-child { color: var(--accent); }
-  .skips td:last-child { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(210,85,59,.6); }
-  .idle td { color: var(--faint); opacity: .6; }
-  textarea { width: 100%; min-height: 7rem; resize: vertical; }
-  input[type=file] { font: inherit; font-size: .78rem; color: var(--faint); max-width: 100%; }
-  input[type=file]::file-selector-button {
-    font: inherit; color: var(--ink); background: #14120d; border: 1px solid var(--rule);
-    border-radius: 2px 4px 2px 3px; padding: .45rem .8rem; margin-right: .6rem; cursor: pointer;
-    text-transform: uppercase; letter-spacing: .12em;
-  }
-  .status { font-size: .82rem; margin: .5rem 0 0; color: var(--faint); min-height: 1.2em; }
-  .status.bad { color: var(--accent); }
-  footer { color: var(--faint); font-size: .78rem; margin-top: 1.5rem; max-width: 70ch; }
-  a { color: var(--ink); }
-  svg.defs { position: absolute; width: 0; height: 0; }
-  .guide { transform: none; }
-  article { max-width: 78ch; }
-  article h1 { font-size: 1.25rem; letter-spacing: .08em; margin: .6rem 0 1rem; filter: url(#worn); }
-  article h2 { font-size: .95rem; margin: 1.8rem 0 .6rem; filter: none; letter-spacing: .14em; }
-  article h3 { font-size: .9rem; margin: 1.4rem 0 .5rem; color: var(--ink); letter-spacing: .06em; }
-  article p, article li { font-size: .92rem; }
-  article ul, article ol { padding-left: 1.3rem; }
-  article li { margin: .25rem 0; }
-  article code { background: #100e0a; padding: .05rem .3rem; border-radius: 2px; font-size: .9em; }
-  article pre { background: #100e0a; border: 1px dashed var(--rule); padding: .6rem .8rem; overflow: auto; }
-  article pre code { background: none; padding: 0; }
-  article .tablewrap { overflow-x: auto; margin: .8rem 0; }
-  article table { border-collapse: collapse; font-size: .85rem; }
-  article th, article td { border-bottom: 1px dotted var(--rule); padding: .3rem .6rem .3rem 0; text-align: left; vertical-align: top; }
-  article th { color: var(--faint); font-weight: normal; letter-spacing: .06em; border-bottom-style: solid; }
-  article a { color: var(--accent); text-underline-offset: 2px; }
-  /* The card: one control. Shows OPEN, or the build of the image.hex on the
-     card, with a mark when something here has not been written to it. */
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { border-color: var(--accent); color: var(--accent); }
+  button.big { font-size: 1rem; padding: .7rem 1.2rem; letter-spacing: .06em; }
+  button.plain { border: 0; background: none; padding: 0; color: var(--faint); text-decoration: underline; text-underline-offset: 2px; }
+  button.plain:hover { color: var(--ink); background: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  select, input[type=text], textarea { width: 100%; }
+  input[type=range] { width: 100%; accent-color: var(--tab, var(--accent)); height: 1.4rem; background: transparent; }
+  input[type=file] { font: inherit; font-size: .8rem; color: var(--faint); max-width: 100%; }
+  input[type=file]::file-selector-button { font: inherit; color: var(--ink); background: #14120d; border: 1px solid var(--rule); border-radius: 2px 4px 2px 3px; padding: .35rem .6rem; margin-right: .6rem; cursor: pointer; }
+  .hint { color: var(--faint); font-size: .82rem; margin: .5rem 0 0; }
+  .hint a { overflow-wrap: anywhere; }
+  .status { font-size: .85rem; margin: .5rem 0 0; color: var(--faint); min-height: 1.2em; }
+  .status.bad, .bad { color: var(--accent); }
+  .status:empty { display: none; }
+
+  /* The card control. */
   button.sd {
     position: relative; flex: none; width: 5.6rem; height: 7.6rem; padding: 0; border: 0; background: none;
-    text-transform: none; letter-spacing: 0; transform: rotate(2deg); cursor: pointer;
-    filter: drop-shadow(2px 3px 0 rgba(0,0,0,.4));
+    transform: rotate(2deg); filter: drop-shadow(2px 3px 0 rgba(0,0,0,.4));
   }
   button.sd:hover { background: none; transform: rotate(0deg); }
   button.sd svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .sd .shell { fill: #14120d; stroke: var(--rule); stroke-width: 3; stroke-dasharray: 7 5; }
   .sd .pins rect { fill: #4a4435; }
   .sd.loaded .shell { fill: var(--panel); stroke: var(--ink); stroke-dasharray: none; }
-  .sd.loaded .pins rect { fill: #b59a52; }
+  .sd.loaded .pins rect { fill: var(--amber); }
   .sd.unsaved .shell { stroke: var(--accent); }
-  .sd-big, .sd-small { position: absolute; left: 0; right: 14%; text-align: center; color: var(--ink); }
+  .sd-big, .sd-small { position: absolute; left: 0; right: 14%; text-align: center; }
   .sd-big { top: 46%; font-size: 1.05rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
   .sd.loaded .sd-big { top: 38%; font-size: 2rem; letter-spacing: 0; color: var(--ink); line-height: 1; }
   .sd-small { top: 66%; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
   .sd.unsaved .sd-small { color: var(--accent); }
   .sd-dot { position: absolute; top: 31%; right: 24%; width: .6rem; height: .6rem; border-radius: 50%; background: var(--accent); }
-  header { display: flex; gap: 1.5rem; justify-content: space-between; align-items: flex-start; }
-  #cardStatus:empty { display: none; }
-  #cardStatus { margin: -.6rem 0 1rem; }
-  .tabs { display: flex; gap: .3rem; margin-bottom: -1px; position: relative; z-index: 1; flex-wrap: wrap; }
-  .tabs button {
-    border-radius: 3px 6px 0 0; border-bottom-color: transparent; background: transparent; color: var(--faint);
-    padding: .5rem 1rem; font-size: .82rem;
+
+  /* A monitor trace under the title. */
+  .trace { display: block; width: 100%; height: 2.2rem; margin: -.6rem 0 1.1rem; overflow: visible; }
+  .trace path { fill: none; stroke: var(--green); stroke-width: 1.6; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 3px rgba(143,207,138,.7)); }
+  .trace.pending path { stroke: var(--amber); filter: drop-shadow(0 0 3px rgba(217,161,59,.7)); }
+  .trace.off path { stroke: var(--rule); filter: none; }
+  .trace line { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 1 7; vector-effect: non-scaling-stroke; }
+
+  /* Start screen. */
+  .start { border: 1px dashed var(--faint); border-radius: 3px 7px 4px 6px; padding: 1.6rem 1.4rem; text-align: center; }
+  .start p { margin: 0 0 1rem; }
+  .start .hint { margin-top: 1.1rem; }
+
+  /* A banner for the one thing that needs doing first. */
+  .banner { border: 1px solid var(--accent); border-radius: 2px 6px 3px 5px; padding: .8rem 1rem; margin-bottom: 1rem; background: rgba(210,85,59,.07); }
+  .banner p { margin: 0 0 .6rem; }
+  .banner p:last-child { margin-bottom: 0; }
+
+  /* The four questions. */
+  .step { --tab: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-left: 5px solid var(--tab); border-radius: 0 5px 3px 0; margin-bottom: .7rem; box-shadow: 2px 3px 0 rgba(0,0,0,.4); }
+  #s-sounds { --tab: var(--amber); } #s-way { --tab: var(--green); } #s-knob { --tab: var(--steel); } #s-fx { --tab: var(--accent); }
+  .step.open { background: linear-gradient(180deg, color-mix(in srgb, var(--tab) 7%, var(--panel)), var(--panel) 5rem); }
+  .step-head {
+    display: grid; grid-template-columns: 1.6rem minmax(0, 15rem) minmax(0, 1fr) auto; gap: .2rem .8rem; align-items: baseline;
+    width: 100%; text-align: left; border: 0; background: none; padding: .8rem 1rem; border-radius: inherit;
   }
-  .tabs button[aria-selected=true] { background: var(--panel); color: var(--accent); border-color: var(--rule); border-bottom-color: var(--panel); }
-  .count { color: var(--faint); font-size: .72rem; letter-spacing: 0; }
-  .tabs button[aria-selected=true] .count { color: var(--ink); }
-  details {
-    margin-bottom: .7rem; border: 1px dotted var(--rule); border-radius: 2px 5px 3px 6px; padding: .45rem .8rem;
+  .step-head:hover { background: rgba(255,255,255,.02); }
+  .step-head .num { color: var(--paper); background: var(--tab); text-align: center; border-radius: 1px; font-size: .8rem; line-height: 1.5; align-self: center; }
+  .step-head .q { color: var(--tab); font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; }
+  .step-head .a { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .step-head .go { color: var(--faint); font-size: .78rem; text-decoration: underline; text-underline-offset: 2px; }
+  .step.open .step-head .a { visibility: hidden; }
+  @media (max-width: 560px) {
+    .step-head { grid-template-columns: 1.6rem minmax(0, 1fr) auto; }
+    .step-head .a { grid-column: 2 / 4; white-space: normal; }
+    .step.open .step-head .a { display: none; }
   }
-  details > summary { cursor: pointer; color: var(--faint); font-size: .82rem; letter-spacing: .06em; }
-  details[open] > summary { margin-bottom: .6rem; color: var(--ink); }
+  .step-body { padding: 0 1rem 1rem 3.4rem; }
+  @media (max-width: 560px) { .step-body { padding-left: 1rem; } }
+  .step-body > p:first-child { margin-top: 0; color: var(--faint); }
+
+  /* Choices as plain sentences. */
+  .choices { display: grid; gap: .35rem; margin: .4rem 0; }
+  .choice { display: grid; grid-template-columns: 1.3rem minmax(0, 1fr); gap: .5rem; padding: .45rem .6rem; border: 1px solid transparent; border-radius: 2px 5px 2px 4px; cursor: pointer; }
+  .choice:hover { background: rgba(255,255,255,.03); }
+  .choice input { accent-color: var(--tab, var(--accent)); margin: .25rem 0 0; width: 1rem; height: 1rem; }
+  .choice b { font-weight: normal; color: var(--ink); display: block; }
+  .choice span { color: var(--faint); font-size: .84rem; display: block; }
+  .choice:has(input:checked) { border-color: var(--tab, var(--accent)); background: color-mix(in srgb, var(--tab, var(--accent)) 8%, transparent); }
+  .choice:has(input:checked) b { color: var(--tab, var(--accent)); }
+  .choice:has(input:disabled) { opacity: .5; cursor: default; }
+  .more > summary { cursor: pointer; color: var(--faint); font-size: .84rem; margin: .5rem 0; }
   details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  section details { border: 0; padding: 0; margin: .7rem 0 0; }
-  aside { position: sticky; top: 1rem; }
-  @media (max-width: 820px) { aside { position: static; } }
-  .side .buttons { margin: .8rem 0 .2rem; }
-  .side pre#out { min-height: 0; }
-  ol.entries { list-style: none; margin: .4rem 0; padding: 0; counter-reset: n; }
-  ol.entries li {
-    display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; gap: .4rem; align-items: center;
-    padding: .18rem 0; border-bottom: 1px dotted var(--rule); font-size: .88rem; counter-increment: n;
-  }
-  ol.entries li::before { content: counter(n); color: var(--faint); font-size: .75rem; text-align: right; padding-right: .3rem; }
-  ol.entries .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  ol.entries .why { display: block; font-size: .74rem; color: var(--accent); white-space: normal; }
-  ol.entries li.stops .name { color: #f0d9cf; }
-  ol.entries li.unreached .name { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(210,85,59,.6); }
-  ol.entries .acts { display: flex; gap: .2rem; }
-  ul.checks { list-style: none; margin: .2rem 0 .7rem; padding: 0; border: 1px dashed var(--rule); }
+
+  /* Effects: one switch each, controls only when on. */
+  .fx { border-top: 1px dotted var(--rule); padding: .7rem 0; }
+  .fx:first-of-type { border-top: 0; padding-top: .2rem; }
+  .fx-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .8rem; align-items: start; cursor: pointer; }
+  .fx-top input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; margin: .2rem 0 0; }
+  .fx-top b { font-weight: normal; }
+  .fx-top span { display: block; color: var(--faint); font-size: .84rem; }
+  .fx.on .fx-top b { color: var(--accent); }
+  .fx-top input { accent-color: var(--accent); }
+  .fx-controls { margin: .7rem 0 0 1.9rem; }
+  .fx-skip { margin: .5rem 0 0 1.9rem; color: var(--accent); font-size: .82rem; }
+  .row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 8.5rem; gap: .6rem; align-items: center; margin: .3rem 0; }
+  .row > span { font-size: .88rem; }
+  .row output { color: var(--faint); font-size: .8rem; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 480px) { .row { grid-template-columns: 5rem minmax(0, 1fr) 5.5rem; } }
+  .seg { display: flex; flex-wrap: wrap; gap: .3rem; margin: .2rem 0 .5rem; }
+  .seg label { cursor: pointer; border: 1px solid var(--rule); padding: .2rem .6rem; border-radius: 2px 5px 2px 4px; background: #14120d; font-size: .86rem; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label:has(input:checked) { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Sounds. */
+  .line { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0; }
+  .line select, .line input[type=text] { width: auto; flex: 1 1 10rem; min-width: 0; }
+  ul.checks { list-style: none; margin: .3rem 0 .6rem; padding: 0; border: 1px dashed var(--rule); max-height: 17rem; overflow: auto; }
   ul.checks li { border-bottom: 1px dotted var(--rule); }
   ul.checks li:last-child { border-bottom: 0; }
-  ul.checks label {
-    display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) auto; gap: .5rem; align-items: center;
-    padding: .28rem .5rem; color: var(--ink); font-size: .88rem; letter-spacing: 0; cursor: pointer;
-  }
+  ul.checks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  ul.checks li.divider { display: block; padding: .3rem .6rem; color: var(--faint); font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; background: #14120d; }
+  ul.checks li.stops .fname { color: #f0d9cf; }
+  ul.checks li.unreached .fname { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(210,85,59,.6); }
+  ul.checks .pos { color: var(--faint); font-size: .74rem; text-align: right; }
+  ul.checks .acts { display: flex; gap: .2rem; padding-right: .4rem; }
+  ul.checks .why { display: block; font-size: .76rem; color: var(--accent); white-space: normal; }
+  ul.checks label { display: grid; grid-template-columns: 1.4rem 1.6rem minmax(0, 1fr) auto; gap: .5rem; align-items: center; padding: .28rem .5rem; cursor: pointer; font-size: .88rem; }
   ul.checks label:hover { background: #221e16; }
-  ul.checks input { accent-color: var(--accent); width: 1rem; height: 1rem; margin: 0; }
+  ul.checks input { accent-color: var(--tab, var(--accent)); width: 1rem; height: 1rem; margin: 0; }
   ul.checks .info { color: var(--faint); font-size: .76rem; white-space: nowrap; }
   ul.checks li.no label { cursor: not-allowed; color: var(--faint); }
   ul.checks li.no .info { color: var(--accent); white-space: normal; text-align: right; }
   ul.checks .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  button.mini { padding: .1rem .42rem; font-size: .8rem; letter-spacing: 0; min-width: 1.7rem; }
-  .line { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .45rem 0; }
-  .line select, .line input[type=text] { width: auto; flex: 1 1 9rem; min-width: 0; }
-  table.files { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: .5rem; }
+  ol.entries { list-style: none; margin: .3rem 0; padding: 0; counter-reset: n; max-height: 17rem; overflow: auto; }
+  ol.entries li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: .4rem; align-items: center; padding: .16rem 0; border-bottom: 1px dotted var(--rule); font-size: .88rem; counter-increment: n; }
+  ol.entries li::before { content: counter(n); color: var(--faint); font-size: .75rem; text-align: right; padding-right: .3rem; }
+  ol.entries .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ol.entries .why { display: block; font-size: .76rem; color: var(--accent); white-space: normal; }
+  ol.entries li.unreached .name { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(210,85,59,.6); }
+  ol.entries .acts { display: flex; gap: .2rem; }
+  button.mini { padding: .08rem .42rem; font-size: .8rem; min-width: 1.7rem; }
+
+  /* The bottom line: what will happen, and one action. */
+  .save { margin-top: 1.2rem; padding: 1rem 1.1rem; border: 1px solid var(--rule); border-top: 2px solid var(--ink); border-radius: 0 0 5px 3px; background: #151915; }
+  #saveCard:not(:disabled), #download.primary { background: var(--accent); color: #14100c; border-color: var(--accent); }
+  #saveCard:not(:disabled):hover, #download.primary:hover { background: #f25a45; }
+  #saveCard:disabled { border-color: var(--green); color: var(--green); opacity: .8; }
+  .save h2 { font-size: .78rem; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); margin: 0 0 .4rem; font-weight: normal; }
+  .save p#short { margin: 0 0 .8rem; }
+  ul.warn { list-style: none; margin: 0 0 .9rem; padding: 0; }
+  ul.warn li { padding: .45rem .6rem .45rem 1.4rem; position: relative; color: #f3e6c4; font-size: .88rem; margin-bottom: .4rem; background: rgba(217,161,59,.07); }
+  ul.warn li::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: .55rem;
+    background: repeating-linear-gradient(-45deg, var(--amber) 0 5px, #14120d 5px 10px); }
+  .actions { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; align-items: center; }
+
+  details.more-box { margin-top: 1.4rem; border: 1px dotted var(--rule); border-radius: 2px 5px 3px 6px; padding: .5rem .9rem; }
+  details.more-box > summary { cursor: pointer; color: var(--faint); font-size: .84rem; }
+  details.more-box[open] > summary { margin-bottom: .7rem; color: var(--ink); }
+  details.more-box h3 { font-size: .76rem; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 1.3rem 0 .5rem; font-weight: normal; }
+  details.more-box h3:first-of-type { margin-top: .3rem; }
+  pre#out { margin: 0 0 .6rem; padding: .7rem .9rem; background: #100e0a; border: 1px dashed var(--rule); white-space: pre-wrap; word-break: break-word; font: 14px/1.5 var(--mono); }
+  textarea { min-height: 6rem; resize: vertical; }
+  table.files { width: 100%; border-collapse: collapse; font-size: .82rem; }
   table.files td { padding: .16rem .3rem; border-bottom: 1px dotted var(--rule); }
-  table.files td:nth-child(2) { color: var(--faint); white-space: nowrap; }
-  table.files tr.bad td:nth-child(2) { color: var(--accent); white-space: normal; }
-  table.files button { float: right; }
+  table.files td:nth-child(2) { color: var(--faint); }
+  table.files tr.bad td:nth-child(2) { color: var(--accent); }
   .scroll { max-height: 15rem; overflow: auto; }
-  dialog {
-    background: var(--panel); color: var(--ink); border: 1px solid var(--accent); border-radius: 2px 6px 3px 5px;
-    font: inherit; max-width: 34rem; width: calc(100% - 2rem); padding: 1rem 1.1rem;
-  }
+  ul.notes { margin: 0; padding-left: 1.1rem; color: var(--faint); font-size: .84rem; }
+
+  dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--accent); border-radius: 2px 6px 3px 5px; font: inherit; max-width: 34rem; width: calc(100% - 2rem); padding: 1rem 1.1rem; }
   dialog::backdrop { background: rgba(0,0,0,.7); }
-  dialog pre { background: #100e0a; border: 1px dashed var(--rule); padding: .5rem .6rem; max-height: 9rem; overflow: auto; margin: .3rem 0 .8rem; font: 13px/1.45 var(--mono); }
-  dialog h3 { margin: .2rem 0; font-size: .85rem; letter-spacing: .08em; }
-  [hidden] { display: none !important; }
+  dialog h2 { font-size: 1rem; margin: 0 0 .4rem; }
+  dialog h3 { margin: .6rem 0 .2rem; font-size: .85rem; letter-spacing: .06em; font-weight: normal; }
+  dialog h3.del { color: var(--accent); }
+  dialog pre { background: #100e0a; border: 1px dashed var(--rule); padding: .5rem .6rem; max-height: 9rem; overflow: auto; margin: .2rem 0 .6rem; font: 13px/1.45 var(--mono); }
+
+  footer { color: var(--faint); font-size: .78rem; margin-top: 1.6rem; }
+  article { max-width: 78ch; }
+  article h1 { font-size: 1.25rem; letter-spacing: .08em; margin: .6rem 0 1rem; filter: url(#worn); transform: none; text-shadow: none; }
+  article h2 { font-size: .95rem; margin: 1.8rem 0 .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: normal; }
+  article h3 { font-size: .9rem; margin: 1.4rem 0 .5rem; letter-spacing: .06em; }
+  article p, article li { font-size: .92rem; }
+  article ul, article ol { padding-left: 1.3rem; }
+  article code { background: #100e0a; padding: .05rem .3rem; border-radius: 2px; font-size: .9em; }
+  article pre { background: #100e0a; border: 1px dashed var(--rule); padding: .6rem .8rem; overflow: auto; }
+  article pre code { background: none; padding: 0; }
+  article .tablewrap { overflow-x: auto; margin: .8rem 0; }
+  article table { border-collapse: collapse; font-size: .85rem; }
+  article th, article td { border-bottom: 1px dotted var(--rule); padding: .3rem .6rem .3rem 0; text-align: left; vertical-align: top; }
+  article th { color: var(--faint); font-weight: normal; }
+  article a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -248,187 +259,198 @@
     </button>
     <input type="file" id="pickFolder" webkitdirectory multiple hidden aria-label="Choose the card folder">
   </header>
-  <p class="status" id="cardStatus" role="status"></p>
 
-  <div class="tabs" role="tablist" aria-label="What to edit">
-    <button type="button" role="tab" id="t-setup" aria-controls="p-setup" aria-selected="true">Playback</button>
-    <button type="button" role="tab" id="t-effects" aria-controls="p-effects" aria-selected="false" tabindex="-1">Effects <span class="count" id="effectCount"></span></button>
-    <button type="button" role="tab" id="t-lists" aria-controls="p-lists" aria-selected="false" tabindex="-1">Playlists <span class="count" id="listCount"></span></button>
-    <button type="button" role="tab" id="t-guide" aria-controls="p-guide" aria-selected="false" tabindex="-1">User guide</button>
-  </div>
+  <svg class="trace off" id="trace" viewBox="0 0 600 40" preserveAspectRatio="none" aria-hidden="true">
+    <line x1="0" y1="20" x2="600" y2="20"/>
+    <path d="M0 20H70l6-4 6 4h18l5 3 4-22 6 34 5-15h26l8-6 9 6h70l6-4 6 4h18l5 3 4-22 6 34 5-15h26l8-6 9 6h70l6-4 6 4h18l5 3 4-22 6 34 5-15h26l8-6 9 6H600"/>
+  </svg>
 
-  <div role="tabpanel" id="p-guide" aria-labelledby="t-guide" hidden>
-    <section class="guide">
-      <div class="line">
-        <label for="guidePick">Page</label>
-        <select id="guidePick"></select>
-      </div>
-      <article id="guideBody"></article>
-    </section>
-  </div>
+  <div id="editor">
+    <div class="start" id="start">
+      <p>Put your ONE's sample card into this computer, then open it here.</p>
+      <button class="primary big" id="startOpen" type="button">Open the card</button>
+      <p class="hint">Nothing is uploaded: the page reads the card on your own computer.<br>
+        No card to hand? <button class="plain" id="startWithout" type="button">Set things up without one</button> and download the file.</p>
+    </div>
+    <p class="status" id="cardStatus" role="status"></p>
 
-  <div class="cols" id="editor">
-    <div>
-      <div role="tabpanel" id="p-setup" aria-labelledby="t-setup">
-        <section>
-          <h2>Playback</h2>
-          <div class="pick"><span class="label" id="l-play">Mode</span><select id="play" aria-labelledby="l-play"></select></div>
-          <div class="pick"><span class="label" id="l-cv">Knob / CV</span><select id="cv" aria-labelledby="l-cv"></select></div>
-          <div class="pick"><span class="label" id="l-playlist">Playlist</span><select id="playlist" aria-labelledby="l-playlist"></select></div>
-          <div class="pick" id="delayRow"><span class="label" id="l-delay">CV settle</span>
-            <div class="seg" role="radiogroup" aria-labelledby="l-delay" id="delay"></div></div>
-        </section>
-        <details>
-          <summary>Files on the card <span class="count" id="fileCount"></span></summary>
-          <div class="scroll" id="cardFiles" hidden><table class="files" id="fileTable"></table></div>
-          <p class="hint" id="noCardHint">Open the card to list its files.</p>
-        </details>
-        <details id="firmwareBox">
-          <summary id="fwSummary">Firmware</summary>
-          <p class="hint" id="fwCard">Open the card to see which firmware it was last used with.</p>
-          <div class="buttons">
-            <button id="fwCheck" type="button">Check for the latest</button>
-            <button class="primary" id="fwInstall" type="button" hidden>Put it on the card</button>
-          </div>
-          <p class="status" id="fwStatus" role="status"></p>
-          <p class="hint">Checking reads <a id="fwListing" target="_blank" rel="noopener noreferrer"></a> and the image it names, both on GitHub. Nothing about you or your card is sent. The same build can be downloaded from the <a id="fwReleases" target="_blank" rel="noopener noreferrer">releases page</a>.</p>
-          <p class="hint">Or use a firmware file you already have:
-            <input type="file" id="fwFile" accept=".hex" aria-label="Choose an image.hex file"></p>
-        </details>
-        <details>
-          <summary>Start from an existing config</summary>
-          <label for="paste">Paste a config.txt, or choose the file.</label>
-          <textarea id="paste" spellcheck="false"></textarea>
-          <div class="buttons" style="margin-top:.5rem">
-            <button id="load" type="button">Load text</button>
-            <input type="file" id="file" accept=".txt,text/plain" aria-label="Choose a config.txt file">
-          </div>
-          <p class="status" id="loadStatus" role="status"></p>
-        </details>
-        <details>
-          <summary>Note on the first line</summary>
-          <div class="pick"><span class="label" id="l-comment">Note</span><input type="text" id="comment" maxlength="61" aria-labelledby="l-comment" spellcheck="false"></div>
-        </details>
-      </div>
-
-      <div role="tabpanel" id="p-effects" aria-labelledby="t-effects" hidden>
-        <section>
-          <h2>What will run</h2>
-          <div class="pick" id="forFileRow" hidden><span class="label" id="l-forFile">For file</span><select id="forFile" aria-labelledby="l-forFile"></select></div>
-          <div class="pick"><span class="label" id="l-sr">File rate</span>
-            <div class="seg" role="radiogroup" aria-labelledby="l-sr" id="sampleRate"></div></div>
-          <div class="row"><span class="label" id="l-pitch">Pitch</span><input type="range" id="pitch" min="-24" max="7" step="1" aria-labelledby="l-pitch"><output for="pitch"></output></div>
-          <table class="stages" id="stages"></table>
-          <p class="hint" id="rateLine"></p>
-        </section>
-        <section>
-          <h2>Filter</h2>
-          <div class="pick"><span class="label" id="l-shape">Shape</span>
-            <div class="seg" role="radiogroup" aria-labelledby="l-shape" id="shape"></div></div>
-          <div class="row"><span class="label" id="l-cutoff">Cutoff</span><input type="range" id="cutoff" min="0" max="9" step="1" aria-labelledby="l-cutoff"><output for="cutoff"></output></div>
-          <div class="row"><span class="label" id="l-resonance">Resonance</span><input type="range" id="resonance" min="0" max="9" step="1" aria-labelledby="l-resonance"><output for="resonance"></output></div>
-          <div class="row"><span class="label" id="l-wah">Wah</span><input type="range" id="wah" min="0" max="9" step="1" aria-labelledby="l-wah"><output for="wah"></output></div>
-        </section>
-        <section>
-          <h2>Phaser or flanger</h2>
-          <div class="pick"><span class="label" id="l-sweep">Effect</span>
-            <div class="seg" role="radiogroup" aria-labelledby="l-sweep" id="sweep"></div></div>
-          <div class="row"><span class="label" id="l-sweepAmt">Intensity</span><input type="range" id="sweepAmt" min="1" max="9" step="1" aria-labelledby="l-sweepAmt"><output for="sweepAmt"></output></div>
-        </section>
-        <section>
-          <h2>Tremolo or ring mod</h2>
-          <div class="pick"><span class="label" id="l-mod">Effect</span>
-            <div class="seg" role="radiogroup" aria-labelledby="l-mod" id="mod"></div></div>
-          <div class="row"><span class="label" id="l-modAmt">Depth</span><input type="range" id="modAmt" min="1" max="9" step="1" aria-labelledby="l-modAmt"><output for="modAmt"></output></div>
-        </section>
-        <section>
-          <h2>Drive and crush</h2>
-          <div class="row"><span class="label" id="l-drive">Drive</span><input type="range" id="drive" min="0" max="9" step="1" aria-labelledby="l-drive"><output for="drive"></output></div>
-          <div class="row"><span class="label" id="l-crush">Crush</span><input type="range" id="crush" min="0" max="9" step="1" aria-labelledby="l-crush"><output for="crush"></output></div>
-        </section>
-        <section id="rateSection">
-          <h2>Rate</h2>
-          <div class="row"><span class="label" id="l-rate">Rate</span><input type="range" id="rate" min="0" max="9" step="1" aria-labelledby="l-rate"><output for="rate"></output></div>
-          <p class="hint" id="rateHint"></p>
-        </section>
-      </div>
-
-      <div role="tabpanel" id="p-lists" aria-labelledby="t-lists" hidden>
-        <section>
-          <h2>Playlists</h2>
-          <div class="line">
-            <label for="listPick">Editing</label>
-            <select id="listPick"></select>
-            <button id="revertList" type="button" title="Put this playlist back to how it was when the card was opened">Revert</button>
-          </div>
-          <div id="checkBox" hidden>
-            <div class="line">
-              <span class="label">Tick the files to include</span>
-              <button class="mini" id="checkAll" type="button">All</button>
-              <button class="mini" id="checkNone" type="button">None</button>
-            </div>
-            <ul class="checks scroll" id="checks"></ul>
-          </div>
-          <div class="line" id="manualAdd">
-            <input type="text" id="addName" placeholder="name.wav" maxlength="63" spellcheck="false" aria-label="File name to add">
-            <button id="addEntry" type="button">Add</button>
-          </div>
-          <p class="label" id="orderLabel">Play order</p>
-          <ol class="entries" id="entries"></ol>
-          <p class="hint" id="listHint"></p>
-          <p class="status" id="listStatus" role="status"></p>
-        </section>
-        <details>
-          <summary>Add or remove a playlist</summary>
-          <div class="line">
-            <input type="text" id="newList" placeholder="new playlist name" maxlength="8" spellcheck="false" aria-label="New playlist name">
-            <button id="createList" type="button">New playlist</button>
-          </div>
-          <div class="line">
-            <button id="removeList" type="button">Remove the one being edited</button>
-            <button id="listDownload" type="button">Download it</button>
-          </div>
-        </details>
-      </div>
+    <div class="banner" id="fwBanner" hidden>
+      <p id="fwBannerText"></p>
+      <p><button class="primary" id="fwBannerGo" type="button"></button> <span class="status" id="fwBannerStatus" role="status"></span></p>
     </div>
 
-    <aside>
-      <section class="side">
-        <h2 id="sideTitle">Ready</h2>
-        <ul class="notes" id="notes"></ul>
-        <details id="moreNotes"><summary><span id="moreCount"></span></summary><ul class="notes" id="infoNotes"></ul></details>
-        <div class="buttons">
-          <button class="primary" id="saveCard" type="button" hidden>Write to card</button>
-          <button class="primary" id="download" type="button">Download config.txt</button>
-        </div>
-        <p class="status" id="copied" role="status"></p>
-        <details>
-          <summary>config.txt</summary>
-          <pre id="out" aria-live="polite"></pre>
-          <div class="buttons">
-            <button id="copy" type="button">Copy</button>
-            <button id="revertConfig" type="button" title="Put the settings back to the config.txt loaded from the card" hidden>Revert</button>
-            <button id="reset" type="button" title="Clear every setting to its default">Reset</button>
+    <div id="steps" hidden>
+      <section class="step" id="s-sounds">
+        <button class="step-head" type="button" aria-expanded="false" aria-controls="b-sounds">
+          <span class="num">1</span><span class="q">Which sounds?</span><span class="a" id="a-sounds"></span><span class="go">Change</span></button>
+        <div class="step-body" id="b-sounds" hidden>
+          <p>The module can play every sound on the card, or just the ones you list.</p>
+          <div class="line"><label for="source">Play</label><select id="source"></select></div>
+          <p class="hint" id="sourceNote"></p>
+          <div id="listEdit">
+            <div class="line" id="tickTools" hidden><button class="mini" id="checkAll" type="button">Tick all</button><button class="mini" id="checkNone" type="button">Untick all</button></div>
+            <ul class="checks" id="checks"></ul>
+            <div class="line" id="manualAdd">
+              <input type="text" id="addName" placeholder="name.wav" maxlength="63" spellcheck="false" aria-label="Sound file name to add">
+              <button id="addEntry" type="button">Add</button>
+            </div>
+            <p class="hint" id="listHint"></p>
           </div>
-        </details>
+          <p class="status" id="listStatus" role="status"></p>
+          <details class="more">
+            <summary>Make another playlist</summary>
+            <div class="line">
+              <input type="text" id="newList" placeholder="a short name, such as drums" maxlength="8" spellcheck="false" aria-label="New playlist name">
+              <button id="createList" type="button">Create</button>
+            </div>
+            <p class="hint">You can keep several playlists on one card and choose which one plays.</p>
+          </details>
+        </div>
       </section>
-    </aside>
+
+      <section class="step" id="s-way">
+        <button class="step-head" type="button" aria-expanded="false" aria-controls="b-way">
+          <span class="num">2</span><span class="q">How should they play?</span><span class="a" id="a-way"></span><span class="go">Change</span></button>
+        <div class="step-body" id="b-way" hidden>
+          <p>What happens when you press PLAY or send a trigger.</p>
+          <div class="choices" id="ways" role="radiogroup" aria-label="How sounds play"></div>
+          <details class="more" id="waysMoreBox"><summary>More ways to play</summary><div class="choices" id="waysMore" role="radiogroup" aria-label="More ways to play"></div></details>
+        </div>
+      </section>
+
+      <section class="step" id="s-knob">
+        <button class="step-head" type="button" aria-expanded="false" aria-controls="b-knob">
+          <span class="num">3</span><span class="q">What does the knob do?</span><span class="a" id="a-knob"></span><span class="go">Change</span></button>
+        <div class="step-body" id="b-knob" hidden>
+          <p id="knobIntro">The pitch knob and the CV input do the same job. Choose what that is.</p>
+          <div class="choices" id="knobs" role="radiogroup" aria-label="What the knob controls"></div>
+          <div class="row" id="delayRow" hidden><span id="l-delay">Wait for CV</span>
+            <div class="seg" role="radiogroup" aria-labelledby="l-delay" id="delay"></div><output></output></div>
+          <p class="hint" id="knobNote"></p>
+        </div>
+      </section>
+
+      <section class="step" id="s-fx">
+        <button class="step-head" type="button" aria-expanded="false" aria-controls="b-fx">
+          <span class="num">4</span><span class="q">Any effects?</span><span class="a" id="a-fx"></span><span class="go">Change</span></button>
+        <div class="step-body" id="b-fx" hidden>
+          <p>Optional. Switch on what you want; each one explains itself.</p>
+
+          <div class="fx" id="fx-filter">
+            <label class="fx-top"><input type="checkbox" id="on-filter"><span><b>Tone filter</b><span>Make the sound darker, thinner, or narrow like a telephone.</span></span></label>
+            <div class="fx-controls" hidden>
+              <div class="seg" role="radiogroup" aria-label="Filter type" id="shape"></div>
+              <div class="row"><span id="l-cutoff">Where</span><input type="range" id="cutoff" min="1" max="9" step="1" aria-labelledby="l-cutoff"><output for="cutoff"></output></div>
+              <div class="row"><span id="l-resonance">Emphasis</span><input type="range" id="resonance" min="0" max="9" step="1" aria-labelledby="l-resonance"><output for="resonance"></output></div>
+              <div class="row"><span id="l-wah">Auto wah</span><input type="range" id="wah" min="0" max="9" step="1" aria-labelledby="l-wah"><output for="wah"></output></div>
+            </div>
+            <p class="fx-skip" hidden></p>
+          </div>
+
+          <div class="fx" id="fx-sweep">
+            <label class="fx-top"><input type="checkbox" id="on-sweep"><span><b>Swirl</b><span>A slow whooshing movement through the sound: phaser or flanger.</span></span></label>
+            <div class="fx-controls" hidden>
+              <div class="seg" role="radiogroup" aria-label="Swirl type" id="sweep"></div>
+              <div class="row"><span id="l-sweepAmt">How strong</span><input type="range" id="sweepAmt" min="1" max="9" step="1" aria-labelledby="l-sweepAmt"><output for="sweepAmt"></output></div>
+            </div>
+            <p class="fx-skip" hidden></p>
+          </div>
+
+          <div class="fx" id="fx-mod">
+            <label class="fx-top"><input type="checkbox" id="on-mod"><span><b>Pulse</b><span>The volume throbs (tremolo), or at high speeds turns metallic (ring mod).</span></span></label>
+            <div class="fx-controls" hidden>
+              <div class="seg" role="radiogroup" aria-label="Pulse type" id="mod"></div>
+              <div class="row"><span id="l-modAmt">How deep</span><input type="range" id="modAmt" min="1" max="9" step="1" aria-labelledby="l-modAmt"><output for="modAmt"></output></div>
+            </div>
+            <p class="fx-skip" hidden></p>
+          </div>
+
+          <div class="fx" id="fx-colour">
+            <label class="fx-top"><input type="checkbox" id="on-colour"><span><b>Grit</b><span>Overdrive and lo-fi crunch.</span></span></label>
+            <div class="fx-controls" hidden>
+              <div class="row"><span id="l-drive">Drive</span><input type="range" id="drive" min="0" max="9" step="1" aria-labelledby="l-drive"><output for="drive"></output></div>
+              <div class="row"><span id="l-crush">Crush</span><input type="range" id="crush" min="0" max="9" step="1" aria-labelledby="l-crush"><output for="crush"></output></div>
+            </div>
+            <p class="fx-skip" hidden></p>
+          </div>
+
+          <div class="fx" id="fx-rate" hidden>
+            <div class="row"><span id="l-rate">Speed</span><input type="range" id="rate" min="0" max="9" step="1" aria-labelledby="l-rate"><output for="rate"></output></div>
+            <p class="hint" id="rateHint"></p>
+          </div>
+        </div>
+      </section>
+
+      <div class="save" id="save">
+        <h2>In short</h2>
+        <p id="short"></p>
+        <ul class="warn" id="warnings"></ul>
+        <div class="actions">
+          <button class="primary big" id="saveCard" type="button" hidden>Save to card</button>
+          <button class="primary big" id="download" type="button">Download config.txt</button>
+          <button class="plain" id="undo" type="button" hidden>Undo my changes</button>
+          <span class="status" id="saved" role="status"></span>
+        </div>
+      </div>
+
+      <details class="more-box" id="details">
+        <summary>Details and extras</summary>
+        <h3>The file this writes</h3>
+        <pre id="out" aria-live="off"></pre>
+        <div class="actions">
+          <button id="copy" type="button">Copy</button>
+          <button id="download2" type="button">Download</button>
+          <button id="reset" type="button" title="Clear every setting to its default">Start again from scratch</button>
+          <span class="status" id="copied" role="status"></span>
+        </div>
+        <div class="line"><label for="comment">First-line note</label><input type="text" id="comment" maxlength="61" spellcheck="false"></div>
+        <ul class="notes" id="infoNotes"></ul>
+
+        <h3>Sounds on the card</h3>
+        <div class="scroll" id="cardFiles" hidden><table class="files" id="fileTable"></table></div>
+        <p class="hint" id="noCardHint">Open the card to list its sounds.</p>
+
+        <h3>Firmware</h3>
+        <p class="hint" id="fwCard"></p>
+        <div class="actions">
+          <button id="fwCheck" type="button">Check for the latest</button>
+          <button class="primary" id="fwInstall" type="button" hidden>Put it on the card</button>
+        </div>
+        <p class="status" id="fwStatus" role="status"></p>
+        <p class="hint">Checking reads <a id="fwListing" target="_blank" rel="noopener noreferrer"></a> and the image it names, both on GitHub. Nothing about you or your card is sent. The same build is on the <a id="fwReleases" target="_blank" rel="noopener noreferrer">releases page</a>.</p>
+        <p class="hint">Or use a firmware file you already have: <input type="file" id="fwFile" accept=".hex" aria-label="Choose an image.hex file"></p>
+
+        <h3>Start from a config you already have</h3>
+        <textarea id="paste" spellcheck="false" aria-label="Paste a config.txt"></textarea>
+        <div class="actions" style="margin-top:.5rem">
+          <button id="load" type="button">Use this text</button>
+          <input type="file" id="file" accept=".txt,text/plain" aria-label="Choose a config.txt file">
+        </div>
+        <p class="status" id="loadStatus" role="status"></p>
+      </details>
+    </div>
   </div>
+
+  <div id="guide" hidden>
+    <p><button class="plain" id="guideBack" type="button">&larr; Back to setting up</button></p>
+    <div class="line"><label for="guidePick">Page</label><select id="guidePick"></select></div>
+    <article id="guideBody"></article>
+  </div>
+
   <footer>
-    For the extended firmware, build 54. Unofficial; not affiliated with or supported by Tiptop Audio. Frequencies are calculated from the firmware's maps, not measured.
-    See the <a href="#" id="footGuide">user guide</a>.
+    <a href="#" id="footGuide">User guide</a> &middot; <a id="footReleases" target="_blank" rel="noopener noreferrer">Firmware downloads</a><br>
+    For the extended firmware, build 54. Unofficial; not affiliated with or supported by Tiptop Audio.
   </footer>
 </main>
 <dialog id="confirm" aria-labelledby="confirmTitle">
-  <h2 id="confirmTitle">Write to card</h2>
-  <p class="hint">These files in the card's root will be written. Nothing else is touched.</p>
+  <h2 id="confirmTitle">Save to card</h2>
+  <p class="hint" style="margin-top:0">These files at the top level of the card will change. Nothing else is touched.</p>
   <div id="confirmBody"></div>
-  <div class="buttons">
-    <button class="primary" id="confirmSave" type="button">Write</button>
+  <div class="actions">
+    <button class="primary" id="confirmSave" type="button">Save</button>
     <button id="confirmCancel" type="button">Cancel</button>
   </div>
 </dialog>
-
 <script type="application/json" id="docs">
 {
 "docs": {
@@ -443,7 +465,7 @@
 "profiling": "# Profiling diagnostics\n\nThis optional diagnostic firmware measures observed operating margins on the module. Normal builds compile out the profiling hooks, counters, report writer and stack watermark.\n\n## Build and install\n\nFrom the repository:\n\n```sh\nmake profile\n```\n\nThe diagnostic is `build/profile/image.hex`. The normal application remains at `build/image.hex`; the two have separate ELF files, generated tables and manifests. Both currently identify as build 21; the diagnostic manifest has `profiling: true`.\n\nFor the extended firmware use `make extended-profile`, which writes `build/extended/profile/image.hex` and reports the extended build number; substitute that path below.\n\nInstall the diagnostic using the usual SD update procedure:\n\n```sh\ncp build/profile/image.hex \"/Volumes/TTA ONE/image.hex\"\nsync\ncmp build/profile/image.hex \"/Volumes/TTA ONE/image.hex\"\ndiskutil eject \"/Volumes/TTA ONE\"\n```\n\nStartup remains one second blue. `ONEBUILD.TXT` should show build 21. That number alone does not distinguish normal from profiling firmware: a freshly written `ONEPROF.TXT` after a run confirms the diagnostic writer ran. Preserve or remove an old profile report before testing so that an unsuccessful write is not mistaken for a fresh result.\n\n## Collect a report\n\nPlay or loop a sample for at least a minute. Stop external triggers before collecting. For sustained looping, turn FILE once to stop playback; this also works with a single-entry playlist. For a non-looping sound, simply let it finish.\n\nWait at least one second with playback stopped, PLAY released, no pending trigger and no mode menu open. The firmware attempts to write a report after 250 ms of that idle condition. Allocation, SD writing and readback can take longer, depending on the card. A new trigger arriving during a report write is handled afterward, so diagnostic mode can briefly delay that next trigger. No report writes occur while audio is playing.\n\nPower down, return the card to the computer and preserve the report with a descriptive name:\n\n```sh\ncp \"/Volumes/TTA ONE/ONEPROF.TXT\" ./profile-96k24-fast.txt\npython3 tools/analyze_profile.py profile-96k24-fast.txt \\\n  --manifest build/profile/manifest.json \\\n  --baseline build/manifest.json\n```\n\nThe manifests are optional local build information; use the ones for the exact image you tested. Add `--json` for machine-readable results. Individual compiler stack-frame sizes are emitted as `build/profile/*.su` and `build/*.su`; the analyser lists the largest when a manifest is supplied.\n\nThe firmware accumulates statistics over the current boot, across triggers, files and mode changes, and overwrites the report after each subsequent stop. Remounting a card does not intentionally start a new session. Power-cycle between test cases if you want separate results. Save each report before the next case.\n\n## Suggested test order\n\nStart with a quick smoke test: one Q480 playback, let it finish, wait, and check the report. Then run:\n\n| Case | Material and activity |\n| --- | --- |\n| Baseline | 48 kHz/16-bit Q480, Loop, original pitch; one minute. |\n| Higher rate | 96 kHz/16-bit Q960, then a 96 kHz/24-bit ordinary sample. |\n| Tight deadline | Same 96 kHz/24-bit sample at highest quantized pitch; several minutes. |\n| Envelopes | Fade, repeated quick retriggers, then Gate release, using the same sample. |\n| Seeking | Random Loop, repeated triggers on a longer sample. |\n| Mixed workload | File changes, multiple sample rates, then varying CV; preserve this as a separate stress case. |\n\nRepeat the useful cases at 44.1/88.2 kHz and on other cards if available. Native pitch depends on the input mapping; a tuner and the generated 440 Hz files help locate it. The clock rates in the report are approximate, not tuning calibration. A report captures the settings at worst-work and tightest-margin observations, not a trace of every file or event.\n\n## What is measured\n\n- `sd`: end-to-end streaming sector read attempts, including command/token waits, transfer, CRC and background polling. Failed attempts can be included. This is not isolated card response latency.\n- `prefetch`: raw file read plus decoding into the staging half, including FAT lookups. Some prefetched data may be discarded on stop/retrigger.\n- `decode`: PCM conversion calls during streaming.\n- `envelope`: combined envelope and tail rendering for a published half.\n- `copy`: buffer copy and publication barrier.\n- `refill_work`: the corresponding prefetch work plus publication work for completed refills. It excludes the intentional waiting between prefetch and publication, and includes the nested SD/decoder/envelope/copy operations. Do not add the category totals together.\n- `colour`, `filter`, `phaser`, `flanger`, `mod` (extended build): time in each effect stage per processed block.\n\nEach metric has sample count, total, minimum and maximum; the host tool calculates means. The SD histogram uses inclusive upper bounds of 250 us, 500 us, 1/2/5/10/50 ms, then an open-ended final bucket. This supports coarse latency-distribution inspection rather than exact percentiles.\n\nThe report also records maximum background-service gap, total observed playback interval, stream error counters, and the smallest divider-weighted buffer margin before/after publication. The margin includes unsafe observations: zero can indicate a missed deadline. Its frame count belongs to the settings recorded alongside it; comparing only frame counts across different pitches is misleading. Minimum margin in microseconds is estimated from nominal clock anchors. Polling can miss events between observations; these are measured samples, not exhaustive timing guarantees.\n\nThe timer is the CPU Count register, using the existing firmware's nominal 24 ticks/us conversion at a 48 MHz CPU clock. Unsigned short intervals and split 64-bit accumulated totals handle timer wrap. This timebase has not been calibrated against external equipment. A back-to-back timer-read minimum is included, but does not capture all instrumentation overhead. No overhead is subtracted from measurements.\n\nMeasured refill-work share includes blocking SD waits and excludes other work and discarded prefills. It is **not CPU utilisation**: the application continuously polls even when there is spare processing time. Use worst work, buffer margin, service gaps and error counts together when assessing whether an added feature is plausible. The profiling build itself perturbs timing.\n\n## Stack and memory\n\nBefore the first C function runs, the diagnostic fills unused RAM between the linker-defined static-data end and the initial stack top with a pattern. The report scans for the lowest modified word. This gives an observed stack watermark, including startup/mount work and earlier report activity. It is a lower bound on stack use: a reserved but unwritten frame can retain the pattern. The current report write can deepen the stack after its snapshot; a later report can observe that use. Compiler `.su` frame sizes are supplementary, not a full call-chain bound.\n\nThe untouched gap is not a guaranteed safe allocation budget. Longer or different workloads may use more stack, and the diagnostic has extra frames. This build keeps the same 8 KiB minimum linker stack reservation and the same application-address limit. Compare normal/profiling manifests for code and static-RAM overhead; do not mistake the diagnostic's small code-space remainder for the normal firmware's headroom.\n\nThese measurements do not establish whether the resident updater accepts a larger flash layout. That remains a separate investigation.\n\n## Report storage and failure handling\n\n`ONEPROF.TXT` is a reserved 1024-byte text file. First creation can allocate FAT clusters and update a root directory entry and applicable FAT32 FSInfo hints, using the same restricted allocator as the recall file. Updates write two data sectors and verify them by readback. An existing unrelated, read-only or differently sized file is refused. No general-purpose file-writing API is added.\n\nThe fixed-position CRC32 footer covers the report body, including padding. The analyser rejects truncated, torn or edited reports rather than presenting potentially inconsistent counters. A failed report is attempted once per stop; a later playback/stop attempts a new report. Previously observed write failures are included in later successful reports. A genuinely unreadable card still needs normal card recovery. Interrupted metadata allocation has the existing FAT limitation: it can leak a cluster and is not transactional.\n\n## Return to normal firmware\n\n```sh\nmake\ncp build/image.hex \"/Volumes/TTA ONE/image.hex\"\nsync\ncmp build/image.hex \"/Volumes/TTA ONE/image.hex\"\ndiskutil eject \"/Volumes/TTA ONE\"\n```\n\nInstall normally. Normal firmware leaves an existing profile report untouched; it may be stale. Delete it on the computer when no longer needed.\n\n## Extended build additions\n\nThe extended profiling image adds a few lines to the report, which the analyser prints when present: FILE encoder step counts and the last filtered pin changes, the number of sector reads that were retried, detail of the last failed read, and the last six Chop gates with the knob/CV reading taken at each.\n",
 "provenance": "# Provenance and hardware limits\n\nThis is a source-built, reverse-engineered application, not a historical clean-room implementation. The private development project examined a manufacturer's update and device documentation. That development repository and its history are not part of this distribution.\n\n## Included implementation\n\nApplication startup, peripheral access, SD SPI, FAT, WAV conversion, buffering, controls, configuration, persistence and playback policy are supplied as source. The encoder's seven-state full-step table and masked-state traversal derive from Ben Buxton's GPLv3 Rotary implementation. `firmware/app.c` carries the copyright, adaptation date and upstream reference; NOTICE describes the modification. The entire project is distributed under GPL-3.0-only, with the complete licence in LICENSE.\n\nThe previously transcribed pitch tables were removed. `tools/generate_pitch.py` calculates the distributed application's tables from equal temperament and nominal hardware clock anchors. It does not read an extracted table or vendor binary. Shared values at octave/clock ratios are a consequence of the mathematics and hardware settings.\n\nThe reset routine follows the PIC32's hardware-defined SYSKEY/software-reset mechanism. Interrupt/exception stubs are source-assembled jumps into this application's fault handling. There is no boot-flash debug handler in the supplied source, linker output or update records.\n\n## Compatibility information\n\nRegister addresses, pin/PPS assignments, clock anchors, configuration words, file formats, supported behavior and application/update addresses were learned from hardware documentation and reverse engineering. The layout JSON contains only record headers/addresses and control records, not application instruction bytes. Hardware configuration words are emitted from source. These compatibility facts are retained and are not represented as newly invented hardware behavior.\n\nThe build is freestanding: it links the supplied object files directly, with no startup library, libc or proprietary SDK runtime. Undefined symbols and statically encoded function jumps outside the supplied payload are rejected. Such checks do not prove the absence of every possible indirect dependency or provide comprehensive third-party rights clearance.\n\n## Excluded material\n\nNo vendor update, original device dump, disassembly, original boot/debug stub, extracted pitch table, vendor sample library, historical hybrid firmware or private Git history is included. Generated objects, HEX/ELF files, test audio and build logs are ignored by Git. The source can generate the application without any of these inputs.\n\n## Hardware and update limits\n\nThe module must already have its resident updater. It is neither supplied nor reconstructed here. Its complete binary has not been obtained, and its erase/protection policy remains unknown. Update files omit the reset vector and boot-debug records and are not full-device recovery images. Source-level safeguards and successful updates do not guarantee recovery from corrupt firmware or power interruption.\n\nThe exported build-15 image matches its development counterpart byte-for-byte with the local toolchain: Homebrew Clang 23.1.5, Rust-bundled LLD 13.0.0 in GNU mode, and Python 3.15.2 on macOS. Different compiler/linker versions may produce different machine code. Qualitative user trials cover earlier playback/retrigger, quantization, random sequencing, mode feedback and Fade read-ahead. Build 14 click-overlap protection and build 15 build-record writing have software tests but no reported hardware confirmation yet. Fine tuning, every sample-rate/card combination, and precise latency remain unmeasured.\n\n## References\n\n- [Ben Buxton Rotary source](https://github.com/buxtronix/arduino/blob/master/libraries/Rotary/Rotary.cpp): copyright 2011 Ben Buxton, GNU GPL Version 3; attribution checked 2026-11-16.\n- [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html): full terms included locally in LICENSE.\n- [ONE manual](https://www.tiptopaudio.com/manuals/Tiptop_Audio_one.pdf): hardware behavior, configuration and published SD update workflow.\n- [PIC32MX1XX/2XX family data sheet](https://ww1.microchip.com/downloads/en/DeviceDoc/PIC32MX1XX2XX-28-36-44-PIN-DS60001168K.pdf): registers, memory layout, pins and reset behavior.\n- [Microchip reference-clock documentation](https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/32bit-mcu/PIC32/mx-arch-cpu-overview/oscillator/refclk/): fractional clock divider.\n- [SD simplified physical-layer specification](https://www.sdcard.org/cms/wp-content/themes/sdcard-org/dl.php?f=Part1_Physical_Layer_Simplified_Specification_Ver5.10.pdf): SPI protocol and CRC.\n- [Microsoft FAT specification](https://www.microsoft.com/en-us/download/details.aspx?id=53426) and [RIFF description](https://learn.microsoft.com/en-us/windows/win32/xaudio2/resource-interchange-file-format--riff-): filesystem/container formats.\n\nReferences are links, not bundled vendor documents or a grant of rights over those documents. Hardware/product names identify compatibility; the project is unofficial.\n",
 "tape": "# Tape: signed playback speed\n\nTape is mode 11 in the extended firmware. PLAY starts/stops a looping sample. Positive CV plays forward; negative CV plays backward. Distance from the calibrated zero sets speed. Near zero it fades to silence, holds the position captured when rest was requested, and resumes from there when CV moves away. GATE is ignored; FILE stops and selects another sample.\n\n## Calibrate and use\n\nSet the knob near centre and patch steady 0 V. Hold PLAY for at least half a second without moving either control, then release. Tap PLAY to arm playback. At zero, the button is red but there is no sound; moving CV away starts the sample. PLAY stops both audible playback and an armed zero hold.\n\nUse +0.5 V and −0.5 V first. On the measured module these produce approximately half native speed in opposite directions. About ±1 V gives native speed, with a maximum of 1.5× at approximately ±1.5 V. These are approximate relationships inferred from the measured ADC response, not calibrated 1 V/octave tracking. The speed law is linear in voltage magnitude. The existing Free/Quantize/Select File settings do not affect Tape.\n\nEntering rest requires magnitude below five raw counts (approximately 0.05 V); leaving rest requires eight counts (approximately 0.08 V). Between these thresholds, the previous rest/moving state is retained. ADC resolution can make very slow sweeps sound stepped. The knob offsets zero: moving it after calibration gives manual tape-stop/reversal gestures. Recalibrate to restore the chosen reference. Calibration is RAM-only and should be repeated each power session.\n\nTransitions retain the 512-frame fades and stopped refill gap from Flip. They are scheduled in output frames, so slowing playback also lengthens control response and fades. Near rest this can be hundreds of milliseconds. This is not continuous overlapping crossfade or seamless scrubbing. The position held is the playhead captured on requesting rest, not the later point at which the fade finishes.\n\n## Configuration\n\n```text\n# Hamburger Wavy\nTape\nQuantize\nShort\n```\n\nThe third line remains required, although pitch/file CV modes are overridden. The usual held-PLAY/FILE menu selects mode 11. Keep CV steady during calibration to avoid entering CV-mode editing.\n\n## Trying it\n\nUse a long rising sweep or a recognisable recording. Calibrate, tap PLAY at zero, move positive to hear forward playback, slowly return to zero and pause, then move negative to resume backwards. Change magnitude on one side to check speed without restarting. Try both knob and external CV gestures.\n",
-"user-guide": "# Using Hamburger Wavy\n\n## Card and audio files\n\nUse FAT16 or FAT32, with 512-byte sectors, either directly on the card or in an MBR partition. Audio must be mono PCM WAV, 16 or 24 bit, with a header sample rate of 8–96 kHz. Native clock families are 44.1/48/88.2/96 kHz; other accepted header rates use the 48 kHz family. Stereo, floating-point/compressed audio, exFAT, FAT12 and subdirectory browsing are unsupported.\n\nUp to 256 files or playlist entries are supported. Any `.wav` in the card's root can be browsed, whatever its name. In a playlist, extended build 54 accepts names up to 63 plain-ASCII characters; see [Playlists](#playlists).\n\n## Playback modes\n\nExtended build 54 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser or flanger, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.\n\n| Red count | Mode | Behavior |\n| --- | --- | --- |\n| 1 | Trigger | Each PLAY tap or gate trigger plays from the beginning once. |\n| 2 | Gate | Plays while external gate is held, fading on release. PLAY taps toggle manual playback. |\n| 3 | Fade | Retriggers fade out the current sound, then restart with a fade-in. |\n| 4 | Loop | Repeats the selected file; triggers restart it. Browsing stops it. |\n| 5 | Sequence | Advances one file before playing on each trigger. |\n| 6 | Combo | Advances one file on each trigger, then loops it. |\n| 7 | Random Sequence | Chooses a random file per trigger; repeats are allowed. |\n| 8 | Random Loop | Loops a file; subsequent triggers jump to random frame positions within it. |\n| 9 | Flip | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |\n| 10 | CV Flip | PLAY starts/stops; positive CV selects forward and negative selects reverse at native speed. Near zero, keeps its last direction. GATE is ignored. Calibrate first; see below. |\n| 11 | Tape | Signed CV controls direction and speed; near zero fades to silence and holds position. PLAY starts/stops; GATE ignored. Calibrate as for CV Flip. See [Tape](tape.md). |\n| 12 | Chop | Each gate jumps to the CV-selected position with a short fade, then plays forward at native speed. PLAY starts/stops. See [Chop](chop.md). |\n\nFade/Gate ramps are short 256-sample linear envelopes: about 5.3 ms at 48 kHz before pitch changes. They mainly suppress clicks, rather than providing long musical fades. Buffering adds release/retrigger latency. Random seeking and file changes require SD access and can take longer than cached Trigger playback. Overlapping voices are not implemented.\n\nFlip, CV Flip, Tape and Chop use 512-frame transition fades. These reduce direction-change clicks; they are not overlapping crossfades, and buffering/refill adds response delay.\n\n## CV Flip and Tape calibration\n\nSelect mode 10 (`CV Flip`) or 11 (`Tape`), or put that name on line 2 of `config.txt`. Examples: [cv-flip.txt](../examples/config/cv-flip.txt) and [tape.txt](../examples/config/tape.txt).\n\n1. Centre the pitch knob and patch a steady 0 V from your bipolar CV source.\n2. Hold PLAY for at least half a second without turning either control, then release. Playback stops and the current input becomes the zero reference.\n3. Tap PLAY to start. Positive CV plays forward and negative plays reverse. CV Flip retains the last direction near zero; Tape fades to silence and holds position there.\n\nA reverse start begins at the end of the sample. Calibration survives file selection but resets on power-up, so repeat it each session. Keep the knob at its calibrated position, or move it deliberately to bias the switching threshold. Keep CV steady during calibration: large movement while PLAY is held can enter CV-mode editing instead.\n\nCV Flip always uses native sample speed and overrides Free/Quantize/Select File behaviour. The third config line is still required, but does not change that behaviour. FILE browsing stops playback; GATE is ignored. See [CV Flip](cv-flip.md) for details. [Tape](tape.md) adds signed variable speed and a zero hold. [Chop](chop.md) samples CV position on each gate. These are separate playback modes, not CV-mode options.\n\n## CV modes\n\nThese apply to playback modes 1–9. CV Flip, Tape and Chop override them with their dedicated controls.\n\n| Blue count | Mode | Behavior |\n| --- | --- | --- |\n| 1 | Free | Continuous playback pitch/speed control. |\n| 2 | Quantize | Chromatic semitone steps using mathematically generated tables. |\n| 3 | Select File | Samples pitch/CV at each trigger to select an offset above FILE's base selection; plays at nominal native rate. |\n\nSelect File spans up to 32 offsets, wraps the file list, and takes precedence over automatic Sequence/random selection. CV alone does not retrigger or loop playback in Trigger mode. An LFO at GATE can retrigger on each rising edge.\n\nQuantize provides 49 notes from +7 through −41 semitones. Software input is `value = ADC >> 2`, clamped to 0–255; the note is `7 - floor((value*48 + 127)/255)`. Increasing ADC lowers pitch; the physical voltage/control relationship is not calibrated. Original pitch occupies ADC 140–159, away from the control's centre. Free mode uses a separate continuous mapping.\n\nThe divider for note `n` is `round(native_divider * 2**(-n/12))`, with half values rounded upward. Nominal anchors are 2176, 2000, 1088 and 1000 for 44.1, 48, 88.2 and 96 kHz. The hardware divider is encoded in steps of 1/512. Maximum rounding error relative to those anchors is about 1.09 cents. Oscillator error, approximate anchors and voltage calibration are additional; calibrated 1 V/octave tracking is not claimed. Runtime floating point is unnecessary.\n\n## Panel editing\n\nHold PLAY for at least 400 ms before moving a control to edit modes. Earlier FILE movement remains ordinary browsing and releasing PLAY remains a playback click.\n\nTurn FILE for playback mode. After the last detent, keep PLAY held and pause 350 ms: the complete red count starts from one. Pulses are 200 ms on/off, with at least a one-second gap between groups. Release PLAY to apply. Once FILE has moved during an editing hold, CV/LFO movement cannot change CV mode or take over the display; any provisional CV edit in that hold is discarded.\n\nTo edit CV mode, release and hold PLAY again, then move pitch without turning FILE. Low ADC selects Free, centre selects Quantize, high selects Select File, with intervening dead bands. Blue counts identify the selection. Power cycling or remounting reloads the card configuration.\n\n## config.txt\n\nPlain text in the card root, for example:\n\n```text\n# Hamburger Wavy configuration\nTrigger\nQuantize\nShort\n```\n\nLine 1 starts with `#`; line 2 is a playback mode; line 3 is a CV mode. Optional line 4 is Select File's settling delay: Short=0 ms, Medium=2 ms, Long=10 ms. In the extended build, effect lines follow (see [Effects](#effects)) and `Colour`, `Filter` or `Rate` are also accepted as the CV mode. Other further lines are ignored. `Random` is an alias for Random Sequence; `Looping` aliases Loop and `Quantized` aliases Quantize. Earlier card spellings remain compatibility aliases in the parser.\n\nCase differences, surrounding setting whitespace, CRLF/LF and a UTF-8 BOM are accepted. Missing or malformed settings use Trigger/Quantize/Short. An actual read error invokes card recovery. Config files must fit within 4096 bytes.\n\n## Effects\n\nExtended build 54 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nBandpass 5\nResonance 6\nWah 6\nRate 4\n```\n\n| Line | What it does | Details |\n| --- | --- | --- |\n| `Drive n` | Gain into a smooth clipper, 1× to about 16× | [Colour](colour.md) |\n| `Crush n` | Fewer bits (16 down to 4) and a sample hold of 1 to 32 frames | [Colour](colour.md) |\n| `Filter n` | Low-pass cutoff, 1 darkest to 9 brightest (`Lowpass n` is the same) | [Filter](filter.md) |\n| `Highpass n` | High-pass cutoff, 1 removes only the lowest bass, 9 leaves a thin top | [Filter](filter.md) |\n| `Bandpass n` | Band-pass centre, low to high | [Filter](filter.md) |\n| `Resonance n` | Emphasis at the cutoff for any of the three filter shapes | [Filter](filter.md) |\n| `Wah n` | A slow sine sweeps the filter cutoff, up to about 2.5 octaves each way | [Filter](filter.md) |\n| `Phaser n` | Swept notches with feedback; intensity | [Phaser](phaser.md) |\n| `Flanger n` | Swept short delay with feedback, the jet sound; intensity. Replaces the phaser if both are present | [Flanger](flanger.md) |\n| `Tremolo n` | Level dips at the `Rate`; depth, 9 reaches silence | [Tremolo and ring modulation](mod.md) |\n| `Ring n` | Multiplies the sound by a sine at the `Rate`; depth. Replaces tremolo if both are present | [Tremolo and ring modulation](mod.md) |\n| `Rate n` | Speed for wah, phaser, flanger, tremolo and ring, each on its own scale | below |\n\nOnly one of `Filter`, `Highpass` and `Bandpass` applies: the last one in the file. The signal passes through drive and crush, then the filter, the phaser or flanger, and tremolo or ring modulation, before the existing fades.\n\n`Rate n` scales (calculated, at the file's native pitch):\n\n| `Rate` | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |\n|---|---|---|---|---|---|---|---|---|---|---|\n| Wah, phaser, flanger (Hz) | 0.125 | 0.2 | 0.31 | 0.5 | 0.79 | 1.3 | 2 | 3.2 | 5 | 8 |\n| Tremolo (Hz) | 1 | 1.4 | 1.9 | 2.7 | 3.5 | 4.8 | 6.7 | 8.8 | 12 | 16 |\n| Ring (Hz) | 16 | 30 | 56 | 107 | 197 | 363 | 682 | 1236 | 2216 | 4096 |\n\n### Effect CV modes\n\nPut one of these on the CV mode line (line 3) to control an effect from the pitch knob/CV. Playback then stays at the file's native pitch, and clockwise or positive CV gives more. They can only be chosen in `config.txt`; picking a CV mode in the held-PLAY menu leaves them until the card is next mounted.\n\n| CV mode | Knob/CV controls |\n| --- | --- |\n| `Colour` | Amount of drive and crush, from clean up to the configured digits (both to 9 if neither line is present) |\n| `Filter` | Cutoff of whichever filter shape is named; with `Wah`, the centre of the sweep |\n| `Rate` | Speed of the wah, phaser, flanger, tremolo or ring modulation. With none of those lines present it gives full-depth tremolo |\n\nIn CV Flip, Tape and Chop the CV input controls the transport, so the effects use their fixed config values.\n\n### Limits\n\nHow many effect stages run depends on the output rate, which rises as a file is pitched up. Drive and crush count as one stage; the filter (with or without wah), the phaser or flanger, and tremolo/ring are one each.\n\n| Output rate | Stages that run |\n| --- | --- |\n| Up to 48 kHz | All four |\n| 48 kHz to about 64 kHz | Three: drive/crush gives way first, then tremolo/ring |\n| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser or flanger, otherwise tremolo/ring, otherwise drive/crush |\n| Above 96 kHz | None |\n\nA 44.1 or 48 kHz file at native pitch or below gets everything; an 88.2 or 96 kHz file at native pitch gets one stage. Crossing a limit while playing switches a stage on or off with an audible step, most obvious on steady tones.\n\nFilter cutoff, phaser and flanger positions and all rates are tied to the playback clock, so they move with pitch: pitching a file down an octave lowers the cutoff an octave and halves the rates.\n\nExample files for each effect are in [examples/config](../examples/config).\n\nThe [config editor](config-editor.html) is a single web page that writes `config.txt` and playlists for you. Open it at <https://misterwavey.github.io/hamburger-wavy/>, or save the file and open it in a browser; it works offline and uploads nothing. It shows each setting in real units, which effects will run for a given file rate and pitch, and what the knob will control, and it can load an existing `config.txt` to edit. Opening the card's folder in it lets it check every WAV against what the firmware accepts, build playlists from the files that are there, and flag a playlist entry that would cut the list short. In Chrome and Edge it can save `config.txt` and the playlists straight to the card, after showing what it will write; in other browsers it reads the card and you download the results. Under Firmware on its Playback tab it shows which build the card was last used with, and can fetch the current firmware, check it against its published checksum and write it to the card as `image.hex`; that step contacts GitHub, and is the only time the page uses the network.\n\n## Playlists\n\nAn optional root file `playlist.txt` lists one WAV filename per line and replaces directory order. Duplicate entries are allowed and weight random selection. From extended build 54 a name can be the file's full name as the computer shows it, up to 63 plain-ASCII characters including `.wav`, with spaces and punctuation allowed; upper and lower case do not matter. Earlier builds, and legacy build 21, accept at most 13 characters with only letters, digits and `~` before `.wav`; longer-named files are then listed by their short alias, such as `MYLONG~1.wav`. The list ends at the first blank, malformed or missing name, so a typing mistake shortens it; a list with no usable entry does not play. Card read errors abort mounting. For a single-tone test, a playlist may simply contain:\n\n```text\nQ480.wav\n```\n\nGenerate that original test tone with `python3 tools/generate_test_tones.py` and copy it from `build/test-tones/` to the card. Delete `playlist.txt` to restore directory browsing.\n\n### Several playlists\n\nFrom extended build 54 a card can hold several playlist files, with `config.txt` choosing the one in use:\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nPlaylist drums\n```\n\n`Playlist drums` (or `Playlist drums.txt`) uses `drums.txt` from the card's root. The name is one to eight letters, digits or `~`. The line goes with the effect lines, after the CV mode and the optional delay line. If the named file is not on the card the firmware uses `playlist.txt`, and if that is absent too, directory order. A named file that exists but has no usable entry does not play. Earlier builds ignore the line and use `playlist.txt`. Switching playlists means editing that one line; the panel cannot change it.\n\n## Persistent files and lights\n\nWAV, config and playlist files remain read-only. Two reserved root files can be created/updated, with audio stopped:\n\n- `ONESTATE.BIN`: 1024 bytes, two alternating CRC-protected records remembering the last manually played file. External gate triggers do not save it. Old `STATUS.BIN` recall is imported read-only.\n- `ONEBUILD.TXT`: 512-byte space-padded plain text identifying the running build. An already-correct record is not rewritten. It identifies the last firmware that successfully wrote the card, not an image merely copied from a computer. Older firmware without this feature can leave the record stale.\n\nFirst creation also updates allocated FAT entries, a root directory entry and applicable FAT32 FSInfo hints. Existing unrelated/read-only same-name files are refused. Build logging is best effort; a failed write does not deliberately block playback. Interrupted metadata creation can leak a cluster; this is not transactional FAT storage.\n\nStartup: one second blue, then no build count. Red indicates playback. Solid blue indicates a playback error, including a missed refill deadline; flashing blue can indicate card recovery or stationary DMA. These signals do not uniquely diagnose the underlying fault. PLAY retries after a playback error reopen/re-prime the selected file.\n\nThe optional diagnostic build adds `ONEPROF.TXT` reporting after playback stops. Normal builds do not create or update it. See [profiling](profiling.md) for collection instructions and the additional reserved write scope.\n"
+"user-guide": "# Using Hamburger Wavy\n\n## Card and audio files\n\nUse FAT16 or FAT32, with 512-byte sectors, either directly on the card or in an MBR partition. Audio must be mono PCM WAV, 16 or 24 bit, with a header sample rate of 8–96 kHz. Native clock families are 44.1/48/88.2/96 kHz; other accepted header rates use the 48 kHz family. Stereo, floating-point/compressed audio, exFAT, FAT12 and subdirectory browsing are unsupported.\n\nUp to 256 files or playlist entries are supported. Any `.wav` in the card's root can be browsed, whatever its name. In a playlist, extended build 54 accepts names up to 63 plain-ASCII characters; see [Playlists](#playlists).\n\n## Playback modes\n\nExtended build 54 provides modes 1–12 and the effects described under [Effects](#effects): drive/crush, a resonant filter with wah, a phaser or flanger, and tremolo/ring modulation. Build with `make extended` (normal) or `make extended-profile` (profiling). The retained legacy build-21 targets (`make` and `make profile`) expose modes 1–8.\n\n| Red count | Mode | Behavior |\n| --- | --- | --- |\n| 1 | Trigger | Each PLAY tap or gate trigger plays from the beginning once. |\n| 2 | Gate | Plays while external gate is held, fading on release. PLAY taps toggle manual playback. |\n| 3 | Fade | Retriggers fade out the current sound, then restart with a fade-in. |\n| 4 | Loop | Repeats the selected file; triggers restart it. Browsing stops it. |\n| 5 | Sequence | Advances one file before playing on each trigger. |\n| 6 | Combo | Advances one file on each trigger, then loops it. |\n| 7 | Random Sequence | Chooses a random file per trigger; repeats are allowed. |\n| 8 | Random Loop | Loops a file; subsequent triggers jump to random frame positions within it. |\n| 9 | Flip | PLAY starts/stops; GATE rising edges reverse from the captured playback position. See [Flip](flip.md) for transitions and testing. |\n| 10 | CV Flip | PLAY starts/stops; positive CV selects forward and negative selects reverse at native speed. Near zero, keeps its last direction. GATE is ignored. Calibrate first; see below. |\n| 11 | Tape | Signed CV controls direction and speed; near zero fades to silence and holds position. PLAY starts/stops; GATE ignored. Calibrate as for CV Flip. See [Tape](tape.md). |\n| 12 | Chop | Each gate jumps to the CV-selected position with a short fade, then plays forward at native speed. PLAY starts/stops. See [Chop](chop.md). |\n\nFade/Gate ramps are short 256-sample linear envelopes: about 5.3 ms at 48 kHz before pitch changes. They mainly suppress clicks, rather than providing long musical fades. Buffering adds release/retrigger latency. Random seeking and file changes require SD access and can take longer than cached Trigger playback. Overlapping voices are not implemented.\n\nFlip, CV Flip, Tape and Chop use 512-frame transition fades. These reduce direction-change clicks; they are not overlapping crossfades, and buffering/refill adds response delay.\n\n## CV Flip and Tape calibration\n\nSelect mode 10 (`CV Flip`) or 11 (`Tape`), or put that name on line 2 of `config.txt`. Examples: [cv-flip.txt](../examples/config/cv-flip.txt) and [tape.txt](../examples/config/tape.txt).\n\n1. Centre the pitch knob and patch a steady 0 V from your bipolar CV source.\n2. Hold PLAY for at least half a second without turning either control, then release. Playback stops and the current input becomes the zero reference.\n3. Tap PLAY to start. Positive CV plays forward and negative plays reverse. CV Flip retains the last direction near zero; Tape fades to silence and holds position there.\n\nA reverse start begins at the end of the sample. Calibration survives file selection but resets on power-up, so repeat it each session. Keep the knob at its calibrated position, or move it deliberately to bias the switching threshold. Keep CV steady during calibration: large movement while PLAY is held can enter CV-mode editing instead.\n\nCV Flip always uses native sample speed and overrides Free/Quantize/Select File behaviour. The third config line is still required, but does not change that behaviour. FILE browsing stops playback; GATE is ignored. See [CV Flip](cv-flip.md) for details. [Tape](tape.md) adds signed variable speed and a zero hold. [Chop](chop.md) samples CV position on each gate. These are separate playback modes, not CV-mode options.\n\n## CV modes\n\nThese apply to playback modes 1–9. CV Flip, Tape and Chop override them with their dedicated controls.\n\n| Blue count | Mode | Behavior |\n| --- | --- | --- |\n| 1 | Free | Continuous playback pitch/speed control. |\n| 2 | Quantize | Chromatic semitone steps using mathematically generated tables. |\n| 3 | Select File | Samples pitch/CV at each trigger to select an offset above FILE's base selection; plays at nominal native rate. |\n\nSelect File spans up to 32 offsets, wraps the file list, and takes precedence over automatic Sequence/random selection. CV alone does not retrigger or loop playback in Trigger mode. An LFO at GATE can retrigger on each rising edge.\n\nQuantize provides 49 notes from +7 through −41 semitones. Software input is `value = ADC >> 2`, clamped to 0–255; the note is `7 - floor((value*48 + 127)/255)`. Increasing ADC lowers pitch; the physical voltage/control relationship is not calibrated. Original pitch occupies ADC 140–159, away from the control's centre. Free mode uses a separate continuous mapping.\n\nThe divider for note `n` is `round(native_divider * 2**(-n/12))`, with half values rounded upward. Nominal anchors are 2176, 2000, 1088 and 1000 for 44.1, 48, 88.2 and 96 kHz. The hardware divider is encoded in steps of 1/512. Maximum rounding error relative to those anchors is about 1.09 cents. Oscillator error, approximate anchors and voltage calibration are additional; calibrated 1 V/octave tracking is not claimed. Runtime floating point is unnecessary.\n\n## Panel editing\n\nHold PLAY for at least 400 ms before moving a control to edit modes. Earlier FILE movement remains ordinary browsing and releasing PLAY remains a playback click.\n\nTurn FILE for playback mode. After the last detent, keep PLAY held and pause 350 ms: the complete red count starts from one. Pulses are 200 ms on/off, with at least a one-second gap between groups. Release PLAY to apply. Once FILE has moved during an editing hold, CV/LFO movement cannot change CV mode or take over the display; any provisional CV edit in that hold is discarded.\n\nTo edit CV mode, release and hold PLAY again, then move pitch without turning FILE. Low ADC selects Free, centre selects Quantize, high selects Select File, with intervening dead bands. Blue counts identify the selection. Power cycling or remounting reloads the card configuration.\n\n## config.txt\n\nPlain text in the card root, for example:\n\n```text\n# Hamburger Wavy configuration\nTrigger\nQuantize\nShort\n```\n\nLine 1 starts with `#`; line 2 is a playback mode; line 3 is a CV mode. Optional line 4 is Select File's settling delay: Short=0 ms, Medium=2 ms, Long=10 ms. In the extended build, effect lines follow (see [Effects](#effects)) and `Colour`, `Filter` or `Rate` are also accepted as the CV mode. Other further lines are ignored. `Random` is an alias for Random Sequence; `Looping` aliases Loop and `Quantized` aliases Quantize. Earlier card spellings remain compatibility aliases in the parser.\n\nCase differences, surrounding setting whitespace, CRLF/LF and a UTF-8 BOM are accepted. Missing or malformed settings use Trigger/Quantize/Short. An actual read error invokes card recovery. Config files must fit within 4096 bytes.\n\n## Effects\n\nExtended build 54 only. Effects are set by extra lines in `config.txt`, after the CV mode line and the optional delay line. Each line is a name and a single digit, 0 (off) to 9. There is no panel control for them; change the file and remount. A mistyped effect line is silently ignored, and any line longer than 63 characters invalidates the whole file.\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nBandpass 5\nResonance 6\nWah 6\nRate 4\n```\n\n| Line | What it does | Details |\n| --- | --- | --- |\n| `Drive n` | Gain into a smooth clipper, 1× to about 16× | [Colour](colour.md) |\n| `Crush n` | Fewer bits (16 down to 4) and a sample hold of 1 to 32 frames | [Colour](colour.md) |\n| `Filter n` | Low-pass cutoff, 1 darkest to 9 brightest (`Lowpass n` is the same) | [Filter](filter.md) |\n| `Highpass n` | High-pass cutoff, 1 removes only the lowest bass, 9 leaves a thin top | [Filter](filter.md) |\n| `Bandpass n` | Band-pass centre, low to high | [Filter](filter.md) |\n| `Resonance n` | Emphasis at the cutoff for any of the three filter shapes | [Filter](filter.md) |\n| `Wah n` | A slow sine sweeps the filter cutoff, up to about 2.5 octaves each way | [Filter](filter.md) |\n| `Phaser n` | Swept notches with feedback; intensity | [Phaser](phaser.md) |\n| `Flanger n` | Swept short delay with feedback, the jet sound; intensity. Replaces the phaser if both are present | [Flanger](flanger.md) |\n| `Tremolo n` | Level dips at the `Rate`; depth, 9 reaches silence | [Tremolo and ring modulation](mod.md) |\n| `Ring n` | Multiplies the sound by a sine at the `Rate`; depth. Replaces tremolo if both are present | [Tremolo and ring modulation](mod.md) |\n| `Rate n` | Speed for wah, phaser, flanger, tremolo and ring, each on its own scale | below |\n\nOnly one of `Filter`, `Highpass` and `Bandpass` applies: the last one in the file. The signal passes through drive and crush, then the filter, the phaser or flanger, and tremolo or ring modulation, before the existing fades.\n\n`Rate n` scales (calculated, at the file's native pitch):\n\n| `Rate` | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |\n|---|---|---|---|---|---|---|---|---|---|---|\n| Wah, phaser, flanger (Hz) | 0.125 | 0.2 | 0.31 | 0.5 | 0.79 | 1.3 | 2 | 3.2 | 5 | 8 |\n| Tremolo (Hz) | 1 | 1.4 | 1.9 | 2.7 | 3.5 | 4.8 | 6.7 | 8.8 | 12 | 16 |\n| Ring (Hz) | 16 | 30 | 56 | 107 | 197 | 363 | 682 | 1236 | 2216 | 4096 |\n\n### Effect CV modes\n\nPut one of these on the CV mode line (line 3) to control an effect from the pitch knob/CV. Playback then stays at the file's native pitch, and clockwise or positive CV gives more. They can only be chosen in `config.txt`; picking a CV mode in the held-PLAY menu leaves them until the card is next mounted.\n\n| CV mode | Knob/CV controls |\n| --- | --- |\n| `Colour` | Amount of drive and crush, from clean up to the configured digits (both to 9 if neither line is present) |\n| `Filter` | Cutoff of whichever filter shape is named; with `Wah`, the centre of the sweep |\n| `Rate` | Speed of the wah, phaser, flanger, tremolo or ring modulation. With none of those lines present it gives full-depth tremolo |\n\nIn CV Flip, Tape and Chop the CV input controls the transport, so the effects use their fixed config values.\n\n### Limits\n\nHow many effect stages run depends on the output rate, which rises as a file is pitched up. Drive and crush count as one stage; the filter (with or without wah), the phaser or flanger, and tremolo/ring are one each.\n\n| Output rate | Stages that run |\n| --- | --- |\n| Up to 48 kHz | All four |\n| 48 kHz to about 64 kHz | Three: drive/crush gives way first, then tremolo/ring |\n| About 64 kHz to 96 kHz | One: the filter if on, otherwise the phaser or flanger, otherwise tremolo/ring, otherwise drive/crush |\n| Above 96 kHz | None |\n\nA 44.1 or 48 kHz file at native pitch or below gets everything; an 88.2 or 96 kHz file at native pitch gets one stage. Crossing a limit while playing switches a stage on or off with an audible step, most obvious on steady tones.\n\nFilter cutoff, phaser and flanger positions and all rates are tied to the playback clock, so they move with pitch: pitching a file down an octave lowers the cutoff an octave and halves the rates.\n\nExample files for each effect are in [examples/config](../examples/config).\n\nThe [config editor](config-editor.html) is a single web page that sets all of this up for you. Open it at [misterwavey.github.io/hamburger-wavy](https://misterwavey.github.io/hamburger-wavy/), or save the file and open it in a browser; it works offline and uploads nothing. It asks four questions in plain words (which sounds, how they play, what the knob does, and which effects), says in a sentence what the module will then do, and warns about anything that will not work, such as an effect that a particular sound's sample rate rules out. Opening the card lets it check every WAV against what the firmware accepts and build playlists by ticking sounds. In Chrome and Edge it saves `config.txt` and the playlists straight to the card after showing what will change; in other browsers it reads the card and you download the results. If the module's firmware is out of date it offers to fetch the current build, check it against its published checksum and put it on the card as `image.hex`; that step contacts GitHub, and is the only time the page uses the network.\n\n## Playlists\n\nAn optional root file `playlist.txt` lists one WAV filename per line and replaces directory order. Duplicate entries are allowed and weight random selection. From extended build 54 a name can be the file's full name as the computer shows it, up to 63 plain-ASCII characters including `.wav`, with spaces and punctuation allowed; upper and lower case do not matter. Earlier builds, and legacy build 21, accept at most 13 characters with only letters, digits and `~` before `.wav`; longer-named files are then listed by their short alias, such as `MYLONG~1.wav`. The list ends at the first blank, malformed or missing name, so a typing mistake shortens it; a list with no usable entry does not play. Card read errors abort mounting. For a single-tone test, a playlist may simply contain:\n\n```text\nQ480.wav\n```\n\nGenerate that original test tone with `python3 tools/generate_test_tones.py` and copy it from `build/test-tones/` to the card. Delete `playlist.txt` to restore directory browsing.\n\n### Several playlists\n\nFrom extended build 54 a card can hold several playlist files, with `config.txt` choosing the one in use:\n\n```text\n# Hamburger Wavy configuration\nLoop\nQuantize\nShort\nPlaylist drums\n```\n\n`Playlist drums` (or `Playlist drums.txt`) uses `drums.txt` from the card's root. The name is one to eight letters, digits or `~`. The line goes with the effect lines, after the CV mode and the optional delay line. If the named file is not on the card the firmware uses `playlist.txt`, and if that is absent too, directory order. A named file that exists but has no usable entry does not play. Earlier builds ignore the line and use `playlist.txt`. Switching playlists means editing that one line; the panel cannot change it.\n\n## Persistent files and lights\n\nWAV, config and playlist files remain read-only. Two reserved root files can be created/updated, with audio stopped:\n\n- `ONESTATE.BIN`: 1024 bytes, two alternating CRC-protected records remembering the last manually played file. External gate triggers do not save it. Old `STATUS.BIN` recall is imported read-only.\n- `ONEBUILD.TXT`: 512-byte space-padded plain text identifying the running build. An already-correct record is not rewritten. It identifies the last firmware that successfully wrote the card, not an image merely copied from a computer. Older firmware without this feature can leave the record stale.\n\nFirst creation also updates allocated FAT entries, a root directory entry and applicable FAT32 FSInfo hints. Existing unrelated/read-only same-name files are refused. Build logging is best effort; a failed write does not deliberately block playback. Interrupted metadata creation can leak a cluster; this is not transactional FAT storage.\n\nStartup: one second blue, then no build count. Red indicates playback. Solid blue indicates a playback error, including a missed refill deadline; flashing blue can indicate card recovery or stationary DMA. These signals do not uniquely diagnose the underlying fault. PLAY retries after a playback error reopen/re-prime the selected file.\n\nThe optional diagnostic build adds `ONEPROF.TXT` reporting after playback stops. Normal builds do not create or update it. See [profiling](profiling.md) for collection instructions and the additional reserved write scope.\n"
 },
 "examples": {
 "bandpass-cv.txt": "# Hamburger Wavy: knob/CV sweeps a resonant band-pass\nLoop\nFilter\nBandpass 5\nResonance 6\n",
@@ -767,6 +789,77 @@ const HW = (() => {
     return bad('no audio data found');
   }
 
+  // ---- Plain words for the choices, and a summary of what the module will do ----
+  const WAYS = [
+    { title: 'Play once', text: 'Each press of PLAY, or each trigger, plays the sound from the start, once.', group: 0 },
+    { title: 'Play while held', text: 'Plays for as long as a gate is held, and fades out when it is released.', group: 0 },
+    { title: 'Play once, soft restart', text: 'Like play once, but a new press fades the old sound out before starting again.', group: 1 },
+    { title: 'Loop', text: 'The sound repeats until you stop it.', group: 0 },
+    { title: 'Next sound each time', text: 'Each press plays the next sound in the list.', group: 0 },
+    { title: 'Next sound, looping', text: 'Each press moves to the next sound and loops it.', group: 1 },
+    { title: 'Random sound each time', text: 'Each press plays a sound picked at random.', group: 0 },
+    { title: 'Loop, jumping around', text: 'Loops one sound; each press jumps to a random place in it.', group: 1 },
+    { title: 'Loop, reversing', text: 'Loops one sound; each gate turns it around to play backwards, then forwards again.', group: 1 },
+    { title: 'Loop, direction from CV', text: 'Loops one sound forwards on positive voltage and backwards on negative.', group: 1 },
+    { title: 'Tape', text: 'Voltage sets both direction and speed, like winding a tape by hand; at zero it holds still.', group: 1 },
+    { title: 'Chop', text: 'Each gate jumps to the place in the sound that the knob or CV points at.', group: 1 },
+  ];
+  const KNOBS = [
+    { title: 'Pitch, smoothly', text: 'Turning the knob or sending CV glides the pitch up and down.' },
+    { title: 'Pitch, in semitones', text: 'The pitch moves in musical steps.' },
+    { title: 'Choose the sound', text: 'The knob or CV picks which sound plays at each trigger.' },
+    { title: 'Grit amount', text: 'The knob or CV sets how much drive and crush is applied. Pitch stays fixed.' },
+    { title: 'Filter', text: 'The knob or CV sweeps the tone filter. Pitch stays fixed.' },
+    { title: 'Effect speed', text: 'The knob or CV sets how fast the wah, swirl or pulse moves. Pitch stays fixed.' },
+  ];
+  const TRANSPORT_KNOB = {
+    9: 'In this mode the CV input chooses the direction, so the knob is not used for anything else.',
+    10: 'In this mode the knob and CV set the tape\'s speed and direction.',
+    11: 'In this mode the knob and CV choose where in the sound each gate jumps to.',
+  };
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+  const effectWords = (state, a) => {
+    const names = { filter: state.wah ? 'filter with wah' : 'filter', colour: 'grit',
+                    sweep: state.sweep === 'flanger' ? 'flanger' : 'phaser', mod: state.mod === 'ring' ? 'ring modulation' : 'tremolo' };
+    return a.stages.filter((x) => x.on).map((x) => names[x.key]);
+  };
+  // One short answer per question, for the collapsed steps and the summary.
+  function describe(state, context) {
+    const a = analyse(state, context);
+    const sounds = a.source === 'card'
+      ? (a.count === null ? 'Every sound on the card' : 'Every sound on the card (' + a.count + ')')
+      : plural(a.count, 'sound') + ' from ' + a.source.toLowerCase() + '.txt';
+    const fx = effectWords(state, a);
+    return {
+      sounds, way: WAYS[state.play].title,
+      knob: TRANSPORT_KNOB[state.play] ? 'Used by this way of playing' : KNOBS[state.cv].title,
+      effects: fx.length ? fx.join(', ').replace(/^./, (c) => c.toUpperCase()) : 'None',
+      short: sounds + '. ' + WAYS[state.play].text + ' ' +
+             (TRANSPORT_KNOB[state.play] || KNOBS[state.cv].text) + ' ' +
+             (fx.length ? 'Effects: ' + fx.join(', ') + '.' : 'No effects.'),
+    };
+  }
+  // Effects that will be skipped for particular sounds because of their
+  // sample rate. files: [{ name, rate }] for the sounds in play.
+  function rateWarnings(state, files) {
+    const byRate = {};
+    for (const f of files) if (f.rate) (byRate[f.rate] = byRate[f.rate] || []).push(f.name);
+    const label = { filter: 'the filter', sweep: 'the swirl', mod: 'the pulse', colour: 'the grit' };
+    const list = (items) => items.length > 1 ? items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1] : items.join('');
+    const out = [];
+    for (const rate of Object.keys(byRate).map(Number).sort((x, y) => x - y)) {
+      const a = analyse(Object.assign({}, state, { sampleRate: rate, pitch: 0 }));
+      const dropped = a.stages.filter((x) => x.on && !x.runs).map((x) => label[x.key]);
+      if (!dropped.length) continue;
+      const names = byRate[rate];
+      const kept = a.stages.filter((x) => x.runs).map((x) => label[x.key]);
+      out.push((names.length === 1 ? names[0] + ' is a ' : plural(names.length, 'sound') + ' (' + names.slice(0, 3).join(', ') + (names.length > 3 ? ', …' : '') + ') are ') +
+        (rate / 1000) + ' kHz ' + (names.length === 1 ? 'file' : 'files') + '. At that rate the module has time for ' +
+        (kept.length ? 'only ' + list(kept) : 'no effects') + ', so ' + list(dropped) + ' will be skipped on ' + (names.length === 1 ? 'it' : 'them') + '.');
+    }
+    return out;
+  }
+
   // ---- Firmware images ----
   // Where the page looks for the current firmware. A branch, because release
   // attachments cannot be fetched from a web page.
@@ -1083,7 +1176,8 @@ const HW = (() => {
     const lists = ctx.lists || {};
     const named = state.playlist ? state.playlist.toUpperCase() : '';
     const has = (key) => Array.isArray(lists[key]) && lists[key].length > 0;
-    let source = 'card', count = ctx.cardNames ? ctx.cardNames.filter((n) => /\.wav$/i.test(n)).length : null;
+    let source = 'card', count = ctx.cardCount !== undefined ? ctx.cardCount
+      : ctx.cardNames ? ctx.cardNames.filter((n) => /\.wav$/i.test(n)).length : null;
     if (state.playlist && !validListName(state.playlist))
       warn('"' + state.playlist + '" is not a usable playlist name: one to eight letters, digits or ~.');
     if (named && has(named)) source = named;
@@ -1105,489 +1199,411 @@ const HW = (() => {
     if (ctx.build && ctx.build < BUILD && ctx.imageBuild >= BUILD)
       warn('Build ' + ctx.imageBuild + ' is on the card but not installed yet: the module last ran build ' + ctx.build + '. Power up holding PLAY to install it.');
     else if (ctx.build && ctx.build < BUILD)
-      warn('The module last ran firmware build ' + ctx.build + '. This page writes for build ' + BUILD + ': update the firmware (see Firmware on the Playback tab).');
+      warn('The module last ran firmware build ' + ctx.build + '. This page writes for build ' + BUILD + ': update the firmware.');
     return { settings: s, stages, notes, outputRate, budget, fixedPitch, source, count,
              live: { colour: live(3), filter: live(4), rate: live(5) } };
   }
 
   return { PLAY, CV, DELAY, SHAPES, defaults, amount, clampDigit, cleanComment, settings, effectLines,
            generate, parse, stateFrom, analyse, slowHz, tremoloHz, ringHz, cutoffHz, hz, usesRate,
-           validListName, entryProblem, BUILD, buildOf, mdRender, mdInline, sha256, hexCheck, firmwareInfo, firmwareState, imageName, cardFirmware, KNOWN_IMAGES, FIRMWARE_BASE, RELEASES_URL, playlistParse, playlistGenerate, playlistCheck, wavInspect, MAX_FILES, RESERVED };
+           validListName, entryProblem, BUILD, buildOf, mdRender, mdInline, sha256, hexCheck, firmwareInfo, firmwareState, imageName, cardFirmware, KNOWN_IMAGES,
+           WAYS, KNOBS, TRANSPORT_KNOB, describe, rateWarnings, FIRMWARE_BASE, RELEASES_URL, playlistParse, playlistGenerate, playlistCheck, wavInspect, MAX_FILES, RESERVED };
 })();
 /*LOGIC-END*/
 </script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  let state = HW.defaults();
-  // lists: NAME (upper case, no extension) -> array of entry names. PLAYLIST is playlist.txt.
-  let lists = { PLAYLIST: [] };
-  let editing = 'PLAYLIST';
-  // What each playlist held when the card was opened (or when it was created
-  // here), and what the card holds now. A list differs from the card when it
-  // is "dirty"; Revert goes back to the opened state.
-  let opened = { PLAYLIST: [] }, onCard = { PLAYLIST: [] };
-  let openedConfig = null;          // editor state loaded from the card's config.txt
-  let baseline = HW.generate(state); // the config text as last read from or written to the card
-  const learned = {};               // checksums named by a firmware check
-  const same = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
-  const dirty = { has: (key) => !same(lists[key], onCard[key]), clear: () => {}, delete: () => {}, add: () => {} };
-  let card = null;                  // { handle|null, files: [{name, wav}], names: [..] }
-
-  const context = () => ({ lists, cardNames: card ? card.names : null, build: card ? card.build : null,
-                           imageBuild: card ? HW.imageName(card.imageSha, learned).build : null });
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const option = (value, text) => { const o = el('option', '', text); o.value = value; return o; };
   const fileOf = (key) => key.toLowerCase() + '.txt';
+  const same = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+  const clone = (x) => JSON.parse(JSON.stringify(x));
 
-  const seg = (id, options) => {
+  let state = HW.defaults();
+  let lists = { PLAYLIST: [] };   // NAME -> sound names; PLAYLIST is playlist.txt
+  let onCard = { PLAYLIST: [] };  // what the card holds now
+  let source = 'card';            // 'card' (every sound) or the key of the playlist that plays
+  let card = null;                // { handle, files, names, build, imageSha }
+  let started = false;            // a card is open, or the user chose to work without one
+  let baseline = HW.generate(state);
+  let snapshot = null;            // { state, lists, source } as last loaded or saved
+  let configProblem = '';
+  let firmware = null, fwProblem = '';
+  const learned = {};
+
+  const context = () => ({ lists: playing(), cardNames: card ? card.names : null, build: null, imageBuild: null,
+    cardCount: card ? card.files.filter((f) => /\.wav$/i.test(f.name) && !(f.wav && f.wav.ok === false)).length : null });
+  // The lists as the module will see them: only the one chosen matters to the summary.
+  const playing = () => {
+    const out = {};
+    for (const k of Object.keys(lists)) out[k] = lists[k];
+    if (source === 'card') out.PLAYLIST = [];
+    return out;
+  };
+  const unsaved = () => HW.generate(state) !== baseline ||
+    Object.keys(Object.assign({}, lists, onCard)).some((k) => !same(playing()[k], onCard[k]));
+  const remember = () => { snapshot = { state: clone(state), lists: clone(lists), source }; };
+
+  // ---------- building the fixed parts ----------
+  const seg = (id, options, onPick) => {
     const box = $(id);
-    box.innerHTML = '';
     for (const [value, text] of options) {
-      const label = document.createElement('label');
-      const input = document.createElement('input');
-      input.type = 'radio'; input.name = id; input.value = value;
-      const span = document.createElement('span'); span.textContent = text;
-      label.append(input, span); box.append(label);
-      input.addEventListener('change', () => {
-        state[id] = typeof HW.defaults()[id] === 'number' ? Number(value) : value;
-        render();
-      });
+      const label = el('label');
+      const input = el('input'); input.type = 'radio'; input.name = id; input.value = value;
+      label.append(input, el('span', '', text)); box.append(label);
+      input.addEventListener('change', () => { onPick(value); render(); });
     }
   };
-  const fill = (id, options) => {
-    const sel = $(id);
-    options.forEach(([text, hint], i) => {
-      const o = document.createElement('option');
-      o.value = i; o.textContent = text + ' — ' + hint; sel.append(o);
-    });
-    sel.addEventListener('change', () => { state[id] = Number(sel.value); render(); });
+  const choice = (box, name, value, title, text, onPick) => {
+    const label = el('label', 'choice');
+    const input = el('input'); input.type = 'radio'; input.name = name; input.value = value;
+    const words = el('span'); words.append(el('b', '', title), el('span', '', text));
+    label.append(input, words); box.append(label);
+    input.addEventListener('change', () => { onPick(Number(value)); render(); });
   };
-  fill('play', HW.PLAY); fill('cv', HW.CV);
-  seg('delay', HW.DELAY.map((d, i) => [i, d[0]]));
-  seg('shape', HW.SHAPES.map((x) => [x[0], x[2]]));
-  seg('sweep', [['none', 'None'], ['phaser', 'Phaser'], ['flanger', 'Flanger']]);
-  seg('mod', [['none', 'None'], ['tremolo', 'Tremolo'], ['ring', 'Ring mod']]);
-  seg('sampleRate', [[44100, '44.1k'], [48000, '48k'], [88200, '88.2k'], [96000, '96k']]);
-  for (const id of ['drive', 'crush', 'cutoff', 'resonance', 'wah', 'sweepAmt', 'modAmt', 'rate', 'pitch'])
+  HW.WAYS.forEach((w, i) => choice($(w.group ? 'waysMore' : 'ways'), 'way', i, w.title, w.text, (v) => { state.play = v; }));
+  HW.KNOBS.forEach((k, i) => choice($('knobs'), 'knob', i, k.title, k.text, (v) => { state.cv = v; }));
+  seg('delay', HW.DELAY.map((d, i) => [i, d[0]]), (v) => { state.delay = Number(v); });
+  seg('shape', [['low', 'Darker'], ['high', 'Thinner'], ['band', 'Narrow band']], (v) => { state.shape = v; });
+  seg('sweep', [['phaser', 'Phaser'], ['flanger', 'Flanger']], (v) => { state.sweep = v; });
+  seg('mod', [['tremolo', 'Tremolo'], ['ring', 'Ring mod']], (v) => { state.mod = v; });
+  for (const id of ['drive', 'crush', 'cutoff', 'resonance', 'wah', 'sweepAmt', 'modAmt', 'rate'])
     $(id).addEventListener('input', () => { state[id] = Number($(id).value); render(); });
   $('comment').addEventListener('input', () => { state.comment = $('comment').value; render(); });
-  $('playlist').addEventListener('change', () => { state.playlist = $('playlist').value; render(); });
-  $('forFile').addEventListener('change', () => {
-    const f = card && card.files.find((x) => x.name === $('forFile').value);
-    if (f && f.wav && f.wav.ok) { state.sampleRate = f.wav.rate; render(); }
+
+  // Effect switches.
+  $('on-filter').addEventListener('change', () => {
+    if ($('on-filter').checked) state.cutoff = state.cutoff || 5; else { state.cutoff = 0; state.wah = 0; state.resonance = 0; }
+    render();
+  });
+  $('on-sweep').addEventListener('change', () => { state.sweep = $('on-sweep').checked ? 'phaser' : 'none'; render(); });
+  $('on-mod').addEventListener('change', () => { state.mod = $('on-mod').checked ? 'tremolo' : 'none'; render(); });
+  $('on-colour').addEventListener('change', () => {
+    if ($('on-colour').checked) state.drive = state.drive || 4; else { state.drive = 0; state.crush = 0; }
+    render();
   });
 
-  const tabs = ['setup', 'effects', 'lists', 'guide'];
-  const showTab = (name) => {
-    for (const t of tabs) {
-      const on = t === name;
-      $('t-' + t).setAttribute('aria-selected', on); $('t-' + t).tabIndex = on ? 0 : -1;
-      $('p-' + t).hidden = !on;
+  // The four questions open one at a time.
+  const steps = ['sounds', 'way', 'knob', 'fx'];
+  const openStep = (name) => {
+    for (const s of steps) {
+      const on = s === name;
+      $('s-' + s).classList.toggle('open', on);
+      $('b-' + s).hidden = !on;
+      const head = $('s-' + s).querySelector('.step-head');
+      head.setAttribute('aria-expanded', on);
+      head.querySelector('.go').textContent = on ? 'Done' : 'Change';
     }
-    $('editor').hidden = name === 'guide'; // the guide gets the full width
   };
-  tabs.forEach((t, i) => {
-    $('t-' + t).addEventListener('click', () => showTab(t));
-    $('t-' + t).addEventListener('keydown', (e) => {
-      const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-      if (!step) return;
-      const next = tabs[(i + step + tabs.length) % tabs.length];
-      showTab(next); $('t-' + next).focus();
-    });
-  });
-  let configProblem = '';
+  for (const s of steps)
+    $('s-' + s).querySelector('.step-head').addEventListener('click', () => openStep($('s-' + s).classList.contains('open') ? '' : s));
 
-  // ---- The built-in guide ----
-  const bundle = (() => { try { return JSON.parse($('docs').textContent); } catch (e) { return {}; } })();
-  const guides = bundle.docs || {}, examples = bundle.examples || {};
-  const names = { docs: Object.keys(guides), examples: Object.keys(examples) };
-  const order = ['user-guide', 'flip', 'cv-flip', 'tape', 'chop', 'colour', 'filter', 'phaser', 'flanger', 'mod', 'profiling', 'provenance'];
-  const pages = order.filter((k) => guides[k]).concat(names.docs.filter((k) => !order.includes(k)));
-  function showGuide(key, anchor) {
-    if (!guides[key]) key = pages[0];
-    if (!key) { $('guideBody').textContent = 'The guide is not included in this copy of the page.'; return; }
-    $('guidePick').value = key;
-    $('guideBody').innerHTML = HW.mdRender(guides[key], names).html; // escaped by the renderer
-    const target = anchor && $('guideBody').querySelector('[id="' + CSS.escape(anchor) + '"]');
-    if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
-  }
-  for (const key of pages) {
-    const o = document.createElement('option');
-    o.value = key; o.textContent = HW.mdRender(guides[key], names).title || key; $('guidePick').append(o);
-  }
-  $('guidePick').addEventListener('change', () => showGuide($('guidePick').value));
-  $('guideBody').addEventListener('click', (e) => {
-    const a = e.target.closest('a');
-    if (!a || a.getAttribute('href') !== '#') return;
-    e.preventDefault();
-    if (a.dataset.example) { loadConfig(examples[a.dataset.example]); showTab('setup'); render(); window.scrollTo(0, 0); }
-    else if (a.dataset.tab) { showTab(a.dataset.tab); window.scrollTo(0, 0); }
-    else showGuide(a.dataset.doc || $('guidePick').value, a.dataset.anchor);
-  });
-  $('footGuide').addEventListener('click', (e) => { e.preventDefault(); showTab('guide'); showGuide($('guidePick').value || 'user-guide'); });
-  $('t-guide').addEventListener('click', () => { if (!$('guideBody').firstChild) showGuide('user-guide'); });
-  const setOutput = (id, text) => { document.querySelector('output[for="' + id + '"]').textContent = text; };
-  const dim = (id, off) => { $(id).closest('.row').hidden = off; };
-  const option = (value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; return o; };
+  // ---------- drawing ----------
   const button = (text, title, act) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'mini'; b.textContent = text; b.title = title; b.setAttribute('aria-label', title);
+    const b = el('button', 'mini', text); b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
     b.addEventListener('click', act); return b;
   };
+  const out = (id, text) => { $(id).closest('.row').querySelector('output').textContent = text; };
   const named = () => Object.keys(lists).filter((k) => k !== 'PLAYLIST').sort();
-  const touch = () => render();
+  const playableWavs = () => card ? card.files.filter((f) => /\.wav$/i.test(f.name)) : [];
+  // The sounds the module will play, with their sample rates where known.
+  const soundsInPlay = () => {
+    if (!card) return [];
+    const rateOf = (name) => { const f = card.files.find((x) => x.name.toUpperCase() === name.toUpperCase()); return f && f.wav && f.wav.ok ? f.wav.rate : 0; };
+    if (source === 'card') return playableWavs().filter((f) => f.wav && f.wav.ok).map((f) => ({ name: f.name, rate: f.wav.rate }));
+    return HW.playlistParse(HW.playlistGenerate(lists[source] || []), card.names).used.map((name) => ({ name, rate: rateOf(name) }));
+  };
 
-  function renderLists() {
-    // Config's playlist choice.
-    const pick = $('playlist');
+  function renderSounds() {
+    const pick = $('source');
     pick.innerHTML = '';
-    pick.append(option('', lists.PLAYLIST.length ? 'playlist.txt' : 'playlist.txt, or the card’s own order'));
-    const wanted = state.playlist.toUpperCase();
-    for (const key of named()) pick.append(option(key.toLowerCase(), fileOf(key)));
-    if (state.playlist && !named().includes(wanted)) pick.append(option(state.playlist, state.playlist + '.txt (not listed here)'));
-    pick.value = state.playlist;
+    const count = playableWavs().filter((f) => !(f.wav && f.wav.ok === false)).length;
+    pick.append(option('card', 'Every sound on the card' + (card ? ' (' + count + ')' : '')));
+    for (const key of ['PLAYLIST', ...named()]) {
+      if (key === 'PLAYLIST' && !lists.PLAYLIST.length && source !== 'PLAYLIST' && !same(onCard.PLAYLIST, [])) continue;
+      pick.append(option(key, (key === 'PLAYLIST' ? 'My own list (playlist.txt)' : 'My list “' + key.toLowerCase() + '”') +
+        (lists[key].length ? ' — ' + lists[key].length + (lists[key].length === 1 ? ' sound' : ' sounds') : '')));
+    }
+    if (!lists[source] && source !== 'card') source = 'card';
+    pick.value = source;
+    const removing = source === 'card' && onCard.PLAYLIST.length;
+    $('sourceNote').textContent = source === 'card'
+      ? 'Sounds play in the order they sit on the card.' + (removing ? ' The playlist.txt on the card will be removed when you save, because it would otherwise take over.' : '')
+      : 'Only the ticked sounds play, from the top down.';
+    $('listEdit').hidden = source === 'card';
+    if (source === 'card') return;
 
-    // Which list is being edited.
-    const edit = $('listPick');
-    edit.innerHTML = '';
-    for (const key of ['PLAYLIST', ...named()])
-      edit.append(option(key, fileOf(key) + (key === (wanted || 'PLAYLIST') ? ' — in use' : '') + (dirty.has(key) ? ' *' : '')));
-    if (!lists[editing]) editing = 'PLAYLIST';
-    edit.value = editing;
-    $('removeList').disabled = editing === 'PLAYLIST';
-    $('revertList').disabled = same(lists[editing], opened[editing]);
-
-    const entries = lists[editing];
+    // One list: the ticked sounds in playing order, then the rest of the card.
+    const entries = lists[source];
     const checked = HW.playlistCheck(entries, card ? card.names : null);
-    const box = $('entries');
+    const wavs = playableWavs();
+    const fileFor = (name) => card && card.files.find((f) => f.name.toUpperCase() === name.toUpperCase());
+    const infoOf = (f) => f && f.wav && f.wav.ok ? (f.wav.rate / 1000) + ' kHz' : '';
+    const box = $('checks');
     box.innerHTML = '';
+    const row = (cls, ticked, pos, name, info, why, onTick, acts, disabled) => {
+      const li = el('li', cls);
+      const label = el('label');
+      const tick = el('input'); tick.type = 'checkbox'; tick.checked = ticked; tick.disabled = !!disabled;
+      tick.addEventListener('change', onTick);
+      const text = el('span', 'fname', name);
+      if (why) text.append(el('span', 'why', why));
+      label.append(tick, el('span', 'pos', pos), text, el('span', 'info', info));
+      li.append(label);
+      if (acts) li.append(acts);
+      box.append(li);
+    };
     checked.forEach((entry, i) => {
-      const li = document.createElement('li');
-      li.className = entry.status;
-      const name = document.createElement('span'); name.className = 'name'; name.textContent = entry.name || '(blank)';
-      if (entry.status === 'stops') {
-        const why = document.createElement('span'); why.className = 'why';
-        why.textContent = 'The list ends here: ' + entry.problem + '.';
-        name.append(why);
-      }
-      const onCard = card && card.files.find((f) => f.name.toUpperCase() === entry.name.toUpperCase());
-      if (entry.status === 'ok' && onCard && onCard.wav && onCard.wav.ok === false) {
-        const why = document.createElement('span'); why.className = 'why';
-        why.textContent = 'On the card, but the firmware cannot play it: ' + onCard.wav.reason + '.';
-        name.append(why);
-      }
-      const acts = document.createElement('span'); acts.className = 'acts';
-      const move = (to) => () => { const [x] = entries.splice(i, 1); entries.splice(to, 0, x); touch(editing); };
-      const up = button('↑', 'Move ' + entry.name + ' up', move(i - 1)); up.disabled = i === 0;
-      const down = button('↓', 'Move ' + entry.name + ' down', move(i + 1)); down.disabled = i === entries.length - 1;
-      acts.append(up, down,
-        button('+', 'Duplicate ' + entry.name, () => { entries.splice(i + 1, 0, entry.name); touch(editing); }),
-        button('×', 'Remove ' + entry.name, () => { entries.splice(i, 1); touch(editing); }));
-      li.append(name, acts); box.append(li);
+      const f = fileFor(entry.name);
+      const why = entry.status === 'stops' ? 'The list ends here: ' + entry.problem + '.'
+        : entry.status === 'ok' && f && f.wav && f.wav.ok === false ? 'The module cannot play this file: ' + f.wav.reason + '.' : '';
+      const acts = el('span', 'acts');
+      const move = (to) => () => { const [x] = entries.splice(i, 1); entries.splice(to, 0, x); render(); };
+      const up = button('\u2191', 'Move ' + entry.name + ' earlier', move(i - 1)); up.disabled = i === 0;
+      const down = button('\u2193', 'Move ' + entry.name + ' later', move(i + 1)); down.disabled = i === entries.length - 1;
+      acts.append(up, down, button('+', 'Play ' + entry.name + ' again later in the list', () => { entries.splice(i + 1, 0, entry.name); render(); }));
+      row(entry.status, true, String(i + 1), entry.name || '(blank)', infoOf(f), why, () => { entries.splice(i, 1); render(); }, acts);
     });
-    const usable = checked.filter((e) => e.status === 'ok').length;
-    $('listHint').textContent = !entries.length
-      ? (editing === 'PLAYLIST' ? 'Empty: no playlist.txt is written, and the firmware plays the card’s files in their own order.'
-                                 : 'Empty: this file is not written.')
-      : usable + ' of ' + entries.length + (entries.length === 1 ? ' entry' : ' entries') + ' will be used' +
-        (card ? '.' : '. Open the card to check the names against its files.') + ' Repeating a file makes random modes pick it more often.';
-
-    // With a card open: one tick box per WAV on it.
-    const wavs = card ? card.files.filter((f) => /\.wav$/i.test(f.name)) : [];
-    $('checkBox').hidden = !wavs.length;
+    const rest = wavs.filter((f) => !entries.some((n) => n.toUpperCase() === f.name.toUpperCase()));
+    if (entries.length && rest.length) box.append(el('li', 'divider', 'Not in the list'));
+    for (const f of rest) {
+      const reason = HW.entryProblem(f.name) ? 'the name cannot be used in a list'
+                   : f.wav && f.wav.ok === false ? 'cannot be played: ' + f.wav.reason : '';
+      row(reason ? 'no' : '', false, '', f.name, reason || infoOf(f), '', () => { if (entries.length < HW.MAX_FILES) entries.push(f.name); render(); }, null, reason);
+    }
+    box.hidden = !box.children.length;
+    $('tickTools').hidden = !wavs.length;
     $('manualAdd').hidden = !!wavs.length;
-    $('orderLabel').hidden = !entries.length;
-    const box2 = $('checks');
-    box2.innerHTML = '';
-    for (const f of wavs) {
-      const reason = HW.entryProblem(f.name) ? 'name cannot go in a playlist: ' + HW.entryProblem(f.name)
-                   : f.wav && f.wav.ok === false ? 'will not play: ' + f.wav.reason : '';
-      const li = document.createElement('li');
-      const label = document.createElement('label');
-      const tick = document.createElement('input');
-      tick.type = 'checkbox';
-      const times = entries.filter((n) => n.toUpperCase() === f.name.toUpperCase()).length;
-      tick.checked = times > 0;
-      tick.disabled = !!reason && !times;
-      if (reason) li.className = 'no';
-      tick.addEventListener('change', () => {
-        if (tick.checked) {
-          if (entries.length >= HW.MAX_FILES) { tick.checked = false; return; }
-          entries.push(f.name);
-        } else {
-          for (let k = entries.length - 1; k >= 0; k--)
-            if (entries[k].toUpperCase() === f.name.toUpperCase()) entries.splice(k, 1);
-        }
-        touch(editing);
-      });
-      const name = document.createElement('span'); name.className = 'fname'; name.textContent = f.name;
-      const info = document.createElement('span'); info.className = 'info';
-      info.textContent = reason || ((f.wav && f.wav.ok ? (f.wav.rate / 1000) + ' kHz · ' + f.wav.bits + '-bit' : '') + (times > 1 ? ' · ×' + times : ''));
-      label.append(tick, name, info); li.append(label); box2.append(li);
+    $('listHint').textContent = !entries.length ? (wavs.length ? 'Nothing ticked yet.' : 'Add the names of the sounds to play.')
+      : 'Arrows change the order. + plays a sound again, so random playing picks it more often.';
+  }
+
+  function renderFirmware() {
+    const st = HW.firmwareState(card ? card.build : null, card ? card.imageSha : null, firmware, !!(card && card.handle), !!card, learned);
+    $('fwCard').textContent = st.message;
+    $('fwInstall').hidden = !st.canInstall;
+    if (firmware) $('fwInstall').textContent = 'Put ' + (firmware.build ? 'build ' + firmware.build : firmware.label) + ' on the card';
+    $('fwStatus').className = fwProblem ? 'status bad' : 'status';
+    $('fwStatus').textContent = fwProblem || (firmware ? firmware.note : '');
+
+    // The banner: shown only when the firmware needs the user's attention.
+    const banner = $('fwBanner');
+    banner.hidden = true;
+    if (!card) return;
+    const image = HW.imageName(card.imageSha, learned);
+    const writable = !!card.handle;
+    const go = $('fwBannerGo');
+    go.hidden = false; go.disabled = false;
+    if (image.build && card.build !== image.build && !(card.build && card.build > image.build)) {
+      banner.hidden = false; go.hidden = true;
+      $('fwBannerText').textContent = 'Build ' + image.build + ' is on the card but your module has not installed it yet. ' +
+        'To install it: switch the module off, put the card in, and hold PLAY while you switch it back on. Wait for the fast flashing to finish.';
+    } else if (!(image.build >= HW.BUILD) && (!card.build || card.build < HW.BUILD)) {
+      banner.hidden = false;
+      $('fwBannerText').textContent = (card.build ? 'Your module is running build ' + card.build + '.' : 'This card has not been used with Hamburger Wavy yet.') +
+        ' The settings here need build ' + HW.BUILD + '.';
+      go.textContent = writable ? 'Put build ' + HW.BUILD + ' on the card' : 'Get build ' + HW.BUILD;
     }
   }
 
-  function renderCard() {
-    const writable = !!(card && card.handle);
-    $('saveCard').hidden = !writable;
-    // Writing to the card is the main action once it is open for writing.
-    $('download').classList.toggle('primary', !writable);
-    const fw0 = renderFirmware();
-    // The card control: OPEN, or the build of the card's image.hex, and a
-    // mark while anything here differs from what the card holds.
+  function render() {
+    const a = HW.analyse(state, context());
+    const d = HW.describe(state, context());
+    const transport = !!HW.TRANSPORT_KNOB[state.play];
+    const dirty = !!card && unsaved();
+
+    $('start').hidden = started; $('steps').hidden = !started;
+
+    // Card control.
     const sd = $('openCard');
-    const unsaved = !!card && (HW.generate(state) !== baseline || Object.keys(lists).some((k) => dirty.has(k) && (lists[k].length || (onCard[k] || []).length)));
-    sd.classList.toggle('loaded', !!card); sd.classList.toggle('unsaved', unsaved);
-    $('cardDot').hidden = !unsaved;
+    sd.classList.toggle('loaded', !!card); sd.classList.toggle('unsaved', dirty);
+    $('cardDot').hidden = !dirty;
     if (!card) {
       $('cardBig').textContent = 'Open'; $('cardSmall').textContent = 'card';
       sd.title = 'Open the sample card'; sd.setAttribute('aria-label', 'Open the sample card');
     } else {
       const image = HW.imageName(card.imageSha, learned);
-      $('cardBig').textContent = image.text;
-      $('cardSmall').textContent = unsaved ? 'unsaved' : 'firmware';
-      const said = image.detail + (unsaved ? ' There are changes not yet written to the card.' : '') + ' Click to read the card again.';
+      $('cardBig').textContent = image.text; $('cardSmall').textContent = dirty ? 'unsaved' : 'firmware';
+      const said = image.detail + (dirty ? ' There are changes not yet saved to the card.' : '') + ' Click to read the card again.';
       sd.title = said; sd.setAttribute('aria-label', said);
     }
-    $('cardFiles').hidden = !card; $('noCardHint').hidden = !!card;
-    const fw = fw0;
-    $('fileCount').textContent = card ? '(' + card.files.filter((f) => /\.wav$/i.test(f.name)).length + ')' : '';
-    $('download').textContent = card && card.handle ? 'Download' : 'Download config.txt';
-    if (!card) return;
-    const table = $('fileTable');
-    table.innerHTML = '';
-    const wavs = card.files.filter((f) => /\.wav$/i.test(f.name));
-    for (const f of wavs) {
-      const tr = document.createElement('tr');
-      const nameProblem = HW.entryProblem(f.name);
-      const a = document.createElement('td'); a.textContent = f.name;
-      const b = document.createElement('td');
-      if (f.wav && f.wav.ok) {
-        b.textContent = (f.wav.rate / 1000) + ' kHz · ' + f.wav.bits + '-bit · ' +
-          (f.wav.seconds >= 60 ? Math.floor(f.wav.seconds / 60) + 'm ' + Math.round(f.wav.seconds % 60) + 's' : f.wav.seconds.toFixed(1) + ' s');
-      } else if (f.wav && f.wav.ok === false) { tr.className = 'bad'; b.textContent = 'will not play: ' + f.wav.reason; }
-      else b.textContent = f.wav ? f.wav.reason : '';
-      if (nameProblem && !(f.wav && f.wav.ok === false)) b.append((b.textContent ? ' · ' : '') + 'cannot go in a playlist: ' + nameProblem);
-      tr.append(a, b); table.append(tr);
-    }
-    // "What will run" can follow one of the card's files.
-    const rated = wavs.filter((f) => f.wav && f.wav.ok && [44100, 48000, 88200, 96000].includes(f.wav.rate));
-    $('forFileRow').hidden = !rated.length;
-    const pickFile = $('forFile');
-    const chosen = pickFile.value;
-    pickFile.innerHTML = '';
-    pickFile.append(option('', 'choose a file to use its rate'));
-    for (const f of rated) pickFile.append(option(f.name, f.name + ' \u2014 ' + (f.wav.rate / 1000) + ' kHz'));
-    const still = rated.find((f) => f.name === chosen);
-    pickFile.value = still && still.wav.rate === state.sampleRate ? chosen : '';
-    const bad = wavs.filter((f) => f.wav && f.wav.ok === false).length;
-    $('cardStatus').className = 'status';
-    $('cardStatus').className = 'status';
-    $('cardStatus').textContent = card.handle ? '' : 'This browser can only read the card: download the results and copy them over.';
-  }
+    // The trace follows the card: none, steady, or changes waiting.
+    const mood = !card ? 'off' : dirty ? 'pending' : '';
+    $('trace').setAttribute('class', 'trace ' + mood);
+    $('cardStatus').textContent = card && !card.handle ? 'This browser can read the card but not save to it. Use Chrome or Edge to save directly, or download the files and copy them over.' : '';
 
-  function render() {
-    const a = HW.analyse(state, context());
-    for (const id of ['play', 'cv']) $(id).value = state[id];
-    for (const id of ['delay', 'shape', 'sweep', 'mod', 'sampleRate'])
-      for (const input of document.querySelectorAll('input[name="' + id + '"]'))
-        input.checked = String(input.value) === String(state[id]);
-    for (const id of ['drive', 'crush', 'cutoff', 'resonance', 'wah', 'sweepAmt', 'modAmt', 'rate', 'pitch'])
-      $(id).value = state[id];
-    if (document.activeElement !== $('comment')) $('comment').value = state.comment;
+    // Answers on the closed steps.
+    $('a-sounds').textContent = d.sounds; $('a-way').textContent = d.way; $('a-knob').textContent = d.knob; $('a-fx').textContent = d.effects;
 
-    setOutput('drive', state.drive ? String(state.drive) : 'off');
-    setOutput('crush', state.crush ? String(state.crush) : 'off');
-    setOutput('cutoff', a.live.filter ? 'on the knob' : state.cutoff ? state.cutoff + ' · ' + HW.hz(HW.cutoffHz(state.cutoff, a.outputRate)) : 'off');
-    setOutput('resonance', state.resonance ? String(state.resonance) : 'none');
-    setOutput('wah', state.wah ? state.wah + ' · ±' + (2.5 * state.wah / 9).toFixed(1) + ' oct' : 'off');
-    setOutput('sweepAmt', state.sweep === 'none' ? '—' : String(state.sweepAmt));
-    setOutput('modAmt', state.mod === 'none' ? '—' : String(state.modAmt));
-    setOutput('rate', a.live.rate ? 'on the knob' : String(state.rate));
-    setOutput('pitch', a.fixedPitch ? 'fixed' : (state.pitch > 0 ? '+' : '') + state.pitch + ' st');
-    dim('sweepAmt', state.sweep === 'none'); $('sweepAmt').disabled = state.sweep === 'none';
-    dim('modAmt', state.mod === 'none'); $('modAmt').disabled = state.mod === 'none';
-    dim('pitch', a.fixedPitch); $('pitch').disabled = a.fixedPitch;
-    $('rateSection').hidden = !HW.usesRate(state);
-    $('delayRow').hidden = !(state.cv === 2 && ![9, 10, 11].includes(state.play));
+    // 2: how they play.
+    for (const input of document.querySelectorAll('input[name="way"]')) input.checked = Number(input.value) === state.play;
+    if (HW.WAYS[state.play].group) $('waysMoreBox').open = true;
 
-    const d = state.rate;
-    $('rateHint').textContent = a.live.rate
-      ? 'The knob/CV sweeps the speed across each effect’s whole range.'
-      : 'Wah, phaser, flanger ' + HW.hz(HW.slowHz(d)) + ' · tremolo ' + HW.hz(HW.tremoloHz(d)) + ' · ring ' + HW.hz(HW.ringHz(d));
+    // 3: the knob.
+    $('knobIntro').textContent = transport ? HW.TRANSPORT_KNOB[state.play] : 'The pitch knob and the CV input do the same job. Choose what that is.';
+    for (const input of document.querySelectorAll('input[name="knob"]')) { input.checked = !transport && Number(input.value) === state.cv; input.disabled = transport; }
+    $('delayRow').hidden = !(state.cv === 2 && !transport);
+    for (const input of document.querySelectorAll('input[name="delay"]')) input.checked = Number(input.value) === state.delay;
+    $('knobNote').textContent = transport ? '' : state.cv === 2 ? 'If the sound chosen seems one step behind your voltage, give it longer to settle.'
+      : state.cv >= 3 ? 'This choice is made here only; changing the knob’s job from the module’s front panel replaces it until the card is next loaded.' : '';
 
-    $('out').textContent = HW.generate(state);
-
-    $('stages').innerHTML = '';
-    for (const stage of a.stages) {
-      const tr = document.createElement('tr');
-      tr.className = !stage.on ? 'idle' : stage.runs ? 'runs' : 'skips';
-      const left = document.createElement('td');
-      left.textContent = !stage.on ? 'off' : stage.runs ? 'runs' : 'skipped';
-      const right = document.createElement('td');
-      right.textContent = stage.text;
-      tr.append(left, right); $('stages').append(tr);
-    }
-    $('rateLine').textContent = 'Output rate ' + HW.hz(a.outputRate) + ': ' +
-      (a.budget === 4 ? 'all four stages may run.' : a.budget === 3 ? 'up to three stages run.' :
-       a.budget === 1 ? 'one stage runs.' : 'no stage runs.') +
-      ' Order of priority: filter, phaser/flanger, tremolo/ring, drive/crush.';
-
-    const warns = a.notes.filter((n) => n.warn).map((n) => n.text);
-    const infos = a.notes.filter((n) => !n.warn).map((n) => n.text);
-    if (configProblem) warns.unshift(configProblem);
-    const fillNotes = (id, items, warn) => {
-      $(id).innerHTML = '';
-      for (const text of items) {
-        const li = document.createElement('li');
-        if (warn) li.className = 'warn';
-        li.textContent = text; $(id).append(li);
-      }
+    // 4: effects.
+    const filterOn = state.cutoff > 0 || state.wah > 0 || a.live.filter;
+    const gritOn = state.drive > 0 || state.crush > 0 || state.cv === 3;
+    const show = (id, on, forced) => {
+      const box = $('fx-' + id);
+      box.classList.toggle('on', on);
+      box.querySelector('.fx-controls').hidden = !on;
+      $('on-' + id).checked = on; $('on-' + id).disabled = !!forced;
     };
-    const playing = (a.count === null ? 'Plays ' : 'Plays ' + a.count + (a.count === 1 ? ' file from ' : ' files from ')) +
-      (a.source === 'card' ? 'the card’s own order' : fileOf(a.source)) + '.';
-    $('sideTitle').textContent = warns.length ? (warns.length === 1 ? '1 thing to check' : warns.length + ' things to check') : 'Ready';
-    fillNotes('notes', warns.length ? warns : [HW.PLAY[state.play][0] + ' mode. ' + playing], warns.length > 0);
-    fillNotes('infoNotes', warns.length ? [HW.PLAY[state.play][0] + ' mode. ' + playing, ...infos] : infos, false);
-    const more = $('infoNotes').children.length;
-    $('moreNotes').hidden = !more;
-    $('moreCount').textContent = more === 1 ? '1 note' : more + ' notes';
-    const active = a.stages.filter((x) => x.on).length;
-    $('effectCount').textContent = active ? '(' + active + ')' : '';
-    $('listCount').textContent = a.count === null ? '' : '(' + a.count + ')';
-    $('revertConfig').hidden = !openedConfig;
-    if (openedConfig) $('revertConfig').disabled = HW.generate(state) === HW.generate(openedConfig);
-    renderLists();
-    renderCard();
+    show('filter', filterOn, a.live.filter);
+    show('sweep', state.sweep !== 'none');
+    show('mod', state.mod !== 'none');
+    show('colour', gritOn, state.cv === 3 && !transport);
+    for (const id of ['shape', 'sweep', 'mod'])
+      for (const input of document.querySelectorAll('input[name="' + id + '"]')) input.checked = input.value === state[id];
+    for (const id of ['drive', 'crush', 'resonance', 'wah', 'sweepAmt', 'modAmt', 'rate']) $(id).value = state[id];
+    $('cutoff').value = state.cutoff || 5;
+    $('cutoff').closest('.row').hidden = a.live.filter;
+    const words = (v, low, mid, high) => v <= 3 ? low : v <= 6 ? mid : high;
+    const shapeWords = { low: ['very dark', 'dark', 'slightly dark'], high: ['a little thin', 'thin', 'very thin'], band: ['low band', 'middle band', 'high band'] }[state.shape];
+    out('cutoff', state.cutoff ? words(state.cutoff, ...shapeWords) + ' · ' + HW.hz(HW.cutoffHz(state.cutoff, a.outputRate)) : '');
+    out('resonance', state.resonance ? words(state.resonance, 'a little', 'some', 'strong') : 'none');
+    out('wah', state.wah ? words(state.wah, 'gentle', 'medium', 'wide') : 'off');
+    out('sweepAmt', words(state.sweepAmt, 'subtle', 'medium', 'strong'));
+    out('modAmt', words(state.modAmt, 'shallow', 'medium', 'deep'));
+    out('drive', state.drive ? words(state.drive, 'warm', 'crunchy', 'heavy') : 'off');
+    out('crush', state.crush ? words(state.crush, 'slight', 'lo-fi', 'broken') : 'off');
+    const moving = HW.usesRate(state);
+    $('fx-rate').hidden = !moving;
+    out('rate', a.live.rate ? 'on the knob' : '');
+    const speeds = [];
+    if (state.wah || state.sweep !== 'none') speeds.push((state.wah && state.sweep !== 'none' ? 'wah and swirl' : state.wah ? 'wah' : 'swirl') + ' once every ' + (1 / HW.slowHz(state.rate) >= 1 ? (1 / HW.slowHz(state.rate)).toFixed(1) + ' s' : Math.round(1000 / HW.slowHz(state.rate)) + ' ms'));
+    if (state.mod === 'tremolo') speeds.push('tremolo ' + HW.hz(HW.tremoloHz(state.rate)));
+    if (state.mod === 'ring') speeds.push('ring mod ' + HW.hz(HW.ringHz(state.rate)));
+    $('rateHint').textContent = a.live.rate ? 'The knob sets the speed, so there is nothing to set here.'
+      : speeds.length ? 'One speed control is shared: ' + speeds.join(', ') + '.' : '';
+
+    // The bottom line.
+    $('short').textContent = d.short;
+    const warns = [];
+    if (configProblem) warns.push(configProblem);
+    for (const n of a.notes) if (n.warn) warns.push(n.text);
+    for (const w of HW.rateWarnings(state, soundsInPlay())) warns.push(w);
+    if (card && !card.handle)
+      for (const k of Object.keys(onCard)) if (onCard[k].length && !(playing()[k] || []).length) warns.push('Delete ' + fileOf(k) + ' from the card yourself: this browser cannot remove it.');
+    $('warnings').innerHTML = '';
+    for (const text of warns) $('warnings').append(el('li', '', text));
+    const writable = !!(card && card.handle);
+    $('saveCard').hidden = !writable; $('saveCard').disabled = writable && !dirty;
+    $('saveCard').textContent = writable && !dirty ? 'Saved on the card' : 'Save to card';
+    $('download').hidden = writable;
+    $('undo').hidden = !(snapshot && (card ? dirty : HW.generate(state) !== HW.generate(snapshot.state)));
+
+    // Details.
+    $('out').textContent = HW.generate(state);
+    if (document.activeElement !== $('comment')) $('comment').value = state.comment;
+    $('infoNotes').innerHTML = '';
+    for (const n of a.notes) if (!n.warn) $('infoNotes').append(el('li', '', n.text));
+    $('cardFiles').hidden = !card; $('noCardHint').hidden = !!card;
+    if (card) {
+      const table = $('fileTable');
+      table.innerHTML = '';
+      for (const f of playableWavs()) {
+        const tr = el('tr', f.wav && f.wav.ok === false ? 'bad' : '');
+        const info = f.wav && f.wav.ok ? (f.wav.rate / 1000) + ' kHz · ' + f.wav.bits + '-bit · ' +
+            (f.wav.seconds >= 60 ? Math.floor(f.wav.seconds / 60) + 'm ' + Math.round(f.wav.seconds % 60) + 's' : f.wav.seconds.toFixed(1) + ' s')
+          : f.wav && f.wav.ok === false ? 'cannot be played: ' + f.wav.reason : f.wav ? f.wav.reason : '';
+        tr.append(el('td', '', f.name), el('td', '', info)); table.append(tr);
+      }
+    }
+    renderSounds();
+    renderFirmware();
   }
 
-  const download = (name, text) => {
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-  $('download').addEventListener('click', () => download('config.txt', HW.generate(state)));
-  $('copy').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(HW.generate(state)); $('copied').textContent = 'Copied.'; }
-    catch (e) { $('copied').textContent = 'Copy failed; select the text above instead.'; }
-    setTimeout(() => { $('copied').textContent = ''; }, 2500);
-  });
-  $('reset').addEventListener('click', () => {
-    const keep = { sampleRate: state.sampleRate, pitch: state.pitch };
-    state = Object.assign(HW.defaults(), keep); render();
-  });
-
-  // ---- Playlists ----
-  $('listPick').addEventListener('change', () => { editing = $('listPick').value; render(); });
-  $('listDownload').addEventListener('click', () => {
-    if (!lists[editing].length) { $('listStatus').textContent = 'This list is empty, so there is nothing to download.'; return; }
-    download(fileOf(editing), HW.playlistGenerate(lists[editing]));
-  });
+  // ---------- sounds ----------
+  $('source').addEventListener('change', () => { source = $('source').value; state.playlist = source === 'card' || source === 'PLAYLIST' ? '' : source.toLowerCase(); render(); });
   const addEntry = (name) => {
     name = name.trim();
     const problem = HW.entryProblem(name);
-    if (problem) { $('listStatus').className = 'status bad'; $('listStatus').textContent = '"' + name + '" cannot be added: ' + problem + '.'; return; }
-    if (lists[editing].length >= HW.MAX_FILES) { $('listStatus').className = 'status bad'; $('listStatus').textContent = 'A playlist holds at most 256 entries.'; return; }
-    $('listStatus').className = 'status'; $('listStatus').textContent = '';
-    lists[editing].push(name); touch(editing);
+    $('listStatus').className = problem ? 'status bad' : 'status';
+    $('listStatus').textContent = problem ? '“' + name + '” cannot be added: ' + problem + '.' : '';
+    if (problem || lists[source].length >= HW.MAX_FILES) return;
+    lists[source].push(name); render();
   };
   $('addEntry').addEventListener('click', () => { addEntry($('addName').value); $('addName').value = ''; });
-  $('addName').addEventListener('keydown', (e) => { if (e.key === 'Enter') addEntry($('addName').value); });
+  $('addName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { addEntry($('addName').value); $('addName').value = ''; } });
   $('checkAll').addEventListener('click', () => {
-    const entries = lists[editing];
-    for (const f of card.files) {
-      if (!/\.wav$/i.test(f.name) || HW.entryProblem(f.name) || (f.wav && f.wav.ok === false)) continue;
+    const entries = lists[source];
+    for (const f of playableWavs()) {
+      if (HW.entryProblem(f.name) || (f.wav && f.wav.ok === false)) continue;
       if (entries.length < HW.MAX_FILES && !entries.some((n) => n.toUpperCase() === f.name.toUpperCase())) entries.push(f.name);
     }
-    touch(editing);
-  });
-  $('checkNone').addEventListener('click', () => { lists[editing].length = 0; touch(editing); });
-  $('revertList').addEventListener('click', () => {
-    lists[editing] = (opened[editing] || []).slice();
-    $('listStatus').className = 'status';
-    $('listStatus').textContent = fileOf(editing) + ' is back to how it was when ' + (card ? 'the card was opened' : 'it was created') +
-      (dirty.has(editing) ? '. The card still holds the newer version until you write this one.' : '.');
     render();
   });
-  $('revertConfig').addEventListener('click', () => {
-    if (!openedConfig) return;
-    state = Object.assign(JSON.parse(JSON.stringify(openedConfig)), { sampleRate: state.sampleRate, pitch: state.pitch });
-    render();
-  });
+  $('checkNone').addEventListener('click', () => { lists[source].length = 0; render(); });
   $('createList').addEventListener('click', () => {
-    const name = $('newList').value.trim();
-    const status = $('listStatus');
-    if (!HW.validListName(name)) {
-      status.className = 'status bad';
-      status.textContent = HW.RESERVED.includes(name.toUpperCase()) ? 'That name is reserved.' : 'Use one to eight letters, digits or ~.';
-      return;
-    }
+    const name = $('newList').value.trim(), status = $('listStatus');
+    status.className = 'status bad';
+    if (!HW.validListName(name)) { status.textContent = HW.RESERVED.includes(name.toUpperCase()) ? 'That name is already used for something else.' : 'Use one to eight letters or digits, with no spaces.'; return; }
     const key = name.toUpperCase();
-    if (lists[key]) { status.className = 'status bad'; status.textContent = 'There is already a playlist with that name.'; return; }
+    if (lists[key]) { status.textContent = 'You already have a list with that name.'; return; }
     status.className = 'status'; status.textContent = '';
-    lists[key] = []; opened[key] = opened[key] || []; editing = key; $('newList').value = ''; render();
-  });
-  $('removeList').addEventListener('click', () => {
-    if (editing === 'PLAYLIST') return;
-    const key = editing;
-    delete lists[key]; dirty.delete(key);
-    if (state.playlist.toUpperCase() === key) state.playlist = '';
-    $('listStatus').className = 'status';
-    $('listStatus').textContent = fileOf(key) + ' is removed from this page. A copy already on the card is left there.';
-    editing = 'PLAYLIST'; render();
+    lists[key] = []; source = key; state.playlist = key.toLowerCase(); $('newList').value = ''; render();
   });
 
-  // ---- Loading a config ----
-  function loadConfig(text, quiet) {
+  // ---------- loading ----------
+  function loadConfig(text, fromCard) {
     const status = $('loadStatus');
     const result = HW.parse(text);
     if (!result.ok) {
       status.className = 'status bad';
-      status.textContent = 'The firmware would reject this file and use Trigger / Quantize. ' + result.error;
-      if (quiet) configProblem = 'The config.txt on the card would be rejected by the firmware. ' + result.error + ' Writing a new one fixes it.';
+      status.textContent = 'The module would reject this file and fall back to its defaults. ' + result.error;
+      if (fromCard) configProblem = 'The settings file on the card has a mistake, so the module is ignoring it. ' + result.error + ' Saving from here replaces it with a good one.';
       return false;
     }
     const first = text.replace(/^﻿/, '').split('\n')[0].replace(/\r/g, '').replace(/^#\s?/, '');
+    state = HW.stateFrom(result.settings, first);
     configProblem = '';
-    const keep = { sampleRate: state.sampleRate, pitch: state.pitch };
-    state = Object.assign(HW.stateFrom(result.settings, first), keep);
     status.className = 'status';
-    status.textContent = (quiet ? 'config.txt loaded from the card.' : 'Loaded.') + (result.notes.length ? ' ' + result.notes.join(' ') : '');
+    status.textContent = fromCard ? '' : 'Loaded.' + (result.notes.length ? ' ' + result.notes.join(' ') : '');
     return true;
   }
-  $('load').addEventListener('click', () => { loadConfig($('paste').value); render(); });
+  const settle = () => { // after settings are loaded: which playlist is in play
+    const key = state.playlist.toUpperCase();
+    source = key && lists[key] ? key : lists.PLAYLIST.length ? 'PLAYLIST' : 'card';
+  };
+  $('load').addEventListener('click', () => { if (loadConfig($('paste').value)) { started = true; settle(); } render(); });
   $('file').addEventListener('change', async () => {
     const file = $('file').files[0];
     if (!file) return;
     const text = await file.text();
-    $('paste').value = text; loadConfig(text); render();
+    $('paste').value = text;
+    if (loadConfig(text)) { started = true; settle(); }
+    render();
   });
 
-  // ---- The card ----
   const looksLikeList = (text) => {
     const lines = text.split('\n').map((l) => l.replace(/\r/g, '').trim()).filter(Boolean);
     return lines.length > 0 && lines.every((l) => /\.wav$/i.test(l));
   };
-  // files: [{name, file: File}] from the card's root.
-  async function readCard(files, handle) {
-    const visible = files.filter((f) => !f.name.startsWith('.'));
+  async function readCard(files, handle, label) {
     const out = [];
-    lists = { PLAYLIST: [] }; editing = 'PLAYLIST'; openedConfig = null; configProblem = '';
-    let loadedConfig = false, build = null, imageSha = null;
-    for (const f of visible.sort((a, b) => a.name.localeCompare(b.name))) {
+    lists = { PLAYLIST: [] }; configProblem = '';
+    let loaded = false, build = null, imageSha = null;
+    for (const f of files.filter((x) => !x.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name))) {
       const entry = { name: f.name, wav: null };
       if (/\.wav$/i.test(f.name)) {
-        try {
-          const bytes = new Uint8Array(await f.file.slice(0, 65536).arrayBuffer());
-          entry.wav = HW.wavInspect(bytes, f.file.size);
-        } catch (e) { entry.wav = { ok: null, reason: 'could not be read' }; }
+        try { entry.wav = HW.wavInspect(new Uint8Array(await f.file.slice(0, 65536).arrayBuffer()), f.file.size); }
+        catch (e) { entry.wav = { ok: null, reason: 'could not be read' }; }
       } else if (f.name.toUpperCase() === 'IMAGE.HEX' && f.file.size <= 2000000) {
         try { imageSha = HW.sha256(new Uint8Array(await f.file.arrayBuffer())); } catch (e) { imageSha = null; }
       } else if (/\.txt$/i.test(f.name) && f.file.size <= 16384) {
         const base = f.name.slice(0, -4).toUpperCase();
         const text = await f.file.text();
         if (base === 'ONEBUILD') build = HW.buildOf(text);
-        else if (base === 'CONFIG') { loadedConfig = loadConfig(text, true); $('paste').value = text; }
+        else if (base === 'CONFIG') { loaded = loadConfig(text, true); $('paste').value = text; }
         else if (base === 'PLAYLIST' || (HW.validListName(base) && looksLikeList(text))) {
           const raw = text.split('\n');
           if (raw[raw.length - 1] === '') raw.pop();
@@ -1596,93 +1612,153 @@ const HW = (() => {
       }
       out.push(entry);
     }
-    card = { handle: handle || null, files: out, names: out.map((f) => f.name), build, imageSha };
-    opened = JSON.parse(JSON.stringify(lists)); onCard = JSON.parse(JSON.stringify(lists));
-    if (loadedConfig) openedConfig = JSON.parse(JSON.stringify(state));
-    baseline = HW.generate(state);
-    if (!loadedConfig && !$('loadStatus').classList.contains('bad')) $('loadStatus').textContent = 'No config.txt on the card yet.';
-    if (Object.keys(lists).some((k) => lists[k].length) && !loadedConfig) showTab('lists');
+    if (!loaded && !configProblem) state = HW.defaults();
+    card = { handle: handle || null, label, files: out, names: out.map((f) => f.name), build, imageSha };
+    onCard = clone(lists);
+    settle();
+    baseline = loaded ? HW.generate(state) : '';
+    started = true;
+    remember();
     render();
   }
-  if (window.showDirectoryPicker) {
-    const listCard = async (handle) => {
-      const files = [];
-      for await (const [name, item] of handle.entries())
-        if (item.kind === 'file') files.push({ name, file: await item.getFile() });
-      return files;
-    };
-    // First click opens the card; after that the button re-reads the same card,
-    // and only asks again if that card is no longer there.
-    $('openCard').addEventListener('click', async () => {
-      let handle = card && card.handle, files = null;
-      if (handle) { try { files = await listCard(handle); } catch (e) { handle = null; } }
-      if (!handle) {
-        try { handle = await window.showDirectoryPicker({ mode: 'readwrite' }); }
-        catch (e) { return; } // cancelled
-        try { files = await listCard(handle); }
-        catch (e) {
-          $('cardStatus').className = 'status bad'; $('cardStatus').textContent = 'The card could not be read: ' + e.message;
-          return;
+  const listCard = async (handle) => {
+    const files = [];
+    for await (const [name, item] of handle.entries()) if (item.kind === 'file') files.push({ name, file: await item.getFile() });
+    return files;
+  };
+  const openCard = async () => {
+    if (!window.showDirectoryPicker) { $('pickFolder').click(); return; }
+    let handle = card && card.handle, files = null;
+    if (handle) { try { files = await listCard(handle); } catch (e) { handle = null; } }
+    if (!handle) {
+      try { handle = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (e) { return; }
+      try { files = await listCard(handle); }
+      catch (e) { $('cardStatus').className = 'status bad'; $('cardStatus').textContent = 'The card could not be read: ' + e.message; return; }
+    }
+    await readCard(files, handle, handle.name);
+  };
+  $('openCard').addEventListener('click', openCard);
+  $('startOpen').addEventListener('click', openCard);
+  $('startWithout').addEventListener('click', () => { started = true; remember(); render(); openStep('sounds'); });
+  $('pickFolder').addEventListener('change', async () => {
+    const files = [];
+    for (const file of $('pickFolder').files) {
+      const parts = (file.webkitRelativePath || file.name).split('/');
+      if (parts.length <= 2) files.push({ name: file.name, file });
+    }
+    const first = $('pickFolder').files[0];
+    await readCard(files, null, first && first.webkitRelativePath ? first.webkitRelativePath.split('/')[0] : 'Card');
+  });
+
+  // ---------- saving ----------
+  const download = (name, text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    const a = el('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const downloadAll = () => {
+    download('config.txt', HW.generate(state));
+    if (source !== 'card' && lists[source].length) setTimeout(() => download(fileOf(source), HW.playlistGenerate(lists[source])), 400);
+  };
+  $('download').addEventListener('click', downloadAll);
+  $('download2').addEventListener('click', downloadAll);
+  $('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(HW.generate(state)); $('copied').textContent = 'Copied.'; }
+    catch (e) { $('copied').textContent = 'Copy failed; select the text instead.'; }
+    setTimeout(() => { $('copied').textContent = ''; }, 2500);
+  });
+  $('reset').addEventListener('click', () => { state = HW.defaults(); source = lists.PLAYLIST.length ? 'PLAYLIST' : 'card'; render(); });
+  $('undo').addEventListener('click', () => {
+    if (!snapshot) return;
+    state = clone(snapshot.state); lists = clone(snapshot.lists); source = snapshot.source; render();
+  });
+  const pending = () => {
+    const items = [];
+    if (HW.generate(state) !== baseline) items.push({ name: 'config.txt', text: HW.generate(state) });
+    const now = playing();
+    for (const key of Object.keys(Object.assign({}, now, onCard)).sort()) {
+      const want = now[key] || [], have = onCard[key] || [];
+      if (same(want, have)) continue;
+      if (want.length) items.push({ name: fileOf(key), key, text: HW.playlistGenerate(want) });
+      else items.push({ name: fileOf(key), key, remove: true });
+    }
+    return items;
+  };
+  $('saveCard').addEventListener('click', () => {
+    const body = $('confirmBody');
+    body.innerHTML = '';
+    for (const item of pending()) {
+      if (item.remove) body.append(el('h3', 'del', item.name + ' — will be removed'));
+      else body.append(el('h3', '', item.name), el('pre', '', item.text));
+    }
+    $('confirm').showModal();
+  });
+  $('confirmCancel').addEventListener('click', () => $('confirm').close());
+  $('confirmSave').addEventListener('click', async () => {
+    const items = pending();
+    $('confirm').close();
+    const status = $('saved');
+    try {
+      for (const item of items) {
+        if (item.remove) {
+          await card.handle.removeEntry(item.name);
+          card.names = card.names.filter((n) => n.toUpperCase() !== item.name.toUpperCase());
+          card.files = card.files.filter((f) => f.name.toUpperCase() !== item.name.toUpperCase());
+          onCard[item.key] = [];
+        } else {
+          const handle = await card.handle.getFileHandle(item.name, { create: true });
+          const writer = await handle.createWritable();
+          await writer.write(item.text); await writer.close();
+          if (!card.names.some((n) => n.toUpperCase() === item.name.toUpperCase())) { card.names.push(item.name); card.files.push({ name: item.name, wav: null }); }
+          if (item.key) onCard[item.key] = playing()[item.key].slice(); else baseline = item.text;
         }
       }
-      await readCard(files, handle);
-    });
-  } else {
-    $('openCard').addEventListener('click', () => $('pickFolder').click());
-    $('pickFolder').addEventListener('change', async () => {
-      const files = [];
-      for (const file of $('pickFolder').files) {
-        const parts = (file.webkitRelativePath || file.name).split('/');
-        if (parts.length <= 2) files.push({ name: file.name, file });
-      }
-      await readCard(files, null);
-      const first = $('pickFolder').files[0];
-      if (card && first && first.webkitRelativePath) { card.label = first.webkitRelativePath.split('/')[0]; render(); }
-    });
-  }
+      for (const k of Object.keys(lists)) if (!(playing()[k] || []).length && k !== 'PLAYLIST' && k !== source) delete lists[k];
+      if (source === 'card') lists.PLAYLIST = [];
+      remember();
+      status.className = 'status';
+      status.textContent = 'Saved. Eject the card before you take it out.';
+    } catch (e) {
+      status.className = 'status bad';
+      status.textContent = 'Saving failed: ' + e.message + '. Nothing more was written.';
+    }
+    render();
+  });
 
-  // ---- Firmware ----
+  // ---------- firmware ----------
   $('fwListing').href = $('fwListing').textContent = HW.FIRMWARE_BASE + 'latest.json';
-  $('fwReleases').href = HW.RELEASES_URL;
-  let firmware = null; // the offered image: { bytes, sha256, build|null, label, note }
-  let fwProblem = '';
-  function renderFirmware() {
-    const st = HW.firmwareState(card ? card.build : null, card ? card.imageSha : null, firmware,
-                                !!(card && card.handle), !!card, learned);
-    $('fwCard').textContent = st.message;
-    $('fwInstall').hidden = !st.canInstall;
-    if (firmware) $('fwInstall').textContent = 'Put ' + (firmware.build ? 'build ' + firmware.build : firmware.label) + ' on the card';
-    $('fwStatus').className = fwProblem ? 'status bad' : 'status';
-    $('fwStatus').textContent = fwProblem || (firmware ? firmware.note : '');
-    // The title speaks about the image on the card, as the card control does.
-    const image = card ? HW.imageName(card.imageSha, learned) : null;
-    $('fwSummary').textContent = !card ? 'Firmware'
-      : st.state === 'available' && firmware.build ? 'Firmware: build ' + firmware.build + ' available'
-      : image.build ? 'Firmware: build ' + image.build + (st.state === 'pending' ? ', not installed yet' : '')
-      : st.state === 'pending' ? 'Firmware: ' + firmware.label + ' ready to install'
-      : 'Firmware';
-    return st;
-  }
+  $('fwReleases').href = $('footReleases').href = HW.RELEASES_URL;
+  const fetchLatest = async () => {
+    const reply = await fetch(HW.FIRMWARE_BASE + 'latest.json', { cache: 'no-store' });
+    if (!reply.ok) throw new Error('no firmware listing was found (' + reply.status + ')');
+    const info = HW.firmwareInfo(await reply.json());
+    if (!info) throw new Error('the firmware listing could not be understood');
+    const image = await fetch(HW.FIRMWARE_BASE + info.file, { cache: 'no-store' });
+    if (!image.ok) throw new Error('the firmware file could not be downloaded (' + image.status + ')');
+    const bytes = new Uint8Array(await image.arrayBuffer());
+    if (HW.sha256(bytes) !== info.sha256) throw new Error('the downloaded file does not match its published checksum');
+    const check = HW.hexCheck(bytes);
+    if (!check.ok) throw new Error('the downloaded file is not a valid image: ' + check.reason);
+    learned[info.sha256] = { build: info.build, kind: '' };
+    firmware = { bytes, sha256: info.sha256, build: info.build, label: 'build ' + info.build,
+                 note: 'Latest release: build ' + info.build + (info.date ? ', ' + info.date : '') + '. Checksum verified.' };
+  };
+  const installFirmware = async () => {
+    if (!firmware || !card || !card.handle) return false;
+    if (!window.confirm('Put ' + firmware.label + ' on the card as image.hex, replacing any image.hex already there?\n\n' +
+        'The module installs it the next time it is switched on with PLAY held. Do not interrupt that update.')) return false;
+    const handle = await card.handle.getFileHandle('image.hex', { create: true });
+    const writer = await handle.createWritable();
+    await writer.write(firmware.bytes); await writer.close();
+    card.imageSha = HW.sha256(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
+    if (card.imageSha !== firmware.sha256) throw new Error('the file read back from the card does not match');
+    if (!card.names.some((n) => n.toUpperCase() === 'IMAGE.HEX')) { card.names.push('image.hex'); card.files.push({ name: 'image.hex', wav: null }); }
+    return true;
+  };
   $('fwCheck').addEventListener('click', async () => {
     fwProblem = ''; $('fwStatus').className = 'status'; $('fwStatus').textContent = 'Checking…';
-    try {
-      const reply = await fetch(HW.FIRMWARE_BASE + 'latest.json', { cache: 'no-store' });
-      if (!reply.ok) throw new Error('no firmware listing was found (' + reply.status + ')');
-      const info = HW.firmwareInfo(await reply.json());
-      if (!info) throw new Error('the firmware listing could not be understood');
-      const image = await fetch(HW.FIRMWARE_BASE + info.file, { cache: 'no-store' });
-      if (!image.ok) throw new Error('the firmware file could not be downloaded (' + image.status + ')');
-      const bytes = new Uint8Array(await image.arrayBuffer());
-      if (HW.sha256(bytes) !== info.sha256) throw new Error('the downloaded file does not match its published checksum');
-      const check = HW.hexCheck(bytes);
-      if (!check.ok) throw new Error('the downloaded file is not a valid image: ' + check.reason);
-      learned[info.sha256] = { build: info.build, kind: '' };
-      firmware = { bytes, sha256: info.sha256, build: info.build, label: 'build ' + info.build,
-                   note: 'Latest release: build ' + info.build + (info.date ? ', ' + info.date : '') + '. Checksum verified.' };
-    } catch (e) {
-      firmware = null;
-      fwProblem = 'Could not get the firmware: ' + e.message + '. You can download it from ' + HW.RELEASES_URL + ' and choose the file below.';
-    }
+    try { await fetchLatest(); }
+    catch (e) { firmware = null; fwProblem = 'Could not get the firmware: ' + e.message + '. You can download it from the releases page and choose the file below.'; }
     render();
   });
   $('fwFile').addEventListener('change', async () => {
@@ -1694,79 +1770,54 @@ const HW = (() => {
     if (!check.ok) { firmware = null; fwProblem = file.name + ' was not accepted: ' + check.reason + '.'; }
     else {
       const sum = HW.sha256(bytes);
-      firmware = { bytes, sha256: sum, build: null, label: file.name,
-                   note: file.name + ' is a valid image (' + check.bytes + ' bytes of data, SHA-256 ' + sum.slice(0, 16) + '…).' };
+      firmware = { bytes, sha256: sum, build: null, label: file.name, note: file.name + ' is a valid image (SHA-256 ' + sum.slice(0, 16) + '…).' };
     }
     render();
   });
   $('fwInstall').addEventListener('click', async () => {
-    if (!firmware || !card || !card.handle) return;
-    if (!window.confirm('Write ' + firmware.label + ' to the card as image.hex, replacing any image.hex already there?\n\n' +
-        'The module installs it the next time it is powered up with PLAY held. Do not interrupt that update.')) return;
     fwProblem = '';
-    try {
-      const handle = await card.handle.getFileHandle('image.hex', { create: true });
-      const writer = await handle.createWritable();
-      await writer.write(firmware.bytes); await writer.close();
-      const back = HW.sha256(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
-      card.imageSha = back;
-      if (back !== firmware.sha256) throw new Error('the file read back from the card does not match');
-      if (!card.names.some((n) => n.toUpperCase() === 'IMAGE.HEX')) { card.names.push('image.hex'); card.files.push({ name: 'image.hex', wav: null }); }
-    } catch (e) {
-      fwProblem = 'Writing the firmware failed: ' + e.message + '. Do not use this card to update until it has been written successfully.';
-    }
+    try { await installFirmware(); }
+    catch (e) { fwProblem = 'Writing the firmware failed: ' + e.message + '. Do not use this card to update until it has been written successfully.'; }
+    render();
+  });
+  $('fwBannerGo').addEventListener('click', async () => {
+    if (!(card && card.handle)) { window.open(HW.RELEASES_URL, '_blank', 'noopener'); return; }
+    const status = $('fwBannerStatus');
+    status.className = 'status'; status.textContent = 'Getting it from GitHub…';
+    $('fwBannerGo').disabled = true;
+    try { await fetchLatest(); await installFirmware(); status.textContent = ''; }
+    catch (e) { status.className = 'status bad'; status.textContent = 'That did not work: ' + e.message + '.'; }
     render();
   });
 
-  // ---- Saving to the card ----
-  const pending = () => {
-    const out = [{ name: 'config.txt', text: HW.generate(state) }];
-    for (const key of Object.keys(lists).sort())
-      if (lists[key].length && (dirty.has(key) || !card.names.some((n) => n.toUpperCase() === key + '.TXT')))
-        out.push({ name: fileOf(key), key, text: HW.playlistGenerate(lists[key]) });
-    return out;
-  };
-  const askSave = () => {
-    const body = $('confirmBody');
-    body.innerHTML = '';
-    for (const item of pending()) {
-      const h = document.createElement('h3'); h.textContent = item.name;
-      const pre = document.createElement('pre'); pre.textContent = item.text;
-      body.append(h, pre);
-    }
-    const stale = Object.keys(lists).filter((k) => !lists[k].length && card.names.some((n) => n.toUpperCase() === k + '.TXT'));
-    if (stale.length) {
-      const p = document.createElement('p'); p.className = 'hint';
-      p.textContent = 'Not changed: ' + stale.map(fileOf).join(', ') + ' is empty here but exists on the card. Delete it on the computer if you no longer want it.';
-      body.append(p);
-    }
-    $('confirm').showModal();
-  };
-  $('saveCard').addEventListener('click', askSave);
-  $('confirmCancel').addEventListener('click', () => $('confirm').close());
-  $('confirmSave').addEventListener('click', async () => {
-    const items = pending();
-    $('confirm').close();
-    const status = $('copied');
-    try {
-      for (const item of items) {
-        const handle = await card.handle.getFileHandle(item.name, { create: true });
-        const writer = await handle.createWritable();
-        await writer.write(item.text); await writer.close();
-        if (!card.names.some((n) => n.toUpperCase() === item.name.toUpperCase())) {
-          card.names.push(item.name); card.files.push({ name: item.name, wav: null });
-        }
-      }
-      for (const item of items) if (item.key) onCard[item.key] = lists[item.key].slice();
-      baseline = HW.generate(state);
-      status.className = 'status';
-      status.textContent = 'Saved ' + items.map((i) => i.name).join(', ') + '. Eject the card before removing it.';
-    } catch (e) {
-      status.className = 'status bad';
-      status.textContent = 'Saving failed: ' + e.message + '. Nothing further was written; use Download instead.';
-    }
-    render();
+  // ---------- the guide ----------
+  const bundle = (() => { try { return JSON.parse($('docs').textContent); } catch (e) { return {}; } })();
+  const guides = bundle.docs || {}, examples = bundle.examples || {};
+  const names = { docs: Object.keys(guides), examples: Object.keys(examples) };
+  const order = ['user-guide', 'flip', 'cv-flip', 'tape', 'chop', 'colour', 'filter', 'phaser', 'flanger', 'mod', 'profiling', 'provenance'];
+  const pages = order.filter((k) => guides[k]).concat(names.docs.filter((k) => !order.includes(k)));
+  const showEditor = () => { $('guide').hidden = true; $('editor').hidden = false; window.scrollTo(0, 0); };
+  function showGuide(key, anchor) {
+    $('editor').hidden = true; $('guide').hidden = false;
+    if (!guides[key]) key = pages[0];
+    if (!key) { $('guideBody').textContent = 'The guide is not included in this copy of the page.'; return; }
+    $('guidePick').value = key;
+    $('guideBody').innerHTML = HW.mdRender(guides[key], names).html; // escaped by the renderer
+    const target = anchor && $('guideBody').querySelector('[id="' + CSS.escape(anchor) + '"]');
+    if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
+  }
+  for (const key of pages) $('guidePick').append(option(key, HW.mdRender(guides[key], names).title || key));
+  $('guidePick').addEventListener('change', () => showGuide($('guidePick').value));
+  $('guideBody').addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a || a.getAttribute('href') !== '#') return;
+    e.preventDefault();
+    if (a.dataset.example) { if (loadConfig(examples[a.dataset.example])) { started = true; settle(); } render(); showEditor(); }
+    else if (a.dataset.tab) showEditor();
+    else showGuide(a.dataset.doc || $('guidePick').value, a.dataset.anchor);
   });
+  $('footGuide').addEventListener('click', (e) => { e.preventDefault(); showGuide('user-guide'); });
+  $('guideBack').addEventListener('click', showEditor);
 
   render();
 })();

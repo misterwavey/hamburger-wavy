@@ -258,4 +258,21 @@ for (const args of [[53, img54, null, true, true], [53, img54, offer54, true, tr
 if (HW.imageName(img54).text !== '54' || HW.imageName('e'.repeat(64)).text !== '?' || HW.imageName(null).build !== null) fail('imageName');
 if (!/not installed yet/.test(noteText(base, { lists: {}, cardNames: card, build: 53, imageBuild: 54 }))) fail('pending install note');
 if (/update the firmware/.test(noteText(base, { lists: {}, cardNames: card, build: 53, imageBuild: 54 }))) fail('pending install must not say update');
+// 10. Plain-language summary.
+if (HW.WAYS.length !== HW.PLAY.length || HW.KNOBS.length !== HW.CV.length) fail('WAYS/KNOBS must cover every mode');
+const d0 = HW.describe(base, { lists: {}, cardNames: card });
+if (d0.sounds !== 'Every sound on the card (5)' || d0.way !== 'Loop' || d0.knob !== 'Pitch, in semitones' || d0.effects !== 'None') fail('describe defaults ' + JSON.stringify(d0));
+const d1 = HW.describe(Object.assign({}, base, { play: 4, cv: 5, playlist: 'drums', shape: 'band', cutoff: 5, wah: 6, sweep: 'flanger', mod: 'ring', drive: 3 }),
+  { lists: { DRUMS: ['A.wav', 'C.wav'] }, cardNames: card });
+if (d1.sounds !== '2 sounds from drums.txt' || d1.way !== 'Next sound each time' || d1.knob !== 'Effect speed' ||
+    d1.effects !== 'Filter with wah, flanger, ring modulation, grit') fail('describe ' + JSON.stringify(d1));
+if (HW.describe(Object.assign({}, base, { play: 10 }), { lists: {}, cardNames: null }).knob !== 'Used by this way of playing') fail('describe tape knob');
+for (let i = 0; i < 300; i++) { const d = HW.describe(randomState(), { lists: {}, cardNames: card }); if (!d.short || /undefined|null/.test(d.short)) fail('describe short: ' + d.short); }
+const fxState = Object.assign({}, base, { cutoff: 5, sweep: 'phaser', mod: 'tremolo', drive: 4 });
+const rw = HW.rateWarnings(fxState, [{ name: 'A.wav', rate: 48000 }, { name: 'B.wav', rate: 96000 }, { name: 'C.wav', rate: 96000 }, { name: 'D.wav', rate: 44100 }]);
+if (rw.length !== 1 || !/2 sounds \(B\.wav, C\.wav\) are 96 kHz files/.test(rw[0]) || !/only the filter/.test(rw[0]) || !/the swirl, the pulse and the grit will be skipped/.test(rw[0])) fail('rateWarnings ' + JSON.stringify(rw));
+if (HW.rateWarnings(fxState, [{ name: 'A.wav', rate: 48000 }]).length) fail('rateWarnings at 48 kHz');
+if (HW.rateWarnings(base, [{ name: 'B.wav', rate: 96000 }]).length) fail('rateWarnings with no effects');
+if (!/B\.wav is a 96 kHz file/.test(HW.rateWarnings(Object.assign({}, base, { sweep: 'flanger', drive: 2 }), [{ name: 'B.wav', rate: 96000 }])[0])) fail('rateWarnings single file');
+
 process.stdout.write(JSON.stringify(cases));
