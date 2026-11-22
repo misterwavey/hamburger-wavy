@@ -12,6 +12,8 @@ This repository contains the application, build tools, tests and documentation. 
 
 It is a single file, [docs/config-editor.html](docs/config-editor.html), so you can also save it and use it offline; a copy is in each release zip.
 
+![The config editor with a card open: four questions, a plain summary and a save button](docs/screenshot.png)
+
 ## Download
 
 Ready-made firmware is on the [releases page](https://github.com/misterwavey/hamburger-wavy/releases): a zip with `image.hex` for the extended build, the legacy build, the config editor and install notes, with SHA-256 checksums. Each release is tied to a tag of this source. The [config editor](https://misterwavey.github.io/hamburger-wavy/) can also fetch the current image, verify its checksum and write it to the card for you (Chrome or Edge). See [Install](#install) before updating a module.

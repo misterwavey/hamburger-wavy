@@ -901,7 +901,8 @@ const HW = (() => {
   function rateWarnings(state, files) {
     const byRate = {};
     for (const f of files) if (f.rate) (byRate[f.rate] = byRate[f.rate] || []).push(f.name);
-    const label = { filter: 'the filter', sweep: 'the swirl', mod: 'the pulse', colour: 'the grit' };
+    const label = { filter: 'the filter', sweep: state.sweep === 'flanger' ? 'the flanger' : 'the phaser',
+                    mod: state.mod === 'ring' ? 'the ring modulation' : 'the tremolo', colour: 'the grit' };
     const list = (items) => items.length > 1 ? items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1] : items.join('');
     const out = [];
     for (const rate of Object.keys(byRate).map(Number).sort((x, y) => x - y)) {
@@ -1217,7 +1218,7 @@ const HW = (() => {
     if (state.cv >= 3)
       info('This knob/CV mode can only be set here. Choosing a mode from the panel drops it until the card is next mounted.');
     if (transport && state.cv >= 3)
-      warn(PLAY[state.play][0] + ' uses the CV input itself, so the knob does not control the effect: the fixed digits apply.');
+      warn(PLAY[state.play][0] + ' uses the knob and CV itself, so they cannot also control an effect. Effects stay at the amounts set under \u201cAny effects?\u201d.');
     if (transport && state.cv < 3)
       info(PLAY[state.play][0] + ' uses the CV input itself, so line 3 has no effect on pitch or file selection.');
     if (state.play === 10)
@@ -1339,7 +1340,13 @@ const HW = (() => {
     label.append(input, words); box.append(label);
     input.addEventListener('change', () => { onPick(Number(value)); render(); });
   };
-  HW.WAYS.forEach((w, i) => choice($(w.group ? 'waysMore' : 'ways'), 'way', i, w.title, w.text, (v) => { state.play = v; }));
+  let knobAside = null; // the knob's job, set aside while a way of playing has taken the knob over
+  HW.WAYS.forEach((w, i) => choice($(w.group ? 'waysMore' : 'ways'), 'way', i, w.title, w.text, (v) => {
+    const takes = !!HW.TRANSPORT_KNOB[v], took = !!HW.TRANSPORT_KNOB[state.play];
+    if (takes && !took && state.cv >= 3) { knobAside = state.cv; state.cv = 1; }
+    if (!takes && took && knobAside !== null) { state.cv = knobAside; knobAside = null; }
+    state.play = v;
+  }));
   HW.KNOBS.forEach((k, i) => choice($('knobs'), 'knob', i, k.title, k.text, (v) => { state.cv = v; }));
   seg('delay', HW.DELAY.map((d, i) => [i, d[0]]), (v) => { state.delay = Number(v); });
   seg('shape', [['low', 'Darker'], ['high', 'Thinner'], ['band', 'Narrow band']], (v) => { state.shape = v; });

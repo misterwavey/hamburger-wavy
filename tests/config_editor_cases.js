@@ -270,7 +270,7 @@ if (HW.describe(Object.assign({}, base, { play: 10 }), { lists: {}, cardNames: n
 for (let i = 0; i < 300; i++) { const d = HW.describe(randomState(), { lists: {}, cardNames: card }); if (!d.short || /undefined|null/.test(d.short)) fail('describe short: ' + d.short); }
 const fxState = Object.assign({}, base, { cutoff: 5, sweep: 'phaser', mod: 'tremolo', drive: 4 });
 const rw = HW.rateWarnings(fxState, [{ name: 'A.wav', rate: 48000 }, { name: 'B.wav', rate: 96000 }, { name: 'C.wav', rate: 96000 }, { name: 'D.wav', rate: 44100 }]);
-if (rw.length !== 1 || !/2 sounds \(B\.wav, C\.wav\) are 96 kHz files/.test(rw[0]) || !/only the filter/.test(rw[0]) || !/the swirl, the pulse and the grit will be skipped/.test(rw[0])) fail('rateWarnings ' + JSON.stringify(rw));
+if (rw.length !== 1 || !/2 sounds \(B\.wav, C\.wav\) are 96 kHz files/.test(rw[0]) || !/only the filter/.test(rw[0]) || !/the phaser, the tremolo and the grit will be skipped/.test(rw[0])) fail('rateWarnings ' + JSON.stringify(rw));
 if (HW.rateWarnings(fxState, [{ name: 'A.wav', rate: 48000 }]).length) fail('rateWarnings at 48 kHz');
 if (HW.rateWarnings(base, [{ name: 'B.wav', rate: 96000 }]).length) fail('rateWarnings with no effects');
 if (!/B\.wav is a 96 kHz file/.test(HW.rateWarnings(Object.assign({}, base, { sweep: 'flanger', drive: 2 }), [{ name: 'B.wav', rate: 96000 }])[0])) fail('rateWarnings single file');
@@ -284,5 +284,10 @@ const rep = HW.soundsReport([{ name: 'a.wav', wav: { ok: true } }, { name: 'b.WA
 if (rep.total !== 3 || rep.playable !== 2 || rep.bad.length !== 1 || rep.text !== 'Card check: 2 of the 3 sounds on this card are in a format the module can play.') fail('soundsReport ' + JSON.stringify(rep));
 if (HW.soundsReport([]).text !== 'Card check: there are no WAV sounds on this card yet.') fail('soundsReport empty');
 if (HW.soundsReport([{ name: 'a.wav', wav: { ok: true } }, { name: 'b.wav', wav: { ok: true } }]).text !== 'Card check: all 2 sounds on this card are in a format the module can play.') fail('soundsReport all');
+
+const rw2 = HW.rateWarnings(Object.assign({}, base, { cutoff: 5, sweep: 'flanger', mod: 'ring' }), [{ name: 'B.wav', rate: 96000 }]);
+if (!/the flanger and the ring modulation will be skipped/.test(rw2[0])) fail('rateWarnings names ' + rw2[0]);
+if (/fixed digits/.test(noteText(Object.assign({}, base, { play: 10, cv: 4, cutoff: 5 }), { lists: {}, cardNames: card })) ||
+    !/cannot also control an effect/.test(noteText(Object.assign({}, base, { play: 10, cv: 4, cutoff: 5 }), { lists: {}, cardNames: card }))) fail('transport knob note');
 
 process.stdout.write(JSON.stringify(cases));
